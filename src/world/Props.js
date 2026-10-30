@@ -16,8 +16,8 @@ const CATALOG = {
   barrier: { file: 'barrier.glb', surface: 'concrete', scale: 0.9 },
   barrel: { file: 'barrel.glb', surface: 'metal' },
   barrelRust: { file: 'barrel_rust.glb', surface: 'metal' },
-  ammo: { file: 'ammo_box.glb', surface: 'metal', scale: 1.8 },
-  jerrycan: { file: 'jerrycan.glb', surface: 'metal', scale: 0.65 },
+  ammo: { file: 'ammo_box.glb', surface: 'metal', scale: 2.4 },
+  jerrycan: { file: 'jerrycan.glb', surface: 'metal', scale: 0.7 },
 };
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -28,11 +28,10 @@ export class Props {
     this.defs = new Map();
     this.pending = new Map();
     this.ready = false;
-    this.error = null;
   }
 
   async load(onProgress) {
-    const entries = Object.entries(CATALOG).filter(([, def]) => !def.optional);
+    const entries = Object.entries(CATALOG);
     let done = 0;
     await Promise.all(entries.map(async ([name, def]) => {
       try {
@@ -85,7 +84,6 @@ export class Props {
     }
     if (!parts.length) return null;
     return {
-      name: def.file.replace(/\.glb$/, ''),
       parts,
       bb,
       size: bb.getSize(new THREE.Vector3()),

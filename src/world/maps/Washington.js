@@ -43,9 +43,9 @@ export function buildWashington(L) {
   L.solidBox(0, bridgeY, 162, 12, 0.4, 52, 0, { surface: 'wood' });
   L.sandbags(0, 140, Math.PI / 2, 7, { base: bridgeY });
   L.sandbags(8, 146, Math.PI / 2, 5, { base: bridgeY });
-  L.prop('crate', -4, 150, 1.5, { base: bridgeY });
-  L.prop('ammo', -4, 150.4, 1.5, { base: bridgeY, y: 0.3 });
-  L.prop('barrier', 4.5, 144, 0.06, { base: bridgeY });
+  L.prop('crate', -4, 150, 1.5, { base: bridgeY + 0.2 });
+  L.prop('ammo', -4, 150.4, 1.5, { base: bridgeY + 0.2, y: 0.3 });
+  L.prop('barrier', 4.5, 144, 0.06, { base: bridgeY + 0.2 });
   L.landingCraft(-30, 150, 1.57, { base: 0.3 });
   L.landingCraft(34, 155, 1.5, { base: 0.3 });
 
