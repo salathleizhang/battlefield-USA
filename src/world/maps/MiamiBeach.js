@@ -290,8 +290,8 @@ export function buildMiamiBeach(L) {
       color: 0x1a1510, transparent: true, opacity: 0.3, depthWrite: false,
     });
     const spots = [
-      [2.9, 70, 0, 0x8fc6bf],
-      [13.0, -20, Math.PI, 0xe6a08f],
+      [3.6, 70, 0, 0x8fc6bf],
+      [12.4, -20, Math.PI, 0xe6a08f],
     ];
     for (const [x, z, rot, paint] of spots) {
       const car = proto.clone(true);
@@ -313,14 +313,14 @@ export function buildMiamiBeach(L) {
         o.material = Array.isArray(o.material) ? next : next[0];
       });
       const gy = height(x, z);
-      car.position.set(x, gy - box.min.y + 0.02, z);
+      car.position.set(x, gy + 0.14 - box.min.y, z);
       car.rotation.y = rot;
       L.scene.add(car);
       // Cheap blob shadow instead of a second full shadow pass for the whole car.
       const blob = new THREE.Mesh(new THREE.CircleGeometry(1, 18), blobMat);
       blob.rotation.x = -Math.PI / 2;
       blob.scale.set(1.25, 2.55, 1);
-      blob.position.set(x, gy + 0.035, z);
+      blob.position.set(x, gy + 0.125, z);
       L.scene.add(blob);
       L.solidBox(x, gy + 0.75, z, size.x, 1.5, size.z, rot, { surface: 'metal' });
     }
