@@ -305,7 +305,7 @@ html, body {
 }
 .brand-lockup { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; }
 .brand-logo {
-  width: 66px; height: 66px; flex: none; object-fit: contain; display: block;
+  width: 74px; height: 74px; flex: none; object-fit: contain; display: block;
   filter:
     drop-shadow(0 3px 0 rgba(60, 5, 2, 0.55))
     drop-shadow(0 8px 20px rgba(0, 0, 0, 0.6))
@@ -370,9 +370,9 @@ html, body {
 .mission:hover { background: linear-gradient(90deg, rgba(180, 40, 16, 0.26), rgba(120, 20, 8, 0.06) 72%, transparent 88%); padding-left: 16px; }
 .mission:hover::before { transform: scaleY(1); }
 .mission.active {
-  background: linear-gradient(90deg, rgba(208, 30, 16, 0.42), rgba(120, 16, 6, 0.16) 72%, transparent 88%);
+  background: linear-gradient(90deg, rgba(214, 32, 16, 0.5), rgba(126, 18, 7, 0.2) 72%, transparent 88%);
   padding-left: 18px;
-  box-shadow: inset 0 0 0 1px rgba(255, 170, 30, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(255, 180, 36, 0.22);
 }
 .mission.active::before { transform: scaleY(1); }
 .mission .idx {
@@ -438,23 +438,23 @@ html, body {
 .card {
   position: relative;
   background:
-    linear-gradient(180deg, rgba(88, 22, 10, 0.36) 0%, rgba(26, 8, 4, 0.22) 46%, rgba(46, 10, 5, 0.3) 100%);
+    linear-gradient(180deg, rgba(118, 20, 8, 0.42) 0%, rgba(34, 7, 3, 0.26) 46%, rgba(66, 11, 4, 0.36) 100%);
   padding: 18px 22px 20px;
   margin-bottom: 11px;
   clip-path: var(--cut);
-  border-top: 1px solid rgba(255, 198, 74, 0.46);
-  border-left: 1px solid rgba(255, 198, 74, 0.22);
+  border-top: 1px solid rgba(255, 204, 90, 0.55);
+  border-left: 1px solid rgba(255, 198, 74, 0.26);
   box-shadow:
-    inset 0 0 0 1px rgba(112, 16, 7, 0.5),
-    inset 0 20px 46px rgba(128, 24, 8, 0.14),
+    inset 0 0 0 1px rgba(128, 18, 8, 0.55),
+    inset 0 20px 46px rgba(140, 26, 8, 0.16),
     0 12px 34px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(2.5px) saturate(1.18) brightness(0.64);
-  -webkit-backdrop-filter: blur(2.5px) saturate(1.18) brightness(0.64);
+  backdrop-filter: blur(2.5px) saturate(1.22) brightness(0.58);
+  -webkit-backdrop-filter: blur(2.5px) saturate(1.22) brightness(0.58);
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
 }
 .card::before {
-  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
-  background: linear-gradient(180deg, #ffe28a 0%, #ffb21e 30%, #c81a10 72%, rgba(70, 6, 2, 0.15) 100%);
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+  background: linear-gradient(180deg, #fff0ad 0%, #ffb21e 30%, #d01b12 72%, rgba(70, 6, 2, 0.15) 100%);
   box-shadow: 0 0 14px rgba(255, 120, 10, 0.35);
   pointer-events: none;
 }
