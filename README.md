@@ -2,7 +2,7 @@
 
 > 1947 年，中国远征军跨海反攻美国西海岸。一款运行在浏览器里的大战场第一人称射击游戏。
 
-![status](https://img.shields.io/badge/status-playable%20prototype-b3281d) ![engine](https://img.shields.io/badge/three.js-r187-c9a15a) ![physics](https://img.shields.io/badge/Rapier-0.21-6f7352)
+![status](https://img.shields.io/badge/status-playable%20prototype-b3281d) ![engine](https://img.shields.io/badge/three.js-r186-c9a15a) ![physics](https://img.shields.io/badge/Rapier-0.21-6f7352)
 
 ## 这是什么
 
@@ -42,8 +42,9 @@ npm run build    # 生产构建到 dist/
 
 ## 技术栈
 
-- **three.js r187**：渲染、天空、粒子、第一人称武器层（独立 viewScene，避免穿模）。
+- **three.js r186**：渲染、天空、粒子、第一人称武器层（独立 viewScene，避免穿模）。
 - **Rapier 0.21**：角色控制器（胶囊 KCC）、地形 trimesh、静态碰撞、射线检测。
+- **后处理**：`postprocessing` 6.39（ACES 色调映射、调色、暗角、色差、胶片颗粒、SMAA、CAS 锐化、God Rays、Bloom、镜头脏污）+ `n8ao` 2.0（屏幕空间环境光遮蔽）。武器层作为独立 pass 在 HDR 之后合成，保留自己的 FOV 与光照。
 - **WebAudio 程序化音效**：枪声、拉栓、脚步、爆炸、环境风与浪，全部实时合成，无外部音频文件。
 - **程序化关卡**：地形高度函数 + 建筑/道具批处理（按材质合并，控制 draw call）。
 - **AI**：视锥 + 视线检测、推进/交火/占点状态机、简易避障与涉水规避、重生与目标分配。
@@ -51,18 +52,24 @@ npm run build    # 生产构建到 dist/
 ## 美术资产
 
 - **PBR 材质管线**：所有表面使用完整的 albedo / normal / roughness / metalness / AO 贴图组，配合每关一张 HDRI 环境光（PMREM + ACES 色调映射）。清单在 `public/assets/pbr/manifest.json`，素材来源与授权见 [CREDITS.md](public/assets/pbr/CREDITS.md)。
+- **全场景材质统一层（unify）**：每个受光材质注入同一段世界空间着色器，做 albedo / 粗糙度归一、共享风化与墙脚积尘、**雨后可湿地面的湿润增亮与镜面积水**（`uWet` / `uRain`），并让四张地图、GLB 道具、棕榈树和程序化建筑落在同一种材质响应里。
+- **积水**：材质遮罩在世界噪声低洼处生成镜面水坑，另在海洋大道、金门桥面、国家广场与密西西比河堤手工布置了带不规则 alpha 与天空反射的静水片；水面会接收火焰、太阳与 HDRI 的高光。
+- **战场氛围**：火焰（程序化火焰卡片 + Unity Labs 火焰翻书粒子）、翻书烟雾柱、上升余烬、会呼吸的橙红点光源，以及翻书爆炸火球；每关的 `Level.fire()` / `smokeColumn()` 会自动接入这套系统。
 - 当前 14 组材质全部来自 **CC0 1.0** 素材库（ambientCG / Poly Haven）或本项目自制，可商用、可再分发；桥塔改用单生成的国际橙喷涂贴图组 `bridge_orange`。
 - **金门大桥为 1:2 结构复刻**：主跨 640 m、桥面净空 33.5 m、塔顶 113.5 m，与真实桥的 1280 / 67 / 227 m 严格同比；双塔为带竖向凹槽与分层收分的 Art Deco 钢塔，塔间 6 道门式横撑，主缆按真实垂度成抛物线并在中跨落到桥面，吊索按 7.6 m 间距成对布置、带索夹，桥面下有 3.8 m 加劲桁架、伸缩缝、六车道标线与 1937 年式路灯。全部构件按材质合批，桥体仍是十余个 draw call。
 - 环境按真实海峡重建：北侧马林岬角、南侧旧金山要塞区、西面恶魔岛、雾中锚泊的货轮，以及贴着桥面漂移的体积雾团；能见度压到 2 km 以内以还原金门雾。
 - **换成付费正版资产不需要改代码**：把贴图按 `albedo / normal / roughness / metalness / ao` 五个文件名放进 `public/assets/pbr/<材质名>/`，或在 manifest 里新增条目即可。具体命名映射见 CREDITS.md。
-- 建筑、武器、士兵、植被、桥梁、纪念碑等主体仍为 **程序化建模**；战壕沙袋改为参考项目的「压扁球体 + 收口」堆垛方式（4 层错缝、双层垛），不再是方盒贴图。
-- 场景小道具复用参考项目的 **CC0 GLB 模型**：混凝土路障、军用木箱、木条箱、油桶、弹药箱、汽油桶，按实例化批渲染放入四张地图的据点与补给点，授权与来源见 [props/CREDITS.md](public/assets/models/props/CREDITS.md)。
+- **第一人称武器改用公版扫描资产**：三八大盖换成 Poly Haven 的 **CC0「Bolt Action Rifle 7.62」**（20k 面、完整 PBR，去掉瞄准镜/枪布/散弹后按 1.275 m 三八式长度归一，枪机 `bolt_a/bolt_b` 重新挂到膛线枢轴，栓动与桥夹动画沿用原锚点）；手榴弹换成 Poly Haven 的 **CC0 木柄手榴弹**。模型与授权见 [weapons/CREDITS.md](public/assets/models/weapons/CREDITS.md)。旧程序化步枪保留为加载失败时的兜底。
+- 建筑、桥梁、纪念碑、士兵、植被等主体仍为 **程序化建模**；战壕沙袋改为参考项目的「压扁球体 + 收口」堆垛方式（4 层错缝、双层垛），不再是方盒贴图。
+- 场景小道具复用参考项目的 **CC0 GLB 模型**：混凝土路障、军用木箱、木条箱、油桶、弹药箱、汽油桶、消防栓、井盖，按实例化批渲染放入四张地图的据点、人行道与补给点，授权与来源见 [props/CREDITS.md](public/assets/models/props/CREDITS.md)。
 - UI 版式参考 [Ironline](https://github.com/cktang88/3d-fps)：左栏战役导航、半透明战役卡片、圆形小地图与紧凑比分区；视觉改为 **红色警戒 / 共和国之辉** 式的赤红搪瓷 + 黄铜描边军械面板，主按钮为金色斜面，次按钮为暗红钢板。战役卡片使用低透明度玻璃底 + 背景压暗，让战役循环影像从卡片后透出。字体保留自托管的毛笔楷书 **Ma Shan Zheng**（SIL OFL 1.1），按钮与标签改用黑体系统栈；正文为宋体系统字体栈，数字与英文为等宽字体。字体与授权见 `public/fonts/`，不依赖外部字体 CDN。
 - **品牌徽记**：由 Seedream 生成的红金圆形军徽 —— 一把锤子镰刀斜插在展翅白头鹰身上，象征远征军的征服；洋红底抠像后导出为透明 PNG（`public/assets/brand/emblem.png`，另导出 64px 的 `favicon.png`），同时用作菜单标识、加载页徽记与站点图标。
 
 ## 参考与致谢
 
-- 代码架构参考了 [cktang88/3d-fps](https://github.com/cktang88/3d-fps)（Ironline）的浏览器 FPS 工程实践，包括 Rapier 角色控制器思路、武器层渲染与征服模式结构；其中场景道具（`public/assets/models/props/`）直接复用其 **Poly Haven CC0** 模型，沙袋堆垛方式也来自该项目；其余美术仍为本项目自制或程序化生成。
+- 代码架构参考了 [cktang88/3d-fps](https://github.com/cktang88/3d-fps)（Ironline）的浏览器 FPS 工程实践，包括 Rapier 角色控制器思路、武器层渲染与征服模式结构；其中场景道具（`public/assets/models/props/`）直接复用其 **Poly Haven CC0** 模型，沙袋堆垛方式也来自该项目。
+- 第一人称步枪与手榴弹来自 [Poly Haven](https://polyhaven.com/)（CC0 1.0）：[Bolt Action Rifle 7.62](https://polyhaven.com/a/bolt_action_rifle_7_62)（Mateusz Sadek）与 [Stick Grenade](https://polyhaven.com/a/stick_grenade)。其余美术仍为本项目自制或程序化生成，后续替换路径见 [weapons/CREDITS.md](public/assets/models/weapons/CREDITS.md)。
+- 湿地面 / 积水 / unify 材质层、后处理链与火焰烟雾系统迁移自 [cktang88/3d-fps](https://github.com/cktang88/3d-fps)（Ironline）的 `Materials.applyUnify`、`Renderer` 与 `world/ambience/*`。其烟雾、火焰、爆炸翻书图集为 **Unity Labs「Free VFX image sequences & flipbooks」**，作者以 **CC0 1.0** 发布；来源与授权见 [vfx/CREDITS.md](public/assets/vfx/CREDITS.md)。
 - 迈阿密海滩的**棕榈树系统**与**敞篷车模型**移植自 [StarKnightt/ocean-drive](https://github.com/StarKnightt/ocean-drive)（MIT）：棕榈部分包括椰子/王棕/菜棕的程序化树干、叶片图集、椰果与风摆着色器，按战役地形重新布置了树列；车辆为 `public/assets/models/miami/convertible.glb`，按停车位重新上色并做了低开销阴影。
 
 ## 开发进度
@@ -75,6 +82,8 @@ npm run build    # 生产构建到 dist/
 - [x] HUD：罗盘、小地图、击杀播报、占点进度、阵亡界面
 - [x] 战役菜单 / 设置 / 暂停 / 结算
 - [x] 四张战役地图
+- [x] 后处理管线（N8AO / Bloom / God Rays / 调色 / SMAA）与画质档位
+- [x] 湿地面、镜面积水、火焰 / 烟雾 / 余烬 / 翻书爆炸
 - [ ] 战役开场演出与任务脚本
 - [ ] 载具（登陆艇、吉普、坦克）
 - [ ] 更丰富的场景破坏与掩体系统
