@@ -394,6 +394,7 @@ export class Game {
         const c = this.debug.cam;
         this.renderer.camera.position.set(c[0], c[1], c[2]);
         this.renderer.camera.lookAt(c[3], c[4], c[5]);
+        this.viewmodel?.setEnabled(false);
       }
       this.renderer.render();
     }
