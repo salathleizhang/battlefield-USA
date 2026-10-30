@@ -120,10 +120,8 @@ export class Weapon {
     if (this.reloading || this.reserve <= 0) return;
     this.reloading = true;
     this.reloadT = this.def.reloadTime;
-    this.game.audio.reload('clip');
     this.game.hud?.setReloading(true);
-    setTimeout(() => this.game.audio.reload('clip'), 900);
-    setTimeout(() => this.game.audio.bolt(), 1900);
+    // The charger and bolt sounds are cued by the viewmodel timeline.
   }
 
   finishReload() {
