@@ -1,0 +1,19 @@
+{
+  "name": "battlefield-liberate-america",
+  "private": true,
+  "version": "0.1.0",
+  "description": "战地·解放美利坚 — 20世纪中国军队跨海进攻美国的大战场 FPS（浏览器 / three.js + Rapier）",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.21.0",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.5"
+  }
+}
