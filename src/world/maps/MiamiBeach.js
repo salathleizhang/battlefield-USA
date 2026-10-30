@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { smoothstep, clamp, lerp } from '../../core/MathUtil.js';
 import { signTexture } from '../Geo.js';
+import { planMiamiPalms, buildPalms } from '../palms/MiamiPalms.js';
 
 /**
  * 迈阿密海滩登陆战 — 1947.3.12
@@ -345,21 +346,6 @@ export function buildMiamiBeach(L) {
     addUmbrella(x, z, beachTints[i % 4]);
   }
 
-  // Palms: promenade, park, Collins and the bayfront.
-  for (let z = -184; z <= 184; z += 16) {
-    if (Math.abs(z) < 14) continue;
-    L.palm(20, z, 0.85 + L.rand() * 0.35);
-  }
-  for (let z = -168; z <= 184; z += 22) {
-    if (Math.abs(z) < 14) continue;
-    if (z > -140 && z < -112) continue; // Lido pavilion
-    L.palm(33, z, 0.9 + L.rand() * 0.3);
-  }
-  for (let z = -168; z <= 184; z += 24) L.palm(-22, z, 0.8 + L.rand() * 0.3);
-  for (let z = -180; z <= 180; z += 30) {
-    if (Math.abs(z) < 20) continue; // causeway mouth
-    L.palm(-54, z, 0.85 + L.rand() * 0.3);
-  }
 
   /* ------------------------------------------------------------- Lido club */
   L.building({
@@ -492,7 +478,6 @@ export function buildMiamiBeach(L) {
   L.sandbags(-210, 20, 0.05, 12);
   L.sandbags(-210, -20, -0.05, 10);
   L.bunker(-218, 28, 0.2);
-  for (let i = 0; i < 12; i++) L.palm(-208 - (i % 3) * 9, -46 + i * 9, 0.8 + L.rand() * 0.3);
 
   const downtown = [
     { x: -244, z: -40, w: 22, d: 18, h: 16, mat: 'stuccoCream', name: 'HOTEL MIAMI', damage: 0.45 },
@@ -562,6 +547,11 @@ export function buildMiamiBeach(L) {
   L.addSpawn(1, 8, 120, -Math.PI / 2);
   L.addSpawn(1, -214, 6, -Math.PI / 2);
   L.addSpawn(1, -216, -10, -Math.PI / 2);
+
+  // Miami palms, ported from ocean-drive: coconut, royal and sabal palms.
+  const palms = planMiamiPalms(height);
+  const palmSystem = buildPalms(L.scene, palms);
+  L.animated.push({ type: 'fn', update: (t) => palmSystem.update(t) });
 
   L.addRoute([
     new THREE.Vector3(50, 1, 0),
