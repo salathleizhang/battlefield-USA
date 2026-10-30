@@ -5,6 +5,7 @@ import { Physics, G } from '../core/Physics.js';
 import { Input } from '../core/Input.js';
 import { Audio } from '../core/Audio.js';
 import { Materials } from '../world/Materials.js';
+import { Props } from '../world/Props.js';
 import { Level } from '../world/Level.js';
 import { Player } from './Player.js';
 import { Weapon } from './weapons/Weapon.js';
@@ -55,6 +56,8 @@ export class Game {
     this.physics = await Physics.create();
     this.materials = new Materials(this.renderer);
     await this.materials.load(onProgress);
+    this.props = new Props();
+    await this.props.load((p, label) => onProgress?.(0.9 + p * 0.08, label));
     onProgress?.(1, '准备就绪');
   }
 

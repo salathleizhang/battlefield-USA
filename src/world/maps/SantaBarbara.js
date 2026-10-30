@@ -66,6 +66,11 @@ export function buildSantaBarbara(L) {
   L.fire(-64, pierY + 4.5, 72, 1.6);
   L.smokeColumn(-64, pierY + 5.5, 72, 1.2);
 
+  // Pier supply cache.
+  L.prop('crate', -87.5, 69.2, 0.1, { base: pierY });
+  L.prop('barrel', -85, 75.2, 0, { base: pierY });
+  L.prop('ammo', -88.2, 69.5, 0.1, { base: pierY, y: 0.3 });
+
   // Ramp from beach up to pier.
   const ramp = new THREE.BoxGeometry(9, 0.4, 16);
   const m = new THREE.Matrix4().makeRotationX(-0.12);
@@ -96,6 +101,12 @@ export function buildSantaBarbara(L) {
   L.sandbags(-20, -6, 0.1, 6);
   L.sandbags(-16, 18, 0.2, 6);
   L.bunker(-30, -58, 0.15);
+
+  // Supply dumps behind the beach strongpoints.
+  L.prop('crate', -18.2, -8.8, 0.15);
+  L.prop('ammo', -18.9, -8.4, 0.15, { y: 0.3 });
+  L.prop('ammo', -17.1, 19.6, -0.2);
+  L.prop('jerrycan', -18.4, 20.8, 0.5);
 
   // Beach palms / boardwalk.
   for (let i = 0; i < 12; i++) L.palm(-14 - Math.random() * 10, -120 + i * 21, 0.85 + Math.random() * 0.3);
@@ -201,8 +212,10 @@ export function buildSantaBarbara(L) {
     L.batch.cylinder(1.6, 1.8, 4.5, 10, fx + ox, fy + 5.8, fz + oz, L.mats.get('brick'));
   }
   L.bunker(fx, fz, 0, { base: fy + 3.4 });
-  L.batch.box(30, 2.2, 0.8, fx, fy + 2.4, fz - 13, L.mats.get('sandbag'), { uv: 0.8 });
-  L.solidBox(fx, fy + 2.4, fz - 13, 30, 2.2, 0.8, 0, { surface: 'sand' });
+  L.sandbags(fx, fz - 12.6, 0, 30, { base: fy + 4.05, rows: 3, depth: 1 });
+  L.prop('crate', fx - 10, fz + 2, 0.1, { base: fy + 4.05 });
+  L.prop('barrelRust', fx + 10, fz - 2, 0, { base: fy + 4.05 });
+  L.prop('ammo', fx - 10.7, fz + 2.3, 0.1, { base: fy + 4.05, y: 0.3 });
   L.sandbags(fx - 8, fz - 20, 0, 7, { base: fy });
   L.sandbags(fx + 9, fz - 20, 0, 7, { base: fy });
   L.sandbags(fx + 20, fz + 4, Math.PI / 2, 8, { base: fy });

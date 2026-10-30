@@ -252,21 +252,71 @@ export class Level {
   }
 
   /* --------------------------------------------------------------- props */
-  sandbags(x, z, rot = 0, len = 5, { base = null } = {}) {
+  /**
+   * Lumpy stacked sandbag wall, adapted from the reference project's hand-built
+   * bags: squashed spheres with pinched tops rather than boxes. Bags are merged
+   * into the level batch, so a whole trench line is still one draw call.
+   */
+  sandbags(x, z, rot = 0, len = 5, { base = null, rows = 4, depth = 2 } = {}) {
     const gy = base ?? this.groundHeight(x, z);
-    const count = Math.round(len / 0.62);
-    for (let layer = 0; layer < 3; layer++) {
-      const inset = layer * 0.09;
-      for (let i = 0; i < count - layer; i++) {
-        const off = (i - (count - layer) / 2) * 0.62 + layer * 0.3;
-        const px = x + Math.cos(rot) * off;
-        const pz = z - Math.sin(rot) * off;
-        this.batch.box(0.62, 0.28, 0.42, px, gy + 0.16 + layer * 0.29, pz, this.mats.get('sandbag'), {
-          rotY: rot + (this.rand() - 0.5) * 0.12, uv: 0.9,
-        });
+    const bagW = 0.62, bagH = 0.215, bagD = 0.4;
+    const count = Math.max(1, Math.round(len / bagW));
+    const c = Math.cos(rot), s = Math.sin(rot);
+    const mat = this.mats.get('sandbag');
+    const layers = Math.max(1, rows);
+    const deep = Math.max(1, depth);
+    for (let r = 0; r < layers; r++) {
+      const off = r % 2 ? bagW * 0.5 : 0;
+      for (let i = 0; i < count - (r % 2); i++) {
+        for (let d = 0; d < deep; d++) {
+          const lz = deep === 1 ? 0 : (d - (deep - 1) / 2) * bagD;
+          const lx = -len / 2 + bagW / 2 + i * bagW + off;
+          const geo = new THREE.SphereGeometry(0.5, 9, 6);
+          geo.scale(bagW * 1.03, bagH * 1.3, bagD * 1.12);
+          const pos = geo.attributes.position;
+          for (let k = 0; k < pos.count; k++) {
+            const py = pos.getY(k);
+            pos.setY(k, Math.max(-bagH * 0.48, Math.min(bagH * 0.5, py)) * (1 + (this.rand() - 0.5) * 0.05));
+            pos.setX(k, pos.getX(k) * (1 + (this.rand() - 0.5) * 0.06));
+          }
+          geo.computeVertexNormals();
+          const px = x + lx * c + lz * s;
+          const pz = z - lx * s + lz * c;
+          const m = new THREE.Matrix4().makeRotationY(rot + (this.rand() - 0.5) * 0.1);
+          m.setPosition(px, gy + bagH * 0.5 + r * bagH * 0.95, pz);
+          geo.applyMatrix4(m);
+          const uv = new Float32Array(pos.count * 2);
+          for (let k = 0; k < pos.count; k++) {
+            uv[k * 2] = (pos.getX(k) + pos.getZ(k)) * 0.32;
+            uv[k * 2 + 1] = pos.getY(k) * 0.55;
+          }
+          geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+          this.batch.add(geo, mat);
+        }
       }
     }
-    this.solidBox(x, gy + 0.45, z, len, 0.9, 0.6, rot, { surface: 'sand' });
+    const h = (layers - 1) * bagH * 0.95 + bagH;
+    const d = deep * bagD + 0.04;
+    this.solidBox(x, gy + h / 2, z, len, h, d, rot, { surface: 'sand' });
+  }
+
+  /**
+   * Place one GLB scene prop (see world/Props.js) on the ground and give it a
+   * cuboid collider. Returns null when the asset library is unavailable.
+   */
+  prop(name, x, z, rot = 0, { base = null, scale = null, y = 0, solid = true, surface = null } = {}) {
+    const lib = this.game.props;
+    if (!lib) return null;
+    const gy = base ?? this.groundHeight(x, z);
+    const hit = lib.place(name, { x, z, y: gy + y, rot, scale });
+    if (!hit) return null;
+    if (solid) {
+      const p = hit.center;
+      this.solidBox(p.x, p.y, p.z, hit.size.x, hit.size.y, hit.size.z, rot, {
+        surface: surface || hit.surface,
+      });
+    }
+    return hit;
   }
 
   crate(x, z, size = 1.1, { base = null, rot = 0 } = {}) {
@@ -559,6 +609,7 @@ export class Level {
     if (!fn) throw new Error('unknown map ' + this.campaign.id);
     fn(this);
     this.batch.flush(this.scene);
+    this.game.props?.flush(this.scene);
     this.finalize();
   }
 
