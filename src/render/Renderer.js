@@ -48,10 +48,11 @@ float fbm3(vec3 p) {
 void main() {
   vec3 dir = normalize(vDir);
   float h = dir.y;
-  vec3 col = mix(uHorizon, uTop, pow(clamp(h, 0.0, 1.0), 0.52));
+  vec3 col = mix(uHorizon, uTop, smoothstep(0.015, 0.30, h));
 
   float sd = max(dot(dir, normalize(uSun)), 0.0);
-  col += uSunColor * pow(sd, 420.0) * 1.8;
+  col += uSunColor * pow(sd, 900.0) * 1.05;
+  col += uSunColor * pow(sd, 40.0) * 0.09;
   col += uSunColor * pow(sd, 14.0) * 0.16;
   col += uSunColor * pow(sd, 3.0) * 0.045;
 
@@ -64,7 +65,7 @@ void main() {
     c *= smoothstep(0.0, 0.14, h);
     vec3 cc = mix(uCloud * 0.62, uCloud * 1.2, smoothstep(0.2, 0.8, n2));
     cc += uSunColor * pow(sd, 10.0) * 0.14;
-    col = mix(col, cc, c * (0.12 + 0.88 * uCloudiness));
+    col = mix(col, cc, c * (0.05 + 0.75 * uCloudiness));
   }
 
   col = mix(col, uHorizon * 1.06, smoothstep(0.12, -0.02, h) * 0.8);
@@ -218,11 +219,14 @@ export class Renderer {
     this.renderer.setSize(w, h);
   }
 
-  setEnvironment({ fogColor, fogDensity, sunColor, sunIntensity, sunDir, skyTop, skyHorizon, cloudiness, cloudColor, groundColor }) {
+  setEnvironment({ fogColor, fogDensity, sunColor, sunIntensity, sunDir, skyTop, skyHorizon, cloudiness, cloudColor, groundColor, hemiIntensity, hemiColor, hemiGround }) {
     if (fogColor !== undefined) this.fog.color.set(fogColor);
     if (fogDensity !== undefined) this.fog.density = fogDensity;
     if (sunColor !== undefined) this.sun.color.set(sunColor);
     if (sunIntensity !== undefined) this.sun.intensity = sunIntensity;
+    if (hemiIntensity !== undefined) this.hemi.intensity = hemiIntensity;
+    if (hemiColor !== undefined) this.hemi.color.set(hemiColor);
+    if (hemiGround !== undefined) this.hemi.groundColor.set(hemiGround);
     if (sunDir) {
       this.sun.position.copy(sunDir).normalize().multiplyScalar(160);
       this.skyUniforms.uSun.value.copy(sunDir).normalize();

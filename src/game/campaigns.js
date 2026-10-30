@@ -16,9 +16,9 @@ export const CAMPAIGNS = [
     video: '/assets/video/miami-beach-war-loop.mp4',
     accent: '#e0906d',
     env: {
-      fogColor: 0xe9d3b8, fogDensity: 0.0011, sunColor: 0xffd0a0, sunIntensity: 3.1,
-      skyTop: 0x3f6f9a, skyHorizon: 0xf7d4ad, cloudColor: 0xd9b9a4,
-      groundColor: 0x8a7a64, cloudiness: 0.2,
+      fogColor: 0xefd9bd, fogDensity: 0.0009, sunColor: 0xffd6a8, sunIntensity: 3.1,
+      skyTop: 0x2f5f8e, skyHorizon: 0xf3c9a3, cloudColor: 0xe8c7a6,
+      groundColor: 0x8a7a64, cloudiness: 0.08,
       sunDir: { x: 0.76, y: 0.32, z: 0.36 },
       ambience: 'coast',
     },
@@ -40,8 +40,8 @@ export const CAMPAIGNS = [
     video: '/assets/video/golden-gate-war-loop.mp4',
     accent: '#b6493a',
     env: {
-      fog: 0xc1c9c8, fogDensity: 0.0021, sun: 0xfff1de, sunIntensity: 1.95,
-      skyTop: 0x84939a, skyHorizon: 0xc9d0ce, ground: 0x5b615c, cloudiness: 0.55,
+      fog: 0xbdc6c5, fogDensity: 0.0016, sun: 0xfff1de, sunIntensity: 1.95,
+      skyTop: 0x8e9ea5, skyHorizon: 0xc9d0ce, ground: 0x5b615c, cloudiness: 0.55,
       sunDir: { x: 0.45, y: 0.52, z: 0.72 },
       ambience: 'bridge',
       hdri: 'goldenGate', envIntensity: 0.9, hdriRotation: 0.4,
