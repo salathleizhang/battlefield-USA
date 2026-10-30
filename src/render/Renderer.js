@@ -64,12 +64,14 @@ void main() {
     c *= smoothstep(0.0, 0.14, h);
     vec3 cc = mix(uCloud * 0.62, uCloud * 1.2, smoothstep(0.2, 0.8, n2));
     cc += uSunColor * pow(sd, 10.0) * 0.14;
-    col = mix(col, cc, c * (0.5 + 0.38 * uCloudiness));
+    col = mix(col, cc, c * (0.12 + 0.88 * uCloudiness));
   }
 
   col = mix(col, uHorizon * 1.06, smoothstep(0.12, -0.02, h) * 0.8);
   col = mix(col, uGround, smoothstep(0.0, -0.18, h));
   gl_FragColor = vec4(col, 1.0);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
 }`;
 
 export class Renderer {
