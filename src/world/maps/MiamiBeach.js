@@ -51,14 +51,19 @@ export function buildMiamiBeach(L) {
     return y;
   };
 
+  const sandMat = L.mats.terrain('sand', { repeat: 760 / 12, color: 0xffffff, vertexColors: true });
+  if (sandMat.normalScale) sandMat.normalScale.setScalar(0.35);
+  sandMat.roughness = 1;
+  sandMat.envMapIntensity = 0.35;
+
   L.addTerrain({
-    size: 760, segments: 150, height, texture: 'sand', tile: 10, tint: 0xffefd6,
+    size: 760, segments: 150, height, material: sandMat, texture: 'sand', tile: 12,
     color: (x, z, y, c) => {
       const causeway = Math.abs(z) < 14 && ((x > -100 && x < -56) || (x > -218 && x < -188));
       if (causeway) c.setHex(0x8d897c).lerp(new THREE.Color(0x777468), Math.random() * 0.3);
       else if (x > shore + 2) c.setHex(0x8f8b6e);
-      else if (x > 36) c.setHex(0xe0cfa4).lerp(new THREE.Color(0xc9b184), Math.random() * 0.35);
-      else if (x > 16) c.setHex(0x7c8a58).lerp(new THREE.Color(0x68764a), Math.random() * 0.4);
+      else if (x > 36) c.setHex(0xf4e6c6).lerp(new THREE.Color(0xe2d0ab), Math.random() * 0.3);
+      else if (x > 16) c.setHex(0x8b9a62).lerp(new THREE.Color(0x74834f), Math.random() * 0.4);
       else if (x > -60) c.setHex(0x918a79).lerp(new THREE.Color(0x7f796b), Math.random() * 0.35);
       else if (x > -196) c.setHex(0x5f6b60);
       else c.setHex(0x7d7864).lerp(new THREE.Color(0x6c6857), Math.random() * 0.3);
@@ -67,9 +72,9 @@ export function buildMiamiBeach(L) {
   L.addWater({ y: 0, size: 1800, color: 0x3f938c, opacity: 0.91, rough: 0.11 });
   L.worldGround = islandY;
 
-  L.addShoreFoam({ x: 68, z: 0, w: 7, d: 500, opacity: 0.55 });
-  L.addShoreFoam({ x: 72, z: -40, w: 5, d: 360, opacity: 0.34 });
-  L.addShoreFoam({ x: 76, z: 90, w: 4, d: 260, opacity: 0.24 });
+  L.addShoreFoam({ x: 68, z: 0, w: 9, d: 500, opacity: 0.8 });
+  L.addShoreFoam({ x: 72, z: -40, w: 6, d: 360, opacity: 0.48 });
+  L.addShoreFoam({ x: 76, z: 90, w: 4, d: 260, opacity: 0.28 });
 
   /* --------------------------------------------------------- material kit */
   const M = {
@@ -83,6 +88,11 @@ export function buildMiamiBeach(L) {
     rust: L.mats.get('rust'),
     glass: L.mats.get('glass'),
   };
+  // Pale sky-reflecting glass for the hotel ribbon windows.
+  const windowGlass = new THREE.MeshStandardMaterial({
+    color: 0x3d5f68, roughness: 0.16, metalness: 0.45, transparent: true, opacity: 0.72,
+    emissive: 0x223b44, emissiveIntensity: 0.35, envMapIntensity: 1.3,
+  });
   const neonMat = (hex) => new THREE.MeshStandardMaterial({
     color: 0xfff2e6, emissive: hex, emissiveIntensity: 2.6, roughness: 0.4,
   });
@@ -154,7 +164,7 @@ export function buildMiamiBeach(L) {
     // Continuous ribbon glazing with white mullions: the streamline look.
     for (let f = 0; f < floors; f++) {
       const wy = gy + floorH * f + floorH * 0.62;
-      L.batch.box(0.14, Math.min(1.55, floorH * 0.34), 19.5, -0.8, wy, z, M.glass, { uv: 0.4 });
+      L.batch.box(0.14, Math.min(1.55, floorH * 0.34), 19.5, -0.8, wy, z, windowGlass, { uv: 0.4 });
       for (let mz = -8.8; mz <= 8.9; mz += 3.2) {
         L.batch.box(0.18, Math.min(1.8, floorH * 0.42), 0.16, -0.76, wy, z + mz, M.white);
       }
