@@ -1,0 +1,564 @@
+import * as THREE from 'three';
+import { Batcher, signTexture, flagTexture } from './Geo.js';
+import { G } from '../core/Physics.js';
+import { mulberry32 } from '../core/MathUtil.js';
+import { BUILDERS } from './maps/index.js';
+
+const TEAM_COLORS = [0xd23a2b, 0x3f6fa8];
+
+/**
+ * Base level: terrain + batching + capture points + spawns + atmosphere.
+ * Concrete missions live in ./maps/*.js and call the helpers below.
+ */
+export class Level {
+  constructor(game, campaign) {
+    this.game = game;
+    this.campaign = campaign;
+    this.scene = game.worldGroup;
+    this.physics = game.physics;
+    this.mats = game.materials;
+    this.batch = new Batcher();
+    this.capturePoints = [];
+    this.spawns = { 0: [], 1: [] };
+    this.playerSpawn = null;
+    this.aiRoutes = [];
+    this.animated = [];
+    this.fires = [];
+    this.smokes = [];
+    this.rand = mulberry32(19470419);
+    this.heightFn = () => 0;
+    this.bounds = { minX: -400, maxX: 400, minZ: -400, maxZ: 400 };
+    this.waterY = 0;
+    this.worldGround = 0;
+  }
+
+  /* ------------------------------------------------------------- terrain */
+  addTerrain({ size = 600, segments = 120, height = () => 0, color = null, material = null }) {
+    this.heightFn = height;
+    const geo = new THREE.PlaneGeometry(size, size, segments, segments);
+    geo.rotateX(-Math.PI / 2);
+    const pos = geo.attributes.position;
+    const colors = color ? new Float32Array(pos.count * 3) : null;
+    const c = new THREE.Color();
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i);
+      const y = height(x, z);
+      pos.setY(i, y);
+      if (colors) {
+        color(x, z, y, c);
+        colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+      }
+    }
+    if (colors) geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geo.computeVertexNormals();
+    const map = this.mats.textures.rubble.clone();
+    map.needsUpdate = true;
+    const mat = material || new THREE.MeshStandardMaterial({
+      map, vertexColors: !!colors, roughness: 0.97, metalness: 0,
+      bumpMap: this.mats.textures.rubble, bumpScale: 0.25,
+    });
+    if (mat.map) {
+      mat.map.wrapS = mat.map.wrapT = THREE.RepeatWrapping;
+      mat.map.repeat.set(size / 20, size / 20);
+    }
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.receiveShadow = true;
+    mesh.castShadow = false;
+    this.scene.add(mesh);
+    this.terrainMesh = mesh;
+    this.physics.addTrimesh(mesh, { surface: 'dirt' });
+    this.size = size;
+    return mesh;
+  }
+
+  addWater({ y = 0, size = 900, color = 0x8b9a94, opacity = 0.94, rough = 0.2 }) {
+    this.waterY = y;
+    const tex = this.mats.textures.water.clone();
+    tex.needsUpdate = true;
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(size / 55, size / 55);
+    const mat = new THREE.MeshStandardMaterial({
+      map: tex, color, roughness: rough, metalness: 0.4, transparent: true, opacity,
+    });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = y;
+    mesh.receiveShadow = true;
+    this.scene.add(mesh);
+    this.water = mesh;
+    this.waterMat = mat;
+    this.waterBaseRepeat = size / 55;
+    return mesh;
+  }
+
+  /* ----------------------------------------------------------- colliders */
+  solidBox(x, y, z, w, h, d, rotY = 0, data = {}) {
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rotY, 0));
+    return this.physics.addStaticBox(
+      { x, y, z }, { x: w / 2, y: h / 2, z: d / 2 }, q, { surface: 'stucco', ...data },
+    );
+  }
+
+  /* ----------------------------------------------------------- buildings */
+  /**
+   * 1940s California building: solid body, punched windows, tiled or flat roof,
+   * battle damage, optional shop sign. Interior is intentionally sealed (urban cover).
+   */
+  building({
+    x, z, w = 12, d = 10, h = 9, rotY = 0, material = 'stucco', roofMaterial = 'roof',
+    floors = 2, flatRoof = false, damage = 0, sign = null, signColor = '#1b1a14',
+    base = null, windows = true, balcony = false,
+  }) {
+    const gy = base ?? this.groundHeight(x, z);
+    const bodyMat = this.mats.get(material);
+    const roofMat = this.mats.get(flatRoof ? 'plaster' : roofMaterial);
+    const rot = rotY;
+    const c = Math.cos(rot), s = Math.sin(rot);
+    const toWorld = (lx, lz) => [x + lx * c + lz * s, z - lx * s + lz * c];
+
+    // Main mass.
+    this.batch.box(w, h, d, x, gy + h / 2, z, bodyMat, { rotY });
+    this.solidBox(x, gy + h / 2, z, w, h, d, rotY, { surface: 'stucco' });
+
+    // Cornice / parapet.
+    this.batch.box(w + 0.5, 0.5, d + 0.5, x, gy + h + 0.2, z, this.mats.get('plasterWhite'), { rotY });
+
+    if (!flatRoof) {
+      // Low-pitch tile roof.
+      const rh = Math.min(2.4, w * 0.14);
+      this.batch.box(w + 1.1, 0.35, d + 1.1, x, gy + h + 0.62, z, roofMat, { rotY, uv: 0.5 });
+      this.batch.cylinder(w * 0.34, w * 0.34, d * 0.36, 4, x, gy + h + 1.2, z, roofMat, { rotY, rotZ: Math.PI / 4 });
+    }
+
+    if (windows) {
+      const floorH = h / floors;
+      const cols = Math.max(2, Math.floor(w / 3.4));
+      const backCols = Math.max(2, Math.floor(d / 3.4));
+      for (let f = 0; f < floors; f++) {
+        const wy = gy + floorH * f + floorH * 0.58;
+        for (let i = 0; i < cols; i++) {
+          const lx = -w / 2 + (w / cols) * (i + 0.5);
+          for (const [nz, flip] of [[d / 2 + 0.06, 0], [-d / 2 - 0.06, Math.PI]]) {
+            const [wx, wz] = toWorld(lx, nz);
+            this._window(wx, wy, wz, rot + flip, 1.1, floorH * 0.52, f === 0 && i === Math.floor(cols / 2));
+          }
+        }
+        for (let i = 0; i < backCols; i++) {
+          const lz = -d / 2 + (d / backCols) * (i + 0.5);
+          for (const [nx, flip] of [[w / 2 + 0.06, Math.PI / 2], [-w / 2 - 0.06, -Math.PI / 2]]) {
+            const [wx, wz] = toWorld(nx, lz);
+            this._window(wx, wy, wz, rot + flip, 1.1, floorH * 0.52, false);
+          }
+        }
+      }
+      // Door.
+      const [dx, dz] = toWorld(0, d / 2 + 0.08);
+      this.batch.box(1.5, 2.5, 0.16, dx, gy + 1.25, dz, this.mats.get('woodDark'), { rotY: rot, uv: 0.4 });
+      this.batch.box(2.1, 0.22, 0.5, dx, gy + 2.62, dz, this.mats.get('plasterWhite'), { rotY: rot });
+    }
+
+    if (sign) {
+      const [sx, sz] = toWorld(0, d / 2 + 0.22);
+      const tex = signTexture(sign, { bg: signColor, fg: '#d9caa5', border: '#7d6a45' });
+      const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(5.4, w * 0.6), 1.35), mat);
+      mesh.position.set(sx, gy + 3.1, sz);
+      mesh.rotation.y = rot;
+      this.scene.add(mesh);
+    }
+
+    if (balcony) {
+      const [bx, bz] = toWorld(0, d / 2 + 0.7);
+      this.batch.box(w * 0.6, 0.16, 1.4, bx, gy + h * 0.52, bz, this.mats.get('wood'), { rotY: rot });
+      this.batch.box(w * 0.6, 0.7, 0.1, bx, gy + h * 0.52 + 0.42, bz + 0.65, this.mats.get('metal'), { rotY: rot });
+    }
+
+    if (damage > 0) this._damage(x, z, w, h, d, rot, damage, gy);
+
+    return { x, z, gy, w, d, h };
+  }
+
+  _window(x, y, z, rotY, w, h, doorLike = false) {
+    const dark = this.mats.get('glass');
+    this.batch.box(w, h, 0.1, x, y, z, dark, { rotY });
+    // Frame.
+    this.batch.box(w + 0.22, 0.1, 0.12, x, y + h / 2 + 0.06, z, this.mats.get('plasterWhite'), { rotY });
+    this.batch.box(w + 0.22, 0.1, 0.12, x, y - h / 2 - 0.06, z, this.mats.get('plasterWhite'), { rotY });
+    // Randomly boarded up.
+    if (this.rand() < 0.28 && !doorLike) {
+      this.batch.box(w + 0.3, h * 0.55, 0.14, x, y, z + 0.06, this.mats.get('wood'), { rotY, uv: 0.5 });
+    }
+  }
+
+  _damage(x, z, w, h, d, rot, amount, gy) {
+    const n = Math.floor(amount * 9);
+    for (let i = 0; i < n; i++) {
+      const side = this.rand() * 4;
+      const lx = (this.rand() - 0.5) * w;
+      const lz = (this.rand() - 0.5) * d;
+      const px = side < 2 ? lx : (side < 3 ? w / 2 : -w / 2);
+      const pz = side < 2 ? (side === 0 ? d / 2 : -d / 2) : lz;
+      const c = Math.cos(rot), s = Math.sin(rot);
+      const wx = x + px * c + pz * s;
+      const wz = z - px * s + pz * c;
+      const wy = gy + this.rand() * h;
+      // Scorch.
+      const scorch = new THREE.Mesh(
+        new THREE.CircleGeometry(0.9 + this.rand() * 1.4, 9),
+        new THREE.MeshBasicMaterial({ color: 0x15120e, transparent: true, opacity: 0.55, depthWrite: false }),
+      );
+      scorch.position.set(wx, wy, wz);
+      scorch.lookAt(wx + (wx - x), wy, wz + (wz - z));
+      this.scene.add(scorch);
+    }
+    // Rubble at the base.
+    const pile = new THREE.Mesh(
+      new THREE.DodecahedronGeometry(Math.min(w, d) * 0.28, 0),
+      this.mats.get('brick'),
+    );
+    pile.position.set(x + (this.rand() - 0.5) * w * 0.8, gy + 0.5, z + d / 2 + 0.4);
+    pile.rotation.set(this.rand(), this.rand() * 6, this.rand());
+    pile.castShadow = pile.receiveShadow = true;
+    this.scene.add(pile);
+    this.physics.addMeshBox(pile, { surface: 'rubble' });
+  }
+
+  /* --------------------------------------------------------------- props */
+  sandbags(x, z, rot = 0, len = 5, { base = null } = {}) {
+    const gy = base ?? this.groundHeight(x, z);
+    const count = Math.round(len / 0.62);
+    for (let layer = 0; layer < 3; layer++) {
+      const inset = layer * 0.09;
+      for (let i = 0; i < count - layer; i++) {
+        const off = (i - (count - layer) / 2) * 0.62 + layer * 0.3;
+        const px = x + Math.cos(rot) * off;
+        const pz = z - Math.sin(rot) * off;
+        this.batch.box(0.62, 0.28, 0.42, px, gy + 0.16 + layer * 0.29, pz, this.mats.get('sandbag'), {
+          rotY: rot + (this.rand() - 0.5) * 0.12, uv: 0.9,
+        });
+      }
+    }
+    this.solidBox(x, gy + 0.45, z, len, 0.9, 0.6, rot, { surface: 'sand' });
+  }
+
+  crate(x, z, size = 1.1, { base = null, rot = 0 } = {}) {
+    const gy = base ?? this.groundHeight(x, z);
+    this.batch.box(size, size, size, x, gy + size / 2, z, this.mats.get('wood'), { rotY: rot, uv: 0.8 });
+    this.batch.box(size * 1.02, 0.08, size * 1.02, x, gy + size * 0.78, z, this.mats.get('woodDark'), { rotY: rot });
+    this.solidBox(x, gy + size / 2, z, size, size, size, rot, { surface: 'wood' });
+  }
+
+  barrel(x, z, { base = null } = {}) {
+    const gy = base ?? this.groundHeight(x, z);
+    this.batch.cylinder(0.32, 0.32, 0.92, 12, x, gy + 0.46, z, this.mats.get('rust'));
+    this.batch.cylinder(0.34, 0.34, 0.06, 12, x, gy + 0.9, z, this.mats.get('metal'));
+    this.physics.addStaticCylinder({ x, y: gy + 0.46, z }, 0.46, 0.34, { surface: 'metal' });
+  }
+
+  palm(x, z, scale = 1, { base = null } = {}) {
+    const gy = base ?? this.groundHeight(x, z);
+    const h = 7 * scale;
+    const lean = (this.rand() - 0.5) * 0.5;
+    this.batch.cylinder(0.16 * scale, 0.3 * scale, h, 7, x + lean, gy + h / 2, z, this.mats.get('palmTrunk'));
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2 + this.rand() * 0.4;
+      const len = 3.1 * scale * (0.8 + this.rand() * 0.4);
+      const frond = new THREE.PlaneGeometry(len, 0.72 * scale);
+      frond.translate(len / 2, 0, 0);
+      const m = new THREE.Matrix4().makeRotationY(-a);
+      m.multiply(new THREE.Matrix4().makeRotationZ(-0.45 - this.rand() * 0.25));
+      m.setPosition(x + lean, gy + h - 0.15, z);
+      this.batch.add(frond, this.mats.get('foliage'), m);
+    }
+    this.physics.addStaticCylinder({ x: x + lean, y: gy + h / 2, z }, h / 2, 0.3 * scale, { surface: 'wood' });
+  }
+
+  wreck(x, z, rot = 0, { base = null, kind = 'car' } = {}) {
+    const gy = base ?? this.groundHeight(x, z);
+    const mat = this.mats.get('rust');
+    const c = Math.cos(rot), s = Math.sin(rot);
+    if (kind === 'car') {
+      this.batch.box(4.1, 0.75, 1.8, x, gy + 0.62, z, mat, { rotY: rot });
+      this.batch.box(2.0, 0.68, 1.7, x - 0.2 * c, gy + 1.24, z + 0.2 * s, mat, { rotY: rot });
+      for (const [lx, lz] of [[-1.3, 0.9], [1.3, 0.9], [-1.3, -0.9], [1.3, -0.9]]) {
+        this.batch.cylinder(0.36, 0.36, 0.24, 10, x + lx * c + lz * s, gy + 0.36, z - lx * s + lz * c,
+          this.mats.get('rubber'), { rotZ: Math.PI / 2 });
+      }
+    } else {
+      // Half-track / truck.
+      this.batch.box(5.4, 1.0, 2.4, x, gy + 0.9, z, mat, { rotY: rot });
+      this.batch.box(3.0, 1.5, 2.2, x - 0.4 * c, gy + 1.9, z + 0.4 * s, mat, { rotY: rot });
+      this.batch.box(2.2, 0.9, 2.1, x + 2.4 * c, gy + 1.5, z - 2.4 * s, mat, { rotY: rot });
+    }
+    this.solidBox(x, gy + 0.9, z, 4.2, 1.5, 2.2, rot, { surface: 'metal' });
+    this.fire(x + (this.rand() - 0.5) * 1.5, gy + 1.4, z + (this.rand() - 0.5) * 1.5, 0.8 + this.rand() * 0.8);
+    this.smokeColumn(x, gy + 2.0, z, 0.8);
+  }
+
+  barbedWire(x, z, rot = 0, len = 8) {
+    const gy = this.groundHeight(x, z);
+    const posts = Math.max(2, Math.round(len / 3));
+    for (let i = 0; i <= posts; i++) {
+      const off = -len / 2 + (len / posts) * i;
+      const px = x + Math.cos(rot) * off;
+      const pz = z - Math.sin(rot) * off;
+      this.batch.box(0.09, 1.15, 0.09, px, gy + 0.58, pz, this.mats.get('woodDark'));
+      for (let k = 0; k < 2; k++) {
+        this.batch.box(len / posts, 0.02, 0.02, px + Math.cos(rot) * (len / posts / 2), gy + 0.4 + k * 0.45,
+          pz - Math.sin(rot) * (len / posts / 2), this.mats.get('metal'), { rotY: rot });
+      }
+    }
+  }
+
+  landingCraft(x, z, rot = 0, { base = null } = {}) {
+    const gy = base ?? this.waterY;
+    const mat = this.mats.get('metal');
+    const c = Math.cos(rot), s = Math.sin(rot);
+    this.batch.box(18, 1.3, 4.6, x, gy + 0.55, z, mat, { rotY: rot });
+    this.batch.box(18, 1.3, 0.35, x + 0.4 * s, gy + 1.65, z + 2.2 * c, mat, { rotY: rot });
+    this.batch.box(18, 1.3, 0.35, x - 0.4 * s, gy + 1.65, z - 2.2 * c, mat, { rotY: rot });
+    // Ramp.
+    const ramp = new THREE.BoxGeometry(4.4, 0.22, 3.2);
+    const m = new THREE.Matrix4().makeRotationY(rot);
+    m.multiply(new THREE.Matrix4().makeRotationX(0.32));
+    m.setPosition(x - 9.5 * c, gy + 0.6, z + 9.5 * s);
+    this.batch.add(ramp, mat, m);
+    this.batch.box(2.6, 1.0, 1.6, x + 6.5 * c, gy + 1.6, z - 6.5 * s, this.mats.get('metal'), { rotY: rot });
+    this.solidBox(x, gy + 0.8, z, 18, 1.6, 4.6, rot, { surface: 'metal' });
+  }
+
+  bunker(x, z, rot = 0, { base = null } = {}) {
+    const gy = base ?? this.groundHeight(x, z);
+    const conc = this.mats.get('plaster');
+    this.batch.box(8, 2.4, 5, x, gy + 1.2, z, conc, { rotY: rot, uv: 0.4 });
+    this.batch.box(8.6, 0.5, 5.6, x, gy + 2.55, z, conc, { rotY: rot });
+    // Embrasure.
+    this.batch.box(3.4, 0.55, 0.2, x, gy + 1.75, z + 2.55, this.mats.get('black'), { rotY: rot });
+    this.solidBox(x, gy + 1.4, z, 8, 2.8, 5, rot, { surface: 'concrete' });
+    this.sandbags(x, z + 3.4, rot, 7, { base: gy });
+  }
+
+  tankTrap(x, z, { base = null, rot = 0 } = {}) {
+    const gy = base ?? this.groundHeight(x, z);
+    const m = this.mats.get('metal');
+    this.batch.box(0.22, 1.6, 0.22, x, gy + 0.8, z, m, { rotY: rot, rotZ: 0.6 });
+    this.batch.box(0.22, 1.6, 0.22, x, gy + 0.8, z, m, { rotY: rot + 1.05, rotZ: 0.6 });
+    this.batch.box(0.22, 1.6, 0.22, x, gy + 0.8, z, m, { rotY: rot + 2.1, rotZ: 0.6 });
+  }
+
+  flagpole(x, z, { base = null, team = 0, height = 6 } = {}) {
+    const gy = base ?? this.groundHeight(x, z);
+    this.batch.cylinder(0.08, 0.1, height, 8, x, gy + height / 2, z, this.mats.get('metal'));
+    const mat = new THREE.MeshStandardMaterial({
+      map: flagTexture(team), roughness: 0.9, side: THREE.DoubleSide,
+    });
+    const geo = new THREE.PlaneGeometry(2.2, 1.4, 8, 1);
+    geo.translate(1.1, 0, 0);
+    const flag = new THREE.Mesh(geo, mat);
+    flag.position.set(x, gy + height - 1.0, z);
+    flag.castShadow = true;
+    this.scene.add(flag);
+    const baseGeo = geo.clone();
+    this.animated.push({ type: 'flag', mesh: flag, base: baseGeo, phase: this.rand() * 6.28 });
+    return flag;
+  }
+
+  fire(x, y, z, scale = 1) {
+    const mat = new THREE.SpriteMaterial({
+      map: this._fireTexture(), color: 0xffb066, transparent: true,
+      blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.9,
+    });
+    const s = new THREE.Sprite(mat);
+    s.position.set(x, y, z);
+    s.scale.setScalar(scale * 2.2);
+    this.scene.add(s);
+    const light = new THREE.PointLight(0xff7a30, 3.2 * scale, 16 * scale, 1.8);
+    light.position.set(x, y + 0.6, z);
+    this.scene.add(light);
+    this.fires.push({ sprite: s, light, base: y, scale, t: this.rand() * 10 });
+    return s;
+  }
+
+  smokeColumn(x, y, z, scale = 1) {
+    const mat = new THREE.SpriteMaterial({
+      map: this._smokeTexture(), color: 0x2c2a26, transparent: true, opacity: 0.42,
+      depthWrite: false,
+    });
+    const s = new THREE.Sprite(mat);
+    s.position.set(x, y, z);
+    s.scale.setScalar(scale * 10);
+    this.scene.add(s);
+    this.smokes.push({ sprite: s, base: y, scale, t: this.rand() * 10 });
+  }
+
+  _fireTexture() {
+    if (this._fireTex) return this._fireTex;
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const ctx = c.getContext('2d');
+    const g = ctx.createRadialGradient(64, 80, 2, 64, 70, 62);
+    g.addColorStop(0, 'rgba(255,255,230,1)');
+    g.addColorStop(0.25, 'rgba(255,190,80,0.95)');
+    g.addColorStop(0.55, 'rgba(230,80,20,0.6)');
+    g.addColorStop(1, 'rgba(80,20,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(64, 6);
+    ctx.bezierCurveTo(100, 40, 104, 92, 64, 122);
+    ctx.bezierCurveTo(24, 92, 28, 40, 64, 6);
+    ctx.fill();
+    this._fireTex = new THREE.CanvasTexture(c);
+    this._fireTex.colorSpace = THREE.SRGBColorSpace;
+    return this._fireTex;
+  }
+
+  _smokeTexture() {
+    if (this._smokeTex) return this._smokeTex;
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const ctx = c.getContext('2d');
+    const g = ctx.createRadialGradient(64, 64, 8, 64, 64, 62);
+    g.addColorStop(0, 'rgba(255,255,255,0.55)');
+    g.addColorStop(0.55, 'rgba(255,255,255,0.22)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128);
+    this._smokeTex = new THREE.CanvasTexture(c);
+    return this._smokeTex;
+  }
+
+  skyline(points) {
+    const mat = new THREE.MeshStandardMaterial({ color: 0x5b5e58, roughness: 1, metalness: 0 });
+    for (const p of points) {
+      this.batch.box(p.w, p.h, p.d, p.x, p.h / 2, p.z, mat, { uv: 0.1 });
+    }
+  }
+
+  /* ------------------------------------------------------------- capture */
+  addCapturePoint({ id, name, x, z, radius = 16, owner = -1, base = null, height = 7 }) {
+    const gy = base ?? this.groundHeight(x, z);
+    const def = {
+      id, name, position: new THREE.Vector3(x, gy, z), radius, owner,
+      progress: owner === -1 ? 0 : 100, contested: false, attacker: -1,
+    };
+    this.capturePoints.push(def);
+
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: owner === -1 ? 0xccc6b4 : TEAM_COLORS[owner], transparent: true, opacity: 0.42,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(radius * 0.92, radius, 64), ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(x, gy + 0.06, z);
+    this.scene.add(ring);
+
+    const beamMat = new THREE.MeshBasicMaterial({
+      color: owner === -1 ? 0xddd6c2 : TEAM_COLORS[owner], transparent: true, opacity: 0.06,
+      side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.86, radius * 0.92, 26, 40, 1, true), beamMat);
+    beam.position.set(x, gy + 13, z);
+    this.scene.add(beam);
+
+    const marker = new THREE.Group();
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, height, 8), this.mats.get('metal'));
+    pole.position.y = height / 2;
+    marker.add(pole);
+    const flagMat = new THREE.MeshStandardMaterial({
+      map: flagTexture(owner === 1 ? 1 : 0), roughness: 0.9, side: THREE.DoubleSide,
+    });
+    const flagGeo = new THREE.PlaneGeometry(2.4, 1.5, 10, 1);
+    flagGeo.translate(1.2, 0, 0);
+    const flag = new THREE.Mesh(flagGeo, flagMat);
+    flag.position.y = height - 1.1;
+    flag.castShadow = true;
+    marker.add(flag);
+    marker.position.set(x, gy, z);
+    this.scene.add(marker);
+
+    def.ring = ring;
+    def.ringMat = ringMat;
+    def.beam = beam;
+    def.beamMat = beamMat;
+    def.flag = flag;
+    def.flagMat = flagMat;
+    def.marker = marker;
+    def.baseGeo = flagGeo.clone();
+    this.animated.push({ type: 'flag', mesh: flag, base: flagGeo.clone(), phase: this.rand() * 6.28 });
+    return def;
+  }
+
+  /* --------------------------------------------------------------- spawn */
+  addSpawn(team, x, z, yaw = 0, { base = null } = {}) {
+    const y = base ?? this.groundHeight(x, z);
+    this.spawns[team].push({ position: new THREE.Vector3(x, y + 0.1, z), yaw });
+  }
+
+  setPlayerSpawn(x, z, yaw = 0, { base = null } = {}) {
+    const y = base ?? this.groundHeight(x, z);
+    this.playerSpawn = { position: new THREE.Vector3(x, y + 0.15, z), yaw };
+  }
+
+  addRoute(points) { this.aiRoutes.push(points); }
+
+  /* ------------------------------------------------------------ utilities */
+  groundHeight(x, z) {
+    // Terrain height is authoritative; props on structures pass `base`.
+    return this.heightFn(x, z);
+  }
+
+  inBounds(x, z) {
+    return x > this.bounds.minX && x < this.bounds.maxX && z > this.bounds.minZ && z < this.bounds.maxZ;
+  }
+
+  randomInRect(x, z, w, d) {
+    return [x + (this.rand() - 0.5) * w, z + (this.rand() - 0.5) * d];
+  }
+
+  /* --------------------------------------------------------------- build */
+  build() {
+    const fn = BUILDERS[this.campaign.id];
+    if (!fn) throw new Error('unknown map ' + this.campaign.id);
+    fn(this);
+    this.batch.flush(this.scene);
+    this.finalize();
+  }
+
+  finalize() {
+    this.game.renderer.setEnvironment(this.campaign.env);
+    this.game.audio.setAmbience(this.campaign.env.ambience);
+  }
+
+  update(dt, t) {
+    if (this.waterMat?.map) {
+      this.waterMat.map.offset.x += dt * 0.006;
+      this.waterMat.map.offset.y += dt * 0.0035;
+    }
+    for (const f of this.fires) {
+      f.t += dt;
+      const flick = 0.78 + Math.sin(f.t * 17) * 0.12 + Math.sin(f.t * 9.3) * 0.1;
+      f.sprite.scale.setScalar(f.scale * 2.2 * flick);
+      f.light.intensity = 3.2 * f.scale * flick;
+      f.sprite.position.y = f.base + Math.sin(f.t * 3) * 0.12;
+    }
+    for (const s of this.smokes) {
+      s.t += dt;
+      s.sprite.position.y = s.base + ((s.t * 1.6) % 18);
+      s.sprite.scale.setScalar(s.scale * (9 + ((s.t * 1.6) % 18) * 1.4));
+      s.sprite.material.opacity = 0.4 * (1 - ((s.t * 1.6) % 18) / 18);
+    }
+    for (const a of this.animated) {
+      if (a.type === 'flag') {
+        const pos = a.base.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i);
+          const k = x / 2.4;
+          pos.setZ(i, Math.sin(t * 6 + x * 2.4 + a.phase) * 0.14 * k);
+          pos.setY(i, a.base.attributes.position.getY(i) + Math.sin(t * 4 + x * 3 + a.phase) * 0.05 * k);
+        }
+        pos.needsUpdate = true;
+        a.mesh.geometry.computeVertexNormals();
+      }
+    }
+    for (const cp of this.capturePoints) {
+      cp.beamMat.opacity = 0.045 + Math.sin(t * 2 + cp.position.x) * 0.015;
+    }
+  }
+}
