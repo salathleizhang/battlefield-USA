@@ -465,6 +465,7 @@ export class Game {
 
     this.updateProjectiles(dt);
     this.updateGrenades(dt);
+    this.materials.update(dt);
     this.level.update(dt, this.time);
     this.atmosphere.update(dt);
     this.effects.update(dt);
