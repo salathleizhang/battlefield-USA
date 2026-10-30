@@ -11,7 +11,7 @@ const CN_NAMES = ['铁柱', '二牛', '长胜', '德福', '青山', '大勇', '�
  * Bots are capsule colliders tagged as actors so bullets can hit them.
  */
 export class Bot {
-  constructor(game, team, position, yaw = 0, name = null) {
+  constructor(game, team, position, yaw = 0, name = null, variant = 0) {
     this.game = game;
     this.team = team;
     this.name = name || (team === 0 ? `八路军·${pick(CN_NAMES)}` : `美军·${pick(US_NAMES)}`);
@@ -44,7 +44,10 @@ export class Bot {
     this.aiming = false;
     this.desired = new THREE.Vector3();
 
-    this.model = new SoldierModel(team, game.materials);
+    this.model = (game.characters && game.characters.ready)
+      ? game.characters.create(team, variant)
+      : new SoldierModel(team, game.materials);
+    if (!this.model) this.model = new SoldierModel(team, game.materials);
     this.model.setPosition(position.x, position.y, position.z, yaw);
     game.worldGroup.add(this.model.group);
 
@@ -258,6 +261,7 @@ export class Bot {
     });
     const cam = this.game.renderer.camera;
     const pan = this._panTo(cam);
+    this.model.shoot?.();
     this.game.audio.shot(this.team === 1 ? 'm1' : 'type38', { dist, pan });
     this.game.effects.botMuzzle(this.model.muzzle, dir);
     this.aiming = true;
@@ -302,10 +306,14 @@ export class Bot {
     this.target = null;
     this.aiming = false;
     this.fireTimer = rand(0.8, 2);
-    this.model.dead = false;
-    this.model.deadT = 0;
-    this.model.group.rotation.z = 0;
-    this.model.group.visible = true;
+    if (this.model.reset) {
+      this.model.reset();
+    } else {
+      this.model.dead = false;
+      this.model.deadT = 0;
+      this.model.group.rotation.z = 0;
+      this.model.group.visible = true;
+    }
     this.model.setPosition(position.x, position.y, position.z, yaw);
     const R = this.game.physics.R;
     if (!this.collider) {
@@ -321,7 +329,8 @@ export class Bot {
   }
 
   dispose() {
-    this.game.worldGroup.remove(this.model.group);
+    if (this.model.dispose) this.model.dispose();
+    else this.game.worldGroup.remove(this.model.group);
     if (this.collider) {
       this.game.physics.world.removeCollider(this.collider);
       this.collider = null;

@@ -11,6 +11,7 @@ import { Player } from './Player.js';
 import { Weapon } from './weapons/Weapon.js';
 import { ViewModel } from './weapons/ViewModel.js';
 import { Bot } from './bots/Bot.js';
+import { CharacterLibrary } from './bots/CharacterLibrary.js';
 import { Match } from './Match.js';
 import { HUD } from '../ui/HUD.js';
 import { Atmosphere } from '../render/Atmosphere.js';
@@ -56,6 +57,8 @@ export class Game {
     this.physics = await Physics.create();
     this.materials = new Materials(this.renderer);
     await this.materials.load(onProgress);
+    this.characters = new CharacterLibrary(this);
+    await this.characters.load(onProgress);
     this.props = new Props();
     await this.props.load((p, label) => onProgress?.(0.9 + p * 0.08, label));
     onProgress?.(1, '准备就绪');
@@ -186,7 +189,7 @@ export class Game {
         const offX = ((i % 5) - 2) * 1.9;
         const offZ = Math.floor(i / 5) * 2.1;
         const pos = s.position.clone().add(new THREE.Vector3(offX, 0, offZ));
-        const bot = new Bot(this, team, pos, s.yaw);
+        const bot = new Bot(this, team, pos, s.yaw, null, i);
         this.bots.push(bot);
       }
     }
