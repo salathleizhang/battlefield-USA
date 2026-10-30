@@ -507,6 +507,15 @@ export function buildMiamiBeach(L) {
   }
   // Bridgehead plaza.
   L.batch.box(44, 0.12, 54, -226, 2.27, 0, M.asphalt, { uv: 0.5 });
+  L.batch.cylinder(13, 13, 0.1, 24, -218, 2.28, 0, M.asphalt);
+  // Downtown street grid and a bayfront park block.
+  for (let z = -180; z <= 180; z += 36) {
+    L.batch.box(140, 0.08, 7, -276, 2.3, z, M.asphalt, { uv: 0.5 });
+  }
+  for (let x = -246; x >= -330; x -= 30) {
+    L.batch.box(7, 0.08, 250, x, 2.3, 0, M.asphalt, { uv: 0.5 });
+  }
+  L.batch.box(18, 0.1, 20, -230, 2.31, 94, L.mats.get('grass'));
   L.sandbags(-210, 20, 0.05, 12);
   L.sandbags(-210, -20, -0.05, 10);
   L.bunker(-218, 28, 0.2);
