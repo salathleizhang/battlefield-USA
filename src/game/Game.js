@@ -120,6 +120,7 @@ export class Game {
       freeze: q.has('freeze'),
       god: q.has('god'),
       aim: q.has('aim'),
+      cam: q.has('cam') ? q.get('cam').split(',').map(Number).slice(0, 6) : null,
     };
     if (q.has('look')) {
       const [ly, lp] = q.get('look').split(',').map(Number);
@@ -128,7 +129,7 @@ export class Game {
     }
     if (q.has('pos')) {
       const [px, pz] = q.get('pos').split(',').map(Number);
-      const py = this.level.groundHeight(px, pz) + 0.2;
+      const py = q.has('y') ? Number(q.get('y')) : this.level.groundHeight(px, pz) + 0.2;
       this.player.spawn(new THREE.Vector3(px, py, pz), this.player.yaw);
     }
     if (q.has('nohud')) this.hud.show(false);
@@ -389,6 +390,11 @@ export class Game {
     this.audio.update(dt);
     if (this.renderer) {
       this.renderer.update(dt, this.player?.position || new THREE.Vector3());
+      if (this.debug?.cam) {
+        const c = this.debug.cam;
+        this.renderer.camera.position.set(c[0], c[1], c[2]);
+        this.renderer.camera.lookAt(c[3], c[4], c[5]);
+      }
       this.renderer.render();
     }
     if (!this.started || this.paused || !this.player) return;
