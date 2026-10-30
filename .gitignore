@@ -4,3 +4,6 @@ dist/
 .DS_Store
 *.log
 screenshots/
+
+# local tooling environments
+.fontenv/
