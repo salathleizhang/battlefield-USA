@@ -444,6 +444,17 @@ export function buildMiamiBeach(L) {
   const bx = (BX0 + BX1) / 2, bl = BX1 - BX0;
   L.batch.box(bl, 0.7, 18, bx, deckY - 0.35, 0, M.asphalt, { uv: 0.55 });
   L.solidBox(bx, deckY - 0.35, 0, bl, 0.7, 18, 0, { surface: 'concrete' });
+  // Asphalt surface over the raised earthen approaches.
+  {
+    const east = new THREE.BoxGeometry(34.4, 0.18, 12);
+    const me = new THREE.Matrix4().makeRotationZ(-0.106);
+    me.setPosition(-77, 3.92, 0);
+    L.batch.add(east, M.asphalt, me);
+    const west = new THREE.BoxGeometry(22.4, 0.18, 12);
+    const mw = new THREE.Matrix4().makeRotationZ(0.154);
+    mw.setPosition(-203, 4.0, 0);
+    L.batch.add(west, M.asphalt, mw);
+  }
   // Girders and curbs.
   for (const z of [-8.8, 8.8]) {
     L.batch.box(bl, 1.3, 0.7, bx, deckY - 1.15, z, M.concrete);
