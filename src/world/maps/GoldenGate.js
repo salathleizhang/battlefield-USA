@@ -16,7 +16,7 @@ export function buildGoldenGate(L) {
     deckY: 33.5,
     length: 1080,
     towerZ: 320,
-    anchorZ: 486,
+    anchorZ: 520,
   };
   const DECK = P.deckY + 0.06;
 
@@ -25,15 +25,17 @@ export function buildGoldenGate(L) {
 
   /* ------------------------------------------------------------- terrain */
   // A deep channel through the strait, then the two headlands. The shoreline
-  // sits at z = ±450…500 so both towers stand offshore, as they do in life.
+  // wanders along x so the coast reads as coves and points instead of a wall,
+  // and rises over ~100 m rather than as a vertical cliff.
   const height = (x, z) => {
     const d = Math.abs(z);
-    if (d < 450) return -26 + Math.sin(x * 0.021) * 1.2;
-    const t = smoothstep(450, 500, d);
-    let h = lerp(-26, 34, t);
-    if (d > 500) {
-      const g = smoothstep(500, 720, d);
-      h += g * (z < 0 ? 88 : 42);
+    const shore = 452 + Math.sin(x * 0.013) * 14 + Math.sin(x * 0.037 + 1.7) * 6;
+    if (d < shore) return -26 + Math.sin(x * 0.021) * 1.2;
+    const t = smoothstep(shore, shore + 95, d);
+    let h = lerp(-26, 32 + Math.sin(x * 0.009) * 6, t);
+    if (d > shore + 80) {
+      const g = smoothstep(shore + 80, 760, d);
+      h += g * (z < 0 ? 86 : 40);
       h += Math.sin(x * 0.018 + z * 0.006) * 9 * g;
       h += Math.sin(x * 0.05 + 1.3) * 3.2 * g;
     }
@@ -41,7 +43,7 @@ export function buildGoldenGate(L) {
   };
 
   L.addTerrain({
-    size: 1600, segments: 220, height, texture: 'grass', tile: 7,
+    size: 1600, segments: 300, height, texture: 'grass', tile: 7,
     color: (x, z, y, c) => {
       const n = Math.random();
       if (y < 1.5) c.setHex(0x4d4b42);
@@ -50,16 +52,40 @@ export function buildGoldenGate(L) {
     },
   });
 
-  L.addWater({ y: 0, size: 3000, color: 0x33474a, opacity: 0.985, rough: 0.09 });
+  L.addWater({ y: 0, size: 3000, color: 0x33474a, opacity: 0.985, rough: 0.12 });
+  // Cold, choppy bay water: small wind waves, very little mirror. The default
+  // sea material is tuned for bright tropical shallows and turns the strait
+  // into white corrugated iron at this scale.
+  if (L.waterMat) {
+    L.waterMat.color.setHex(0x233438);
+    L.waterMat.roughness = 0.3;
+    L.waterMat.envMapIntensity = 0.55;
+    L.waterMat.normalScale.setScalar(0.28);
+    if (L.waterMat.normalMap) L.waterMat.normalMap.repeat.set(3000 / 42, 3000 / 42);
+  }
 
   /* -------------------------------------------------------------- bridge */
   buildGoldenGateBridge(L, P);
+
+  // Approach viaduct: twin concrete columns carry the deck from the anchorage
+  // down to where the road cuts into the headland.
+  const conc = L.mats.get('concrete');
+  for (const zs of [-1, 1]) {
+    for (let z = 492; z <= 536; z += 11) {
+      const gy = height(0, zs * z);
+      const h = P.deckY - gy;
+      if (h < 1.2) continue;
+      for (const s of [-1, 1]) {
+        L.batch.box(1.4, h, 1.4, s * 8, gy + h / 2, zs * z, conc, { uv: 0.25 });
+      }
+      L.batch.box(18, 0.9, 1.6, 0, gy + h - 0.4, zs * z, conc, { uv: 0.25 });
+    }
+  }
 
   /* -------------------------------------------------------- environment */
   const rock = L.mats.get('ground');
   const concrete = L.mats.get('concrete');
   const foliage = L.mats.get('foliage');
-  const dark = L.mats.get('bridgeDark');
 
   // Alcatraz, 700 m west of the span and half lost in the fog.
   L.batch.box(96, 26, 58, -340, 2, 150, rock, { uv: 0.08 });
@@ -69,13 +95,28 @@ export function buildGoldenGate(L) {
   L.batch.cylinder(1.6, 2.2, 14, 8, -312, 40, 140, concrete);
   L.batch.sphere(0.5, -312, 47.5, 140, L.mats.get('lampWarm'), 8);
 
-  // A Liberty ship anchored in the roads, for scale.
+  // A Liberty ship anchored in the roads, for scale. Kept far enough out that
+  // it reads as a silhouette rather than a floating box.
   const hull = L.mats.get('metal');
-  L.batch.box(92, 9, 14, -220, 4, -70, hull, { uv: 0.08 });
-  L.batch.box(20, 9, 11, -246, 12, -70, hull, { uv: 0.12 });
-  L.batch.box(9, 6, 9, -236, 19, -70, L.mats.get('rust'), { uv: 0.15 });
-  L.batch.cylinder(1.1, 1.4, 14, 6, -236, 28, -70, L.mats.get('rust'));
-  L.batch.box(46, 1.2, 12, -214, 9.5, -70, hull, { uv: 0.15 });
+  const white = L.mats.get('plasterWhite');
+  L.batch.box(74, 7, 11, -390, 2.5, -95, hull, { uv: 0.1 });
+  L.batch.box(46, 1.5, 10, -386, 6.2, -95, hull, { uv: 0.12 });
+  L.batch.box(13, 7, 9, -402, 9, -95, white, { uv: 0.18 });
+  L.batch.box(7, 4, 7, -398, 14.5, -95, white, { uv: 0.2 });
+  L.batch.box(3, 3, 3, -416, 13, -95, L.mats.get('rust'), { uv: 0.3 });
+  L.batch.cylinder(0.35, 0.5, 11, 5, -414, 9, -95, hull);
+  L.batch.cylinder(0.35, 0.5, 9, 5, -370, 8, -95, hull);
+  L.batch.box(30, 0.4, 0.4, -390, 11, -95, hull, { uv: 0.4 });
+
+  // Rocks and kelp along the waterline soften the meeting of land and bay.
+  for (let i = 0; i < 30; i++) {
+    const x = -370 + ((i * 97) % 740);
+    const zs = i % 2 ? 1 : -1;
+    const shoreZ = 452 + Math.sin(x * 0.013) * 14 + Math.sin(x * 0.037 + 1.7) * 6;
+    const z = zs * (shoreZ + (i % 3) * 5);
+    const r = 2.2 + (i % 4) * 1.5;
+    L.batch.box(r * 2.2, r, r * 1.5, x, r * 0.25, z, rock, { uv: 0.35 });
+  }
 
   // Presidio conifers on the southern bluff, and scrub on the Marin side.
   const conifer = (x, z, s) => {
@@ -98,19 +139,41 @@ export function buildGoldenGate(L) {
     conifer(-180 + (i * 67) % 360, -560 - ((i * 41) % 70), 0.9 + (i % 4) * 0.3);
   }
 
-  // A few Marin rock outcrops breaking through the grass.
-  for (let i = 0; i < 12; i++) {
-    const x = -190 + (i * 71) % 380;
-    const z = -548 - (i * 29) % 90;
-    const gy = height(x, z);
-    L.batch.box(6 + (i % 4) * 4, 3 + (i % 3) * 2, 5 + (i % 5) * 3, x, gy + 1, z, rock, { uv: 0.1 });
+  // Dense scrub and cypress along the Marin shore, so the headland has scale.
+  for (let i = 0; i < 34; i++) {
+    const x = -210 + ((i * 83) % 420);
+    const z = -505 - ((i * 37) % 90);
+    conifer(x, z, 0.55 + (i % 5) * 0.22);
+  }
+
+  /* ------------------------------------------------ shadow on the water */
+  // No planar reflections in this pipeline, so the bridge gets a soft,
+  // sun-offset shadow strip on the bay. Without it the deck floats.
+  {
+    const c = document.createElement('canvas');
+    c.width = 64; c.height = 8;
+    const ctx = c.getContext('2d');
+    const g = ctx.createLinearGradient(0, 0, 64, 0);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(0.32, 'rgba(0,0,0,0.55)');
+    g.addColorStop(0.68, 'rgba(0,0,0,0.55)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 64, 8);
+    const tex = new THREE.CanvasTexture(c);
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex, transparent: true, opacity: 0.32, depthWrite: false, color: 0x101a1c,
+    });
+    const shadow = new THREE.Mesh(new THREE.PlaneGeometry(92, 1180), mat);
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.set(-16, 0.06, -14);
+    L.scene.add(shadow);
   }
 
   /* ------------------------------------------------------------- fog banks */
   // Soft, camera-facing puffs drifting through the span. The hard-edged planes
   // of the old build read as floating glass, so these use a radial alpha ramp.
   const fogTex = softFogTexture();
-  const fogGroup = [];
   for (let i = 0; i < 16; i++) {
     const mat = new THREE.SpriteMaterial({
       map: fogTex, color: 0xd7dcd9, transparent: true,
@@ -127,7 +190,6 @@ export function buildGoldenGate(L) {
       type: 'fog', mesh: sp, baseX: x, baseZ: z, baseY: y,
       phase: Math.random() * 6.28, opacity: mat.opacity,
     });
-    fogGroup.push(sp);
   }
 
   /* ------------------------------------------------------------- gameplay */

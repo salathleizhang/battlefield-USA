@@ -384,14 +384,17 @@ function buildCables(L, P, M) {
     }
   }
 
-  /* Anchorages: two concrete blocks flanking the roadway at each end. */
+  /* Anchorages: two concrete blocks flanking the roadway at each end. Kept
+   * fully outboard of the deck (deck edge x = 11) so they never become an
+   * invisible wall on the walkway. */
+  const anchorX = P.deckWidth / 2 + 7;
   for (const zs of [-1, 1]) {
     for (const s of [-1, 1]) {
-      const x = s * P.cableX;
+      const x = s * anchorX;
       const zz = zs * P.anchorZ;
-      L.batch.box(19, 30, 24, x, 25, zz, M.concrete, { uv: 0.1 });
-      L.batch.box(20, 2.2, 25, x, 41, zz, M.concrete, { uv: 0.2 });
-      L.solidBox(x, 25, zz, 19, 30, 24, 0, { surface: 'concrete' });
+      L.batch.box(14, 30, 24, x, 25, zz, M.concrete, { uv: 0.1 });
+      L.batch.box(15, 2.2, 25, x, 41, zz, M.concrete, { uv: 0.2 });
+      L.solidBox(x, 25, zz, 14, 30, 24, 0, { surface: 'concrete' });
     }
   }
 }
