@@ -354,7 +354,7 @@ export class HUD {
       ctx.beginPath();
       ctx.moveTo(x, 4); ctx.lineTo(x + 6, 12); ctx.lineTo(x - 6, 12); ctx.closePath(); ctx.fill();
       ctx.font = '400 11px "Ma Shan Zheng", "Kaiti SC", serif';
-      ctx.fillStyle = '#0c0e0b';
+      ctx.fillStyle = '#1a0704';
       ctx.fillText(cp.id, x, 11);
     }
     ctx.restore();

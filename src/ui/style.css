@@ -305,7 +305,7 @@ html, body {
 }
 .brand-lockup { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; }
 .brand-logo {
-  width: 74px; height: 74px; flex: none; object-fit: contain; display: block;
+  width: 84px; height: 84px; flex: none; object-fit: contain; display: block;
   filter:
     drop-shadow(0 3px 0 rgba(60, 5, 2, 0.55))
     drop-shadow(0 8px 20px rgba(0, 0, 0, 0.6))
@@ -1086,7 +1086,7 @@ html, body {
 /* ------------------------------------------------------------- responsive */
 @media (max-width: 1180px) {
   .menu-side { width: min(350px, 38vw); padding-left: 3vw; }
-  .brand-logo { width: 58px; height: 58px; }
+  .brand-logo { width: 64px; height: 64px; }
   .brand-word { font-size: 34px; }
   .mission .m-name { font-size: 20px; }
   .brief-title { font-size: 32px; }
@@ -1097,7 +1097,7 @@ html, body {
 @media (max-width: 980px) {
   .menu { flex-direction: column; overflow-y: auto; }
   .menu-side { width: 100%; padding: 20px 24px 14px; background: rgba(13, 5, 3, 0.95); }
-  .brand-logo { width: 54px; height: 54px; }
+  .brand-logo { width: 58px; height: 58px; }
   .brand-word { font-size: 32px; }
   .side-sub { margin: 18px 0 8px; }
   .side-foot { display: none; }
@@ -1123,6 +1123,6 @@ html, body {
   .objective-strip { bottom: 86px; padding: 6px 12px; }
   .obj-v { font-size: 11px; }
   .end-stats { grid-template-columns: repeat(2, 1fr); }
-  .brand-logo { width: 46px; height: 46px; }
+  .brand-logo { width: 48px; height: 48px; }
   .brand-word { font-size: 28px; }
 }
