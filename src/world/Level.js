@@ -659,6 +659,8 @@ export class Level {
         a.mesh.position.z = a.baseZ + Math.cos(t * 0.021 + a.phase) * 10;
         a.mesh.position.y = a.baseY + Math.sin(t * 0.06 + a.phase) * 1.2;
         a.mesh.material.opacity = a.opacity * (0.72 + 0.28 * Math.sin(t * 0.11 + a.phase));
+      } else if (a.type === 'fn') {
+        a.update(t, dt);
       }
     }
   }
