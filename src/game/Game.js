@@ -396,7 +396,7 @@ export class Game {
         this.renderer.camera.lookAt(c[3], c[4], c[5]);
         this.viewmodel?.setEnabled(false);
       }
-      this.renderer.render();
+      this.renderer.render(dt);
     }
     if (!this.started || this.paused || !this.player) return;
     if (this.match?.state === 'ended') return;
