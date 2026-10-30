@@ -12,11 +12,13 @@ import { Level } from '../world/Level.js';
 import { Player } from './Player.js';
 import { Weapon } from './weapons/Weapon.js';
 import { ViewModel } from './weapons/ViewModel.js';
+import { loadRifle } from './weapons/RifleModel.js';
 import { Bot } from './bots/Bot.js';
 import { CharacterLibrary } from './bots/CharacterLibrary.js';
 import { Match } from './Match.js';
 import { HUD } from '../ui/HUD.js';
 import { Atmosphere } from '../render/Atmosphere.js';
+import { Ambience } from '../render/Ambience.js';
 import { CAMPAIGN_BY_ID } from './campaigns.js';
 import { rand, clamp } from '../core/MathUtil.js';
 
@@ -65,7 +67,35 @@ export class Game {
     this.props = new Props();
     await this.props.load((p, label) => onProgress?.(0.9 + p * 0.08, label));
     await this._loadMiamiCar();
+    await this._loadRifle();
     onProgress?.(1, '准备就绪');
+  }
+
+  /**
+   * First-person weapons: a Poly Haven CC0 bolt-action rifle plus a CC0 stick grenade.
+   * The rifle is handed to Type38 as the raw authored scene, which owns metric
+   * normalisation, the sight-line origin and the bolt re-parenting.
+   */
+  async _loadRifle() {
+    try {
+      this.weaponTemplate = await loadRifle();
+    } catch (e) {
+      console.warn('[weapon] rifle asset unavailable', e?.message || e);
+      this.weaponTemplate = null;
+    }
+    try {
+      const gltf = await new GLTFLoader().loadAsync('/assets/models/weapons/stick_grenade/model.gltf');
+      this.grenadeTemplate = gltf.scene;
+      this.grenadeTemplate.traverse((o) => {
+        if (!o.isMesh) return;
+        o.castShadow = true;
+        o.receiveShadow = true;
+        if (o.material) o.material.envMapIntensity = 0.9;
+      });
+    } catch (e) {
+      console.warn('[weapon] stick grenade unavailable', e?.message || e);
+      this.grenadeTemplate = null;
+    }
   }
 
   /** Ocean Drive's hero convertible, ported from StarKnightt/ocean-drive (MIT). */
@@ -354,11 +384,15 @@ export class Game {
     const vel = dir.clone().multiplyScalar(15).add(new THREE.Vector3(0, 4.4, 0)).add(
       new THREE.Vector3(owner.velocity.x * 0.4, 0, owner.velocity.z * 0.4),
     );
-    const mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.09, 8, 6),
-      new THREE.MeshStandardMaterial({ color: 0x3b3f37, roughness: 0.6, metalness: 0.3 }),
-    );
+    // Poly Haven CC0 Stielhandgranate 24; fall back to a sphere if the asset is missing.
+    const mesh = this.grenadeTemplate
+      ? this.grenadeTemplate.clone(true)
+      : new THREE.Mesh(
+        new THREE.SphereGeometry(0.09, 8, 6),
+        new THREE.MeshStandardMaterial({ color: 0x3b3f37, roughness: 0.6, metalness: 0.3 }),
+      );
     mesh.position.copy(pos);
+    mesh.rotation.set(0.4, 0, 0.25);
     this.worldGroup.add(mesh);
     this.grenadeList.push({ pos, vel, mesh, t: 2.6, owner });
     this.hud?.toast(`手榴弹 · 剩余 ${this.grenades}`);
