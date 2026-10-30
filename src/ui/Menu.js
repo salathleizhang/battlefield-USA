@@ -5,9 +5,9 @@ const SETTINGS_KEY = 'bf-la-settings-v1';
 export function loadSettings() {
   try {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
-    return { sens: 1, volume: 0.7, master: 0.7, recoil: 1, ...s };
+    return { sens: 1, volume: 0.7, master: 0.7, recoil: 1, quality: 2, ...s };
   } catch {
-    return { sens: 1, volume: 0.7, master: 0.7, recoil: 1 };
+    return { sens: 1, volume: 0.7, master: 0.7, recoil: 1, quality: 2 };
   }
 }
 
@@ -99,6 +99,7 @@ export class Menu {
         <div class="setting-row"><label>鼠标灵敏度</label><input type="range" id="set-sens" min="0.2" max="2" step="0.05"><span class="val" id="val-sens">1.00</span></div>
         <div class="setting-row"><label>主音量</label><input type="range" id="set-vol" min="0" max="1" step="0.05"><span class="val" id="val-vol">70%</span></div>
         <div class="setting-row"><label>后坐力强度</label><input type="range" id="set-rec" min="0" max="1.5" step="0.05"><span class="val" id="val-rec">100%</span></div>
+        <div class="setting-row"><label>画质</label><input type="range" id="set-qual" min="0" max="3" step="1"><span class="val" id="val-qual">高</span></div>
         <button class="btn settings-close" id="btn-settings-close">返回</button>
       </div>`;
     this.root.appendChild(settingsPanel);
@@ -209,6 +210,7 @@ export class Menu {
     bind('#set-sens', 'sens', (v) => v.toFixed(2));
     bind('#set-vol', 'volume', (v) => `${Math.round(v * 100)}%`);
     bind('#set-rec', 'recoil', (v) => `${Math.round(v * 100)}%`);
+    bind('#set-qual', 'quality', (v) => ['低', '中', '高', '极致'][v | 0] ?? '高');
   }
 
   _applySettings() {
@@ -217,6 +219,7 @@ export class Menu {
     this.game.audio.ensure();
     if (this.game.input) this.game.input.sensitivity = this.settings.sens;
     if (this.game.player) this.game.player.recoilScale = this.settings.recoil ?? 1;
+    this.game.renderer?.applySettings?.(this.settings);
   }
 
   toggleSettings(open) {
