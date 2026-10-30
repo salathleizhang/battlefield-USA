@@ -390,7 +390,7 @@ export class Level {
 
   landingCraft(x, z, rot = 0, { base = null } = {}) {
     const gy = base ?? this.waterY;
-    const mat = this.mats.get('metal');
+    const mat = this.mats.get('landingHull');
     const c = Math.cos(rot), s = Math.sin(rot);
     this.batch.box(18, 1.3, 4.6, x, gy + 0.55, z, mat, { rotY: rot });
     this.batch.box(18, 1.3, 0.35, x + 0.4 * s, gy + 1.65, z + 2.2 * c, mat, { rotY: rot });

@@ -445,6 +445,9 @@ export class Materials {
 
     /* Metal family. */
     m.metal = pbr('steel', { color: 0x9aa1a6 }) || this._std(t.metal, { roughness: 0.62, metalness: 0.18 });
+    // LCM/LCVP hulls: weathered grey-green paint, pale enough to read against the surf.
+    m.landingHull = pbr('steel', { color: 0x8b968d, roughness: 0.74, metalness: 0.1 })
+      || this._std(t.metal, { color: 0x77827a, roughness: 0.78, metalness: 0.14 });
     m.rust = pbr('rust', { color: 0xd9c2ab }) || this._std(t.metal, { color: 0x8a5a3a, roughness: 0.8, metalness: 0.15 });
     // The source plate is heavily corroded; keep only a hint of that relief so
     // the towers read as painted steel, not as chipped terrazzo.
