@@ -76,9 +76,9 @@ export function buildGoldenGate(L) {
       const h = P.deckY - gy;
       if (h < 1.2) continue;
       for (const s of [-1, 1]) {
-        L.batch.box(1.4, h, 1.4, s * 8, gy + h / 2, zs * z, conc, { uv: 0.25 });
+        L.batch.box(1.4, h, 1.4, s * 4.5, gy + h / 2, zs * z, conc, { uv: 0.25 });
       }
-      L.batch.box(18, 0.9, 1.6, 0, gy + h - 0.4, zs * z, conc, { uv: 0.25 });
+      L.batch.box(12.5, 0.9, 1.6, 0, gy + h - 0.4, zs * z, conc, { uv: 0.25 });
     }
   }
 
@@ -164,7 +164,7 @@ export function buildGoldenGate(L) {
     const mat = new THREE.MeshBasicMaterial({
       map: tex, transparent: true, opacity: 0.32, depthWrite: false, color: 0x101a1c,
     });
-    const shadow = new THREE.Mesh(new THREE.PlaneGeometry(92, 1180), mat);
+    const shadow = new THREE.Mesh(new THREE.PlaneGeometry(56, 1180), mat);
     shadow.rotation.x = -Math.PI / 2;
     shadow.position.set(-16, 0.06, -14);
     L.scene.add(shadow);
@@ -193,62 +193,62 @@ export function buildGoldenGate(L) {
   }
 
   /* ------------------------------------------------------------- gameplay */
-  L.addCapturePoint({ id: 'A', name: '北塔', x: 0, z: -P.towerZ, radius: 16, owner: -1, base: DECK, height: 10 });
-  L.addCapturePoint({ id: 'B', name: '中跨', x: 0, z: 0, radius: 16, owner: -1, base: DECK, height: 10 });
-  L.addCapturePoint({ id: 'C', name: '南塔 · 旧金山', x: 0, z: P.towerZ, radius: 16, owner: 1, base: DECK, height: 10 });
+  L.addCapturePoint({ id: 'A', name: '北塔', x: 0, z: -P.towerZ, radius: 7, owner: -1, base: DECK, height: 10 });
+  L.addCapturePoint({ id: 'B', name: '中跨', x: 0, z: 0, radius: 7, owner: -1, base: DECK, height: 10 });
+  L.addCapturePoint({ id: 'C', name: '南塔 · 旧金山', x: 0, z: P.towerZ, radius: 7, owner: 1, base: DECK, height: 10 });
 
   L.setPlayerSpawn(0, -512, Math.PI, { base: DECK });
   L.addSpawn(0, 0, -512, Math.PI, { base: DECK });
-  L.addSpawn(0, -7, -500, Math.PI, { base: DECK });
-  L.addSpawn(0, 7, -494, Math.PI, { base: DECK });
+  L.addSpawn(0, -3.2, -500, Math.PI, { base: DECK });
+  L.addSpawn(0, 3.2, -494, Math.PI, { base: DECK });
   L.addSpawn(0, 0, -462, Math.PI, { base: DECK });
   L.addSpawn(0, 0, -398, Math.PI, { base: DECK });
   L.addSpawn(1, 0, 512, 0, { base: DECK });
-  L.addSpawn(1, -7, 500, 0, { base: DECK });
-  L.addSpawn(1, 7, 494, 0, { base: DECK });
+  L.addSpawn(1, -3.2, 500, 0, { base: DECK });
+  L.addSpawn(1, 3.2, 494, 0, { base: DECK });
   L.addSpawn(1, 0, 462, 0, { base: DECK });
   L.addSpawn(1, 0, 398, 0, { base: DECK });
 
   // Strongpoints on the deck: sandbags under each portal, roadblocks and
   // supply caches at the three objectives.
   for (const tz of [-P.towerZ, P.towerZ]) {
-    L.sandbags(-8, tz - 8, 0, 5, { base: DECK });
-    L.sandbags(8, tz + 8, Math.PI, 5, { base: DECK });
-    L.batch.cylinder(0.25, 0.3, 4, 6, -8, DECK + 2, tz - 8, L.mats.get('metal'));
-    L.batch.cylinder(0.25, 0.3, 4, 6, 8, DECK + 2, tz + 8, L.mats.get('metal'));
+    L.sandbags(-4.2, tz - 8, 0, 4, { base: DECK });
+    L.sandbags(4.2, tz + 8, Math.PI, 4, { base: DECK });
+    L.batch.cylinder(0.25, 0.3, 4, 6, -4.2, DECK + 2, tz - 8, L.mats.get('metal'));
+    L.batch.cylinder(0.25, 0.3, 4, 6, 4.2, DECK + 2, tz + 8, L.mats.get('metal'));
   }
   L.sandbags(0, 106, Math.PI / 2, 7, { base: DECK });
   L.sandbags(0, -96, Math.PI / 2, 6, { base: DECK });
-  L.barbedWire(-6, 78, Math.PI / 2, 14, { base: DECK });
-  L.barbedWire(6, -70, Math.PI / 2, 14, { base: DECK });
+  L.barbedWire(-3.4, 78, Math.PI / 2, 14, { base: DECK });
+  L.barbedWire(3.4, -70, Math.PI / 2, 14, { base: DECK });
 
-  L.wreck(5, 14, 1.2, { base: DECK, kind: 'truck' });
-  L.wreck(-5, -44, 0.3, { base: DECK, kind: 'car' });
+  L.wreck(3, 14, 1.2, { base: DECK, kind: 'truck' });
+  L.wreck(-3, -44, 0.3, { base: DECK, kind: 'car' });
 
   const cache = (x, z, rot = 0) => {
     L.prop('crate', x, z, rot, { base: DECK });
     L.prop('ammo', x + 0.5, z + 0.6, rot, { base: DECK, y: 0.32 });
     L.prop('barrel', x + 1.9, z - 0.4, 0, { base: DECK });
   };
-  cache(-8.6, -310);
-  cache(8.6, -330);
-  cache(-8.4, 8);
-  cache(8.4, -10);
-  cache(-8.6, 304);
-  cache(8.6, 330);
+  cache(-4.2, -310);
+  cache(4.2, -330);
+  cache(-4.2, 8);
+  cache(4.2, -10);
+  cache(-4.2, 304);
+  cache(4.2, 330);
 
   for (const z of [-382, -258, -64, 64, 250, 382]) {
-    L.prop('barrier', -5.5, z, 0.1, { base: DECK });
-    L.prop('barrier', 5.5, z + 1, -0.1, { base: DECK });
+    L.prop('barrier', -3.4, z, 0.1, { base: DECK });
+    L.prop('barrier', 3.4, z + 1, -0.1, { base: DECK });
   }
-  L.prop('crateWood', -7, -150, 0.4, { base: DECK });
-  L.prop('barrelRust', 7, 148, 0, { base: DECK });
+  L.prop('crateWood', -4, -150, 0.4, { base: DECK });
+  L.prop('barrelRust', 4, 148, 0, { base: DECK });
   L.prop('ammo', 2.4, 150, 0, { base: DECK });
 
   // A pair of searchlights watching the southern approach.
   for (const s of [-1, 1]) {
-    L.batch.cylinder(0.3, 0.36, 1.2, 8, s * 7, DECK + 0.6, 452, L.mats.get('metal'));
-    L.batch.cylinder(0.5, 0.62, 1.4, 10, s * 7, DECK + 1.9, 452, L.mats.get('metal'), {
+    L.batch.cylinder(0.3, 0.36, 1.2, 8, s * 3.2, DECK + 0.6, 452, L.mats.get('metal'));
+    L.batch.cylinder(0.5, 0.62, 1.4, 10, s * 3.2, DECK + 1.9, 452, L.mats.get('metal'), {
       rotZ: s * 0.5, rotX: -0.4,
     });
   }
