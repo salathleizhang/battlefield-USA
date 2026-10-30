@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
-import { clamp } from '../../core/MathUtil.js';
+import { clamp, damp } from '../../core/MathUtil.js';
 
 const BASE = '/assets/models/chars/';
 const TARGET_HEIGHT = 1.83;
@@ -19,6 +19,7 @@ export class CharacterLibrary {
     this.templates = {};
     this.weapons = {};
     this.clips = [];
+    this.aimClip = null;
     this.matCache = new Map();
     this.texCache = new Map();
     this._loading = null;
@@ -45,6 +46,7 @@ export class CharacterLibrary {
       this.templates.us = us2.scene;
       this.templates.us2 = us2.scene;
       this.clips = anims.animations;
+      this.aimClip = upperBodyMask(this.clips.find((c) => c.name === 'aim'));
       const kar = weapons.scene.getObjectByName('kar98k');
       if (kar) this.weapons.kar98k = kar;
       this.ready = true;
@@ -151,6 +153,17 @@ class PbrSoldier {
       const action = this.mixer.clipAction(clip);
       this.actions[clip.name] = action;
     }
+    // Rifle-up overlay: the aim clip masked to spine/arms/head, blended over locomotion
+    // so a moving bot still presents the weapon instead of swinging it at the hip.
+    this.aimW = 0;
+    if (this.library.aimClip) {
+      this.aimAction = this.mixer.clipAction(this.library.aimClip);
+      this.aimAction.setLoop(THREE.LoopRepeat, Infinity);
+      this.aimAction.enabled = true;
+      this.aimAction.setEffectiveWeight(0);
+      this.aimAction.play();
+    }
+
     this._base = 'idle';
     this.play('idle', 0);
     this.mixer.addEventListener('finished', (e) => {
@@ -319,6 +332,11 @@ class PbrSoldier {
     this.playOneShot('reload', 0.12);
   }
 
+  hit(head = false) {
+    if (!this.alive) return;
+    this.playOneShot(head ? 'hit_head' : 'hit', 0.05);
+  }
+
   setDead() {
     this.dead = true;
     this.deadT = 0;
@@ -359,6 +377,11 @@ class PbrSoldier {
       }
     }
 
+    if (this.aimAction) {
+      const target = this.alive ? (this.aiming ? 1 : 0) : 0;
+      this.aimW = damp(this.aimW, target, 8, dt);
+      this.aimAction.setEffectiveWeight(this.aimW * 0.92);
+    }
     this.mixer.update(dt);
 
     this.lodT -= dt;
@@ -457,4 +480,13 @@ function starTexture() {
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
+}
+
+/** Keep only the upper-body tracks of a clip so it can be layered over locomotion. */
+function upperBodyMask(clip) {
+  if (!clip) return null;
+  const keep = /(spine|neck|head|upperarm|lowerarm|hand|shoulder|clavicle)/i;
+  const tracks = clip.tracks.filter((t) => keep.test(t.name.split('.')[0]));
+  if (!tracks.length) return null;
+  return new THREE.AnimationClip(`${clip.name}_upper`, clip.duration, tracks);
 }

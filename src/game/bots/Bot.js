@@ -283,6 +283,7 @@ export class Bot {
       this.targetSeenAt = this.time;
     }
     this.game.effects.blood(this.eye, new THREE.Vector3(rand(-0.4, 0.4), 0.2, rand(-0.4, 0.4)));
+    if (this.health > 0) this.model.hit?.(!!info.headshot);
     if (this.health <= 0) this.die(attacker, info);
   }
 
