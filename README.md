@@ -57,12 +57,13 @@ npm run build    # 生产构建到 dist/
 - **换成付费正版资产不需要改代码**：把贴图按 `albedo / normal / roughness / metalness / ao` 五个文件名放进 `public/assets/pbr/<材质名>/`，或在 manifest 里新增条目即可。具体命名映射见 CREDITS.md。
 - 建筑、武器、士兵、植被、桥梁、纪念碑等主体仍为 **程序化建模**；战壕沙袋改为参考项目的「压扁球体 + 收口」堆垛方式（4 层错缝、双层垛），不再是方盒贴图。
 - 场景小道具复用参考项目的 **CC0 GLB 模型**：混凝土路障、军用木箱、木条箱、油桶、弹药箱、汽油桶，按实例化批渲染放入四张地图的据点与补给点，授权与来源见 [props/CREDITS.md](public/assets/models/props/CREDITS.md)。
-- UI 版式参考 [Ironline](https://github.com/cktang88/3d-fps)：深色战术面板、切角、金色单强调、左栏战役导航、圆形小地图与紧凑比分区；字体换成自托管的毛笔楷书 **Ma Shan Zheng**（SIL OFL 1.1），按项目实际用字子集化为约 280KB 的 woff2，正文为宋体系统字体栈，数字与英文为等宽字体。字体与授权见 `public/fonts/`，不依赖外部字体 CDN。
+- UI 版式参考 [Ironline](https://github.com/cktang88/3d-fps)：左栏战役导航、半透明战役卡片、圆形小地图与紧凑比分区；视觉改为 **红色警戒 / 共和国之辉** 式的赤红搪瓷 + 黄铜描边军械面板，主按钮为金色斜面，次按钮为暗红钢板。战役卡片使用低透明度玻璃底 + 背景压暗，让战役循环影像从卡片后透出。字体保留自托管的毛笔楷书 **Ma Shan Zheng**（SIL OFL 1.1），按钮与标签改用黑体系统栈；正文为宋体系统字体栈，数字与英文为等宽字体。字体与授权见 `public/fonts/`，不依赖外部字体 CDN。
+- **品牌徽记**：由 Seedream 生成的红金圆形军徽 —— 一把锤子镰刀斜插在展翅白头鹰身上，象征远征军的征服；洋红底抠像后导出为透明 PNG（`public/assets/brand/emblem.png`，另导出 64px 的 `favicon.png`），同时用作菜单标识、加载页徽记与站点图标。
 
 ## 参考与致谢
 
 - 代码架构参考了 [cktang88/3d-fps](https://github.com/cktang88/3d-fps)（Ironline）的浏览器 FPS 工程实践，包括 Rapier 角色控制器思路、武器层渲染与征服模式结构；其中场景道具（`public/assets/models/props/`）直接复用其 **Poly Haven CC0** 模型，沙袋堆垛方式也来自该项目；其余美术仍为本项目自制或程序化生成。
-- 迈阿密海滩的**棕榈树系统**移植自 [StarKnightt/ocean-drive](https://github.com/StarKnightt/ocean-drive)（MIT）：包括椰子/王棕/菜棕的程序化树干、叶片图集、椰果与风摆着色器；迈阿密地图按战役地形重新布置了树列。
+- 迈阿密海滩的**棕榈树系统**与**敞篷车模型**移植自 [StarKnightt/ocean-drive](https://github.com/StarKnightt/ocean-drive)（MIT）：棕榈部分包括椰子/王棕/菜棕的程序化树干、叶片图集、椰果与风摆着色器，按战役地形重新布置了树列；车辆为 `public/assets/models/miami/convertible.glb`，按停车位重新上色并做了低开销阴影。
 
 ## 开发进度
 
