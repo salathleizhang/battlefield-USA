@@ -202,7 +202,7 @@ export class Renderer {
     // Screen-space ambient occlusion: the single biggest "the reference looks solid" upgrade.
     this.aoPass = new N8AOPostPass(this.scene, this.camera, 1, 1);
     Object.assign(this.aoPass.configuration, {
-      aoRadius: 1.1, distanceFalloff: 0.35, intensity: 2.4, halfRes: true, depthAwareUpsampling: true,
+      aoRadius: 2.4, distanceFalloff: 0.18, intensity: 3.6, halfRes: true, depthAwareUpsampling: true,
       gammaCorrection: false, color: new THREE.Color(0x0d0a08),
     });
     this.aoPass.setQualityMode('Medium');
@@ -460,7 +460,7 @@ export class Renderer {
     this.skyUniforms.uCloud.value.set(cloudColor ?? 0x4e5257);
     this.skyUniforms.uSunColor.value.set(sunColor ?? 0xffd9a0);
     // Rebuild the IBL from the new sky so wet surfaces and puddles reflect it.
-    this.captureSkyEnvironment({ intensity: 0.82 });
+    this.captureSkyEnvironment({ intensity: 0.95 });
   }
 
   setDamage(amount) { this.damagePulse = Math.min(1, this.damagePulse + amount); }

@@ -57,11 +57,11 @@ export class GradeEffect extends Effect {
       uniforms: new Map([
         ['lift', new THREE.Uniform(new THREE.Vector3(0.010, 0.014, 0.020))],
         ['gammaV', new THREE.Uniform(new THREE.Vector3(1.0, 1.0, 1.0))],
-        ['gain', new THREE.Uniform(new THREE.Vector3(1.02, 1.0, 0.97))],
-        ['shadowTint', new THREE.Uniform(new THREE.Vector3(-0.010, 0.003, 0.014))],
-        ['highTint', new THREE.Uniform(new THREE.Vector3(0.020, 0.007, -0.014))],
-        ['contrast', new THREE.Uniform(0.28)],
-        ['saturation', new THREE.Uniform(0.94)],
+        ['gain', new THREE.Uniform(new THREE.Vector3(1.06, 1.0, 0.93))],
+        ['shadowTint', new THREE.Uniform(new THREE.Vector3(-0.018, 0.004, 0.026))],
+        ['highTint', new THREE.Uniform(new THREE.Vector3(0.03, 0.011, -0.02))],
+        ['contrast', new THREE.Uniform(0.4)],
+        ['saturation', new THREE.Uniform(1.02)],
         ['exposure', new THREE.Uniform(0.98)],
       ]),
     });

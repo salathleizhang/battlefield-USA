@@ -17,9 +17,9 @@ export const CAMPAIGNS = [
     accent: '#e0906d',
     env: {
       fogColor: 0xefd9bd, fogDensity: 0.0009, sunColor: 0xffd6a8, sunIntensity: 3.1,
-      skyTop: 0x2f5f8e, skyHorizon: 0xf3c9a3, cloudColor: 0xe8c7a6,
+      skyTop: 0x4a7fae, skyHorizon: 0xf6d6b0, cloudColor: 0xf0d6b8,
       groundColor: 0x8a7a64, cloudiness: 0.08,
-      hemiIntensity: 2.15, hemiColor: 0xbdd9ec, hemiGround: 0xb09470,
+      hemiIntensity: 1.25, hemiColor: 0xbdd9ec, hemiGround: 0xb09470,
       sunDir: { x: 0.76, y: 0.32, z: 0.36 },
       ambience: 'coast', wetness: 0.9,
     },
@@ -41,8 +41,8 @@ export const CAMPAIGNS = [
     video: '/assets/video/golden-gate-war-loop.mp4',
     accent: '#b6493a',
     env: {
-      fog: 0xbdc6c5, fogDensity: 0.0016, sun: 0xfff1de, sunIntensity: 1.95,
-      skyTop: 0x8e9ea5, skyHorizon: 0xc9d0ce, ground: 0x5b615c, cloudiness: 0.55,
+      fog: 0x8f9b99, fogDensity: 0.0015, sun: 0xe9e2d4, sunIntensity: 1.55,
+      skyTop: 0x64767d, skyHorizon: 0x9faaa8, ground: 0x454b46, cloudiness: 0.28, cloudColor: 0x5b6463,
       sunDir: { x: 0.45, y: 0.52, z: 0.72 },
       ambience: 'bridge', wetness: 1.0,
       hdri: 'goldenGate', envIntensity: 0.9, hdriRotation: 0.4,
