@@ -6,13 +6,15 @@ import { clamp, lerp } from '../core/MathUtil.js';
  * Golden Gate Bridge — structural replica at half the real dimensions.
  *
  * The real span is 1280 m between towers, 67 m of clearance under the deck and
- * 227 m from the water to the tower tops. Everything here is that geometry at
- * 0.5x (640 / 33.5 / 113.5), so the silhouette, the cable sag and the deck
- * proportions match photographs instead of being eyeballed. On top of the
- * dimensions the model carries the details that actually read at play
- * distance: stepped Art Deco tower portals with fluted legs, a 3.8 m deep
- * stiffening truss, paired suspender ropes with cable bands, the picket
- * railing, lane paint, expansion joints and the 1937 lamp standards.
+ * 227 m from the water to the tower tops, with a 27.4 m deck. Everything here
+ * is that geometry at 0.5x (640 / 33.5 / 113.5 / 13.8), so the silhouette,
+ * the cable sag and — critically — the tower's slenderness match photographs
+ * instead of being eyeballed: 80 m of tower above the deck over a 19.5 m wide
+ * shaft is a 4.1 ratio, against the real 4.4. On top of the dimensions the
+ * model carries the details that read at play distance: densely fluted Art
+ * Deco legs, four portal struts with recessed ribbed panels, X-bracing below
+ * the roadway, a 3.8 m stiffening truss, paired suspender ropes with cable
+ * bands, the picket railing, lane paint and the 1937 lamp standards.
  */
 
 export const GG_DEFAULTS = {
