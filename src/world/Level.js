@@ -373,8 +373,8 @@ export class Level {
     this.smokeColumn(x, gy + 2.0, z, 0.8);
   }
 
-  barbedWire(x, z, rot = 0, len = 8) {
-    const gy = this.groundHeight(x, z);
+  barbedWire(x, z, rot = 0, len = 8, { base = null } = {}) {
+    const gy = base ?? this.groundHeight(x, z);
     const posts = Math.max(2, Math.round(len / 3));
     for (let i = 0; i <= posts; i++) {
       const off = -len / 2 + (len / posts) * i;
@@ -654,6 +654,11 @@ export class Level {
         }
         pos.needsUpdate = true;
         a.mesh.geometry.computeVertexNormals();
+      } else if (a.type === 'fog') {
+        a.mesh.position.x = a.baseX + Math.sin(t * 0.035 + a.phase) * 16;
+        a.mesh.position.z = a.baseZ + Math.cos(t * 0.021 + a.phase) * 10;
+        a.mesh.position.y = a.baseY + Math.sin(t * 0.06 + a.phase) * 1.2;
+        a.mesh.material.opacity = a.opacity * (0.72 + 0.28 * Math.sin(t * 0.11 + a.phase));
       }
     }
   }

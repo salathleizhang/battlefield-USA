@@ -1,201 +1,217 @@
 import * as THREE from 'three';
-import { clamp, lerp, smoothstep } from '../../core/MathUtil.js';
+import { lerp, smoothstep } from '../../core/MathUtil.js';
+import { buildGoldenGateBridge } from '../GoldenGateBridge.js';
 
 /**
  * 飞夺金门大桥 — 1947.3.19
- * A 500 m compressed Golden Gate span: two 150 m towers, catenary cables,
- * deck at 58 m, heavy fog. Capture north tower → mid-span → south tower.
+ *
+ * The bridge is a half-scale structural replica of the real Golden Gate
+ * (640 m main span, 33.5 m deck clearance, 113.5 m towers) sitting in a
+ * 1.6 km model of the strait: Marin headlands to the north, the Presidio
+ * bluff to the south, Alcatraz in the fog off to the west. Capture the north
+ * tower, the mid-span, then the south tower.
  */
 export function buildGoldenGate(L) {
-  L.bounds = { minX: -260, maxX: 260, minZ: -420, maxZ: 420 };
-  const deckY = 58;
+  const P = {
+    deckY: 33.5,
+    length: 1080,
+    towerZ: 320,
+    anchorZ: 486,
+  };
+  const DECK = P.deckY + 0.06;
 
+  L.bounds = { minX: -220, maxX: 220, minZ: -590, maxZ: 590 };
+  L.worldGround = P.deckY;
+
+  /* ------------------------------------------------------------- terrain */
+  // A deep channel through the strait, then the two headlands. The shoreline
+  // sits at z = ±450…500 so both towers stand offshore, as they do in life.
   const height = (x, z) => {
     const d = Math.abs(z);
-    if (d < 235) return -14;
-    const t = smoothstep(235, 300, d);
-    return lerp(-14, 42, t) + Math.sin(x * 0.05) * 3 * t;
+    if (d < 450) return -26 + Math.sin(x * 0.021) * 1.2;
+    const t = smoothstep(450, 500, d);
+    let h = lerp(-26, 34, t);
+    if (d > 500) {
+      const g = smoothstep(500, 720, d);
+      h += g * (z < 0 ? 88 : 42);
+      h += Math.sin(x * 0.018 + z * 0.006) * 9 * g;
+      h += Math.sin(x * 0.05 + 1.3) * 3.2 * g;
+    }
+    return h;
   };
+
   L.addTerrain({
-    size: 900, segments: 150, height, texture: 'grass', tile: 6,
+    size: 1600, segments: 220, height, texture: 'grass', tile: 7,
     color: (x, z, y, c) => {
-      if (y < 2) c.setHex(0x7c8278);
-      else c.setHex(0xa5a37c).lerp(new THREE.Color(0x737a62), Math.random() * 0.5);
+      const n = Math.random();
+      if (y < 1.5) c.setHex(0x4d4b42);
+      else if (y < 30) c.setHex(0x5b5f43).lerp(new THREE.Color(0x7a7050), n * 0.7);
+      else c.setHex(0x566440).lerp(new THREE.Color(0x7b7450), n * 0.75);
     },
   });
-  L.addWater({ y: 0, size: 2000, color: 0x4f5c5a, opacity: 0.98, rough: 0.09 });
-  L.worldGround = deckY;
 
-  /* ---------------------------------------------------------------- deck */
-  const orange = L.mats.get('bridgePaint');
-  L.mats.mats.bridgeOrange = orange;
-  const deckMat = L.mats.get('bridgeDeck') || L.mats.get('asphalt');
-  const walkMat = L.mats.get('concrete');
-  const steelMat = L.mats.get('bridgeSteel');
-  L.batch.box(24, 1.3, 500, 0, deckY, 0, deckMat, { uv: 0.15 });
-  L.solidBox(0, deckY, 0, 24, 1.3, 500, 0, { surface: 'concrete' });
-  // Underside girders catch light from the water and give the deck an edge.
-  for (const side of [-1, 1]) {
-    L.batch.box(1.1, 1.9, 500, side * 9.4, deckY - 1.5, 0, steelMat, { uv: 0.2 });
-  }
-  // Sidewalks & railings.
-  for (const side of [-1, 1]) {
-    L.batch.box(2.2, 0.5, 500, side * 10.6, deckY + 0.9, 0, walkMat, { uv: 0.3 });
-    L.batch.box(0.12, 0.10, 500, side * 11.7, deckY + 2.05, 0, orange, { uv: 0.3 });
-    L.batch.box(0.08, 0.08, 500, side * 11.7, deckY + 1.55, 0, orange, { uv: 0.3 });
-    for (let z = -248; z <= 248; z += 4) {
-      L.batch.box(0.1, 1.15, 0.1, side * 11.7, deckY + 1.55, z, orange);
-    }
-    L.solidBox(side * 11.7, deckY + 1.6, 0, 0.25, 1.4, 500, 0, { surface: 'metal' });
-    // Lamp posts every 24 m.
-    for (let z = -240; z <= 240; z += 24) {
-      L.batch.cylinder(0.07, 0.09, 5.5, 6, side * 11.2, deckY + 3.2, z, steelMat);
-      L.batch.sphere(0.22, side * 11.2, deckY + 6, z, L.mats.get('lampWarm'));
-    }
-  }
-  // Road markings.
-  for (let z = -245; z < 245; z += 12) {
-    L.batch.box(0.18, 0.02, 4, 0, deckY + 0.68, z, L.mats.get('plasterWhite'), { uv: 0.4 });
-  }
-  // Approach ramps at both ends.
-  for (const dir of [-1, 1]) {
-    const anchorZ = dir * 250;
-    const geo = new THREE.BoxGeometry(24, 1.3, 60);
-    const m = new THREE.Matrix4().makeRotationX(dir * 0.35);
-    m.setPosition(0, deckY - 12, anchorZ + dir * 28);
-    L.batch.add(geo, deckMat, m);
-    L.solidBox(0, deckY - 12, anchorZ + dir * 28, 24, 1.3, 60, 0, { surface: 'concrete' });
-  }
+  L.addWater({ y: 0, size: 3000, color: 0x33474a, opacity: 0.985, rough: 0.09 });
 
-  /* -------------------------------------------------------------- towers */
-  const towerTop = 208;
-  for (const tz of [-140, 140]) {
-    for (const side of [-1, 1]) {
-      const legX = side * 14;
-      // Tapering steel legs: three stacked segments.
-      L.batch.box(6.5, 80, 7.5, legX, deckY + 40, tz, orange, { uv: 0.16 });
-      L.batch.box(5.4, 70, 6.2, legX, deckY + 115, tz, orange, { uv: 0.16 });
-      L.batch.box(4.4, 60, 5.2, legX, deckY + 180, tz, orange, { uv: 0.16 });
-      L.solidBox(legX, deckY + 60, tz, 7, 120, 8, 0, { surface: 'metal' });
-      L.solidBox(legX, deckY + 150, tz, 5, 60, 6, 0, { surface: 'metal' });
-    }
-    // Cross braces.
-    for (const y of [deckY + 40, deckY + 100, deckY + 155, deckY + 200]) {
-      L.batch.box(28, 2.0, 3.2, 0, y, tz, orange, { uv: 0.2 });
-      L.batch.box(2.0, 2.0, 6, -14, y, tz, orange);
-      L.batch.box(2.0, 2.0, 6, 14, y, tz, orange);
-    }
-    // Tower-top cross bracing.
-    L.batch.box(28, 1.4, 3, 0, towerTop, tz, orange, { uv: 0.2 });
-    // Deck-level portal bracing (players walk through the middle).
-    L.batch.box(22, 4.5, 4, 0, deckY + 5.5, tz, orange, { uv: 0.25 });
-    L.solidBox(0, deckY + 5.5, tz, 22, 4.5, 4, 0, { surface: 'metal' });
-    // Sandbag nests on the portals.
-    L.sandbags(-8, tz - 3, 0, 5, { base: deckY + 7.8 });
-    L.sandbags(8, tz - 3, 0, 5, { base: deckY + 7.8 });
-    L.batch.cylinder(0.25, 0.3, 4, 6, -8, deckY + 9.5, tz - 3, L.mats.get('metal'));
-    L.batch.cylinder(0.25, 0.3, 4, 6, 8, deckY + 9.5, tz - 3, L.mats.get('metal'));
+  /* -------------------------------------------------------------- bridge */
+  buildGoldenGateBridge(L, P);
+
+  /* -------------------------------------------------------- environment */
+  const rock = L.mats.get('ground');
+  const concrete = L.mats.get('concrete');
+  const foliage = L.mats.get('foliage');
+  const dark = L.mats.get('bridgeDark');
+
+  // Alcatraz, 700 m west of the span and half lost in the fog.
+  L.batch.box(96, 26, 58, -340, 2, 150, rock, { uv: 0.08 });
+  L.batch.box(70, 12, 40, -340, 20, 150, rock, { uv: 0.1 });
+  L.batch.box(42, 13, 22, -344, 31, 150, concrete, { uv: 0.2 });
+  L.batch.box(9, 8, 8, -312, 30, 140, concrete, { uv: 0.25 });
+  L.batch.cylinder(1.6, 2.2, 14, 8, -312, 40, 140, concrete);
+  L.batch.sphere(0.5, -312, 47.5, 140, L.mats.get('lampWarm'), 8);
+
+  // A Liberty ship anchored in the roads, for scale.
+  const hull = L.mats.get('metal');
+  L.batch.box(92, 9, 14, -220, 4, -70, hull, { uv: 0.08 });
+  L.batch.box(20, 9, 11, -246, 12, -70, hull, { uv: 0.12 });
+  L.batch.box(9, 6, 9, -236, 19, -70, L.mats.get('rust'), { uv: 0.15 });
+  L.batch.cylinder(1.1, 1.4, 14, 6, -236, 28, -70, L.mats.get('rust'));
+  L.batch.box(46, 1.2, 12, -214, 9.5, -70, hull, { uv: 0.15 });
+
+  // Presidio conifers on the southern bluff, and scrub on the Marin side.
+  const conifer = (x, z, s) => {
+    const gy = height(x, z);
+    if (gy < 26) return;
+    L.batch.cylinder(0.35 * s, 0.5 * s, 4 * s, 6, x, gy + 2 * s, z, L.mats.get('palmTrunk'));
+    const cone = (r, h, dy) => {
+      const g = new THREE.ConeGeometry(r, h, 7);
+      g.translate(x, gy + dy, z);
+      L.batch.add(g, foliage);
+    };
+    cone(2.6 * s, 6 * s, 6.4 * s);
+    cone(2.0 * s, 5 * s, 9.6 * s);
+    cone(1.3 * s, 4 * s, 12.2 * s);
+  };
+  for (let i = 0; i < 16; i++) {
+    conifer(-160 + (i * 53) % 320, 545 + ((i * 37) % 60), 0.8 + (i % 3) * 0.35);
+  }
+  for (let i = 0; i < 10; i++) {
+    conifer(-180 + (i * 67) % 360, -560 - ((i * 41) % 70), 0.9 + (i % 4) * 0.3);
   }
 
-  /* --------------------------------------------------------------- cables */
-  // Main cables are wire rope, not painted plate: tight roughness, high metalness.
-  const cableMat = new THREE.MeshStandardMaterial({
-    color: 0x8a4a3a, roughness: 0.42, metalness: 0.72, envMapIntensity: 1.2,
-  });
-  const ropeMat = new THREE.MeshStandardMaterial({ color: 0x4a332c, roughness: 0.6, metalness: 0.35 });
-  for (const side of [-1, 1]) {
-    const cableX = side * 14;
-    const pts = [];
-    pts.push(new THREE.Vector3(cableX, deckY + 12, -250));
-    pts.push(new THREE.Vector3(cableX, deckY + 70, -190));
-    pts.push(new THREE.Vector3(cableX, 200, -140));
-    for (let z = -120; z <= 120; z += 20) {
-      const k = z / 140;
-      pts.push(new THREE.Vector3(cableX, 200 - 122 * (1 - k * k), z));
-    }
-    pts.push(new THREE.Vector3(cableX, 200, 140));
-    pts.push(new THREE.Vector3(cableX, deckY + 70, 190));
-    pts.push(new THREE.Vector3(cableX, deckY + 12, 250));
-    const curve = new THREE.CatmullRomCurve3(pts);
-    const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 90, 0.6, 6, false), cableMat);
-    tube.castShadow = true;
-    L.scene.add(tube);
-
-    // Suspender ropes.
-    for (let z = -235; z <= 235; z += 9) {
-      const t = (z + 250) / 500;
-      const p = curve.getPoint(t);
-      if (p.y <= deckY + 2) continue;
-      const h = p.y - (deckY + 1.2);
-      if (h < 1) continue;
-      const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, h, 4), ropeMat);
-      rope.position.set(cableX, deckY + 1.2 + h / 2, z);
-      L.scene.add(rope);
-    }
+  // A few Marin rock outcrops breaking through the grass.
+  for (let i = 0; i < 12; i++) {
+    const x = -190 + (i * 71) % 380;
+    const z = -548 - (i * 29) % 90;
+    const gy = height(x, z);
+    L.batch.box(6 + (i % 4) * 4, 3 + (i % 3) * 2, 5 + (i % 5) * 3, x, gy + 1, z, rock, { uv: 0.1 });
   }
 
-  /* --------------------------------------------------------- environment */
-  // Marin headlands (north) and San Francisco (south) silhouettes.
-  L.skyline([
-    { x: -120, z: -330, w: 70, h: 26, d: 60 },
-    { x: 40, z: -340, w: 80, h: 18, d: 50 },
-    { x: 150, z: -320, w: 60, h: 30, d: 60 },
-    { x: -150, z: 340, w: 90, h: 34, d: 70 },
-    { x: 20, z: 350, w: 80, h: 46, d: 60 },
-    { x: 140, z: 345, w: 70, h: 24, d: 50 },
-  ]);
-  // Distant Alcatraz-ish island.
-  const islandMat = L.mats.get('ground');
-  L.batch.box(60, 24, 40, -170, 6, 60, islandMat, { uv: 0.1 });
-  L.batch.box(20, 12, 16, -170, 24, 60, islandMat, { uv: 0.1 });
-
-  // Fog banks drifting on the deck.
-  const fogMat = new THREE.MeshBasicMaterial({ color: 0xc3c8c6, transparent: true, opacity: 0.10, depthWrite: false });
-  for (let i = 0; i < 8; i++) {
-    const fog = new THREE.Mesh(new THREE.PlaneGeometry(90, 32), fogMat.clone());
-    fog.position.set((Math.random() - 0.5) * 30, deckY + 6 + Math.random() * 10, -220 + i * 60);
-    fog.material.opacity = 0.07 + Math.random() * 0.09;
-    L.scene.add(fog);
-    L.animated.push({ type: 'fog', mesh: fog, phase: Math.random() * 6.28 });
+  /* ------------------------------------------------------------- fog banks */
+  // Soft, camera-facing puffs drifting through the span. The hard-edged planes
+  // of the old build read as floating glass, so these use a radial alpha ramp.
+  const fogTex = softFogTexture();
+  const fogGroup = [];
+  for (let i = 0; i < 16; i++) {
+    const mat = new THREE.SpriteMaterial({
+      map: fogTex, color: 0xd7dcd9, transparent: true,
+      opacity: 0.12 + Math.random() * 0.08, depthWrite: false, fog: true,
+    });
+    const sp = new THREE.Sprite(mat);
+    const z = -520 + i * 68;
+    const x = (Math.random() - 0.5) * 90;
+    const y = P.deckY + 2 + Math.random() * 26;
+    sp.position.set(x, y, z);
+    sp.scale.set(110 + Math.random() * 70, 34 + Math.random() * 18, 1);
+    L.scene.add(sp);
+    L.animated.push({
+      type: 'fog', mesh: sp, baseX: x, baseZ: z, baseY: y,
+      phase: Math.random() * 6.28, opacity: mat.opacity,
+    });
+    fogGroup.push(sp);
   }
-
-  // Fallen girders + wrecked truck on the deck.
-  L.wreck(5, 20, 1.2, { base: deckY + 0.7, kind: 'truck' });
-  L.wreck(-4, -60, 0.3, { base: deckY + 0.7, kind: 'car' });
-  L.sandbags(0, 100, Math.PI / 2, 7, { base: deckY + 0.7 });
-  L.barbedWire(-6, 70, Math.PI / 2, 14);
-  L.batch.cylinder(0.3, 0.35, 7, 6, -9, deckY + 4, -160, L.mats.get('metal'));
-
-  // Roadblocks and supply caches at the three deck strongpoints.
-  const deck = deckY + 0.7;
-  L.prop('barrier', -6, -151, 0.12, { base: deck });
-  L.prop('barrier', 6, -151, -0.12, { base: deck });
-  L.prop('crate', -9.4, -144, 1.45, { base: deck });
-  L.prop('ammo', -9.4, -144.3, 1.45, { base: deck, y: 0.3 });
-  L.prop('crate', -6.2, 9, 0.25, { base: deck });
-  L.prop('barrel', -8.4, 11, 0, { base: deck });
-  L.prop('ammo', 2.4, 100, 0, { base: deck });
-  L.prop('barrelRust', 7, 134, 0, { base: deck });
-  L.prop('crateWood', -7, 133, 0.4, { base: deck });
-  L.prop('barrier', 5, 152, 0.05, { base: deck });
 
   /* ------------------------------------------------------------- gameplay */
-  L.addCapturePoint({ id: 'A', name: '北塔', x: 0, z: -140, radius: 15, owner: -1, base: deckY + 0.7, height: 9 });
-  L.addCapturePoint({ id: 'B', name: '中跨', x: 0, z: 0, radius: 15, owner: -1, base: deckY + 0.7, height: 9 });
-  L.addCapturePoint({ id: 'C', name: '南塔 · 旧金山', x: 0, z: 140, radius: 15, owner: 1, base: deckY + 0.7, height: 9 });
+  L.addCapturePoint({ id: 'A', name: '北塔', x: 0, z: -P.towerZ, radius: 16, owner: -1, base: DECK, height: 10 });
+  L.addCapturePoint({ id: 'B', name: '中跨', x: 0, z: 0, radius: 16, owner: -1, base: DECK, height: 10 });
+  L.addCapturePoint({ id: 'C', name: '南塔 · 旧金山', x: 0, z: P.towerZ, radius: 16, owner: 1, base: DECK, height: 10 });
 
-  const SPAWN_Y = deckY + 0.7;
-  L.setPlayerSpawn(0, -230, Math.PI, { base: SPAWN_Y });
-  L.addSpawn(0, 0, -228, Math.PI, { base: SPAWN_Y });
-  L.addSpawn(0, -6, -212, Math.PI, { base: SPAWN_Y });
-  L.addSpawn(0, 6, -195, Math.PI, { base: SPAWN_Y });
-  L.addSpawn(0, 0, -160, Math.PI, { base: SPAWN_Y });
-  L.addSpawn(1, 0, 228, 0, { base: SPAWN_Y });
-  L.addSpawn(1, -6, 205, 0, { base: SPAWN_Y });
-  L.addSpawn(1, 6, 190, 0, { base: SPAWN_Y });
-  L.addSpawn(1, 0, 160, 0, { base: SPAWN_Y });
-  L.addRoute([new THREE.Vector3(0, deckY, -140), new THREE.Vector3(-7, deckY, -70), new THREE.Vector3(0, deckY, 0)]);
-  L.addRoute([new THREE.Vector3(-7, deckY, 20), new THREE.Vector3(7, deckY, 80), new THREE.Vector3(0, deckY, 140)]);
+  L.setPlayerSpawn(0, -512, Math.PI, { base: DECK });
+  L.addSpawn(0, 0, -512, Math.PI, { base: DECK });
+  L.addSpawn(0, -7, -500, Math.PI, { base: DECK });
+  L.addSpawn(0, 7, -494, Math.PI, { base: DECK });
+  L.addSpawn(0, 0, -462, Math.PI, { base: DECK });
+  L.addSpawn(0, 0, -398, Math.PI, { base: DECK });
+  L.addSpawn(1, 0, 512, 0, { base: DECK });
+  L.addSpawn(1, -7, 500, 0, { base: DECK });
+  L.addSpawn(1, 7, 494, 0, { base: DECK });
+  L.addSpawn(1, 0, 462, 0, { base: DECK });
+  L.addSpawn(1, 0, 398, 0, { base: DECK });
+
+  // Strongpoints on the deck: sandbags under each portal, roadblocks and
+  // supply caches at the three objectives.
+  for (const tz of [-P.towerZ, P.towerZ]) {
+    L.sandbags(-8, tz - 8, 0, 5, { base: DECK });
+    L.sandbags(8, tz + 8, Math.PI, 5, { base: DECK });
+    L.batch.cylinder(0.25, 0.3, 4, 6, -8, DECK + 2, tz - 8, L.mats.get('metal'));
+    L.batch.cylinder(0.25, 0.3, 4, 6, 8, DECK + 2, tz + 8, L.mats.get('metal'));
+  }
+  L.sandbags(0, 106, Math.PI / 2, 7, { base: DECK });
+  L.sandbags(0, -96, Math.PI / 2, 6, { base: DECK });
+  L.barbedWire(-6, 78, Math.PI / 2, 14, { base: DECK });
+  L.barbedWire(6, -70, Math.PI / 2, 14, { base: DECK });
+
+  L.wreck(5, 14, 1.2, { base: DECK, kind: 'truck' });
+  L.wreck(-5, -44, 0.3, { base: DECK, kind: 'car' });
+
+  const cache = (x, z, rot = 0) => {
+    L.prop('crate', x, z, rot, { base: DECK });
+    L.prop('ammo', x + 0.5, z + 0.6, rot, { base: DECK, y: 0.32 });
+    L.prop('barrel', x + 1.9, z - 0.4, 0, { base: DECK });
+  };
+  cache(-8.6, -310);
+  cache(8.6, -330);
+  cache(-8.4, 8);
+  cache(8.4, -10);
+  cache(-8.6, 304);
+  cache(8.6, 330);
+
+  for (const z of [-382, -258, -64, 64, 250, 382]) {
+    L.prop('barrier', -5.5, z, 0.1, { base: DECK });
+    L.prop('barrier', 5.5, z + 1, -0.1, { base: DECK });
+  }
+  L.prop('crateWood', -7, -150, 0.4, { base: DECK });
+  L.prop('barrelRust', 7, 148, 0, { base: DECK });
+  L.prop('ammo', 2.4, 150, 0, { base: DECK });
+
+  // A pair of searchlights watching the southern approach.
+  for (const s of [-1, 1]) {
+    L.batch.cylinder(0.3, 0.36, 1.2, 8, s * 7, DECK + 0.6, 452, L.mats.get('metal'));
+    L.batch.cylinder(0.5, 0.62, 1.4, 10, s * 7, DECK + 1.9, 452, L.mats.get('metal'), {
+      rotZ: s * 0.5, rotX: -0.4,
+    });
+  }
+
+  L.addRoute([
+    new THREE.Vector3(0, DECK, -512), new THREE.Vector3(0, DECK, -400),
+    new THREE.Vector3(0, DECK, -320), new THREE.Vector3(0, DECK, -200),
+    new THREE.Vector3(0, DECK, 0), new THREE.Vector3(0, DECK, 200),
+    new THREE.Vector3(0, DECK, 320), new THREE.Vector3(0, DECK, 440),
+    new THREE.Vector3(0, DECK, 512),
+  ]);
 }
 
-/* Fog animation hook is handled by Level.update via `animated` entries. */
+/* A soft radial blob used for the drifting fog banks. */
+function softFogTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 64);
+  g.addColorStop(0, 'rgba(255,255,255,0.9)');
+  g.addColorStop(0.45, 'rgba(255,255,255,0.45)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}

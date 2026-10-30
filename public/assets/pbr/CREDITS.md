@@ -49,4 +49,4 @@ bridge_paint/
 | 金门大桥环境光 | Kloofendal Overcast (Pure Sky) 1K HDR | [Poly Haven](https://polyhaven.com/a/kloofendal_overcast_puresky) |
 
 ambientCG 与 Poly Haven 的素材均为 CC0 1.0（公共领域），无需署名；此表用于追溯来源。
-`bridge_paint/albedo.jpg` 在原图上做了色相偏移与压平处理，以匹配金门大桥的 International Orange。
+`bridge_paint/albedo.jpg` 以国际橙 #C0362C 为基色、用原图亮度重建，并压缩了掉漆对比，避免桥塔看起来像水磨石；法线 / 粗糙度 / 金属度仍来自原图。

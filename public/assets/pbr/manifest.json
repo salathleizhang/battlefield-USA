@@ -5,13 +5,23 @@
   "sets": {
     "bridgePaint": {
       "dir": "bridge_paint",
-      "tile": 2.0,
+      "tile": 4.5,
       "credit": {
         "title": "Painted Metal 008",
         "author": "ambientCG / Lennart Demes",
         "license": "CC0 1.0",
         "url": "https://ambientcg.com/view?id=PaintedMetal008",
-        "modification": "Hue-shifted and flattened toward International Orange #C0362C"
+        "modification": "Hue-shifted toward International Orange #C0362C and flattened to soften paint-chip contrast"
+      }
+    },
+    "bridgeOrange": {
+      "dir": "bridge_orange",
+      "tile": 2.4,
+      "credit": {
+        "title": "International Orange sprayed steel",
+        "author": "battlefield-USA (procedural)",
+        "license": "Same as project",
+        "modification": "Generated from the 1937 International Orange spec (#C0362C) with satin spray roughness, faint vertical grime and sun-bleached patches; replaces the chipped plate map on the bridge structure"
       }
     },
     "steel": {

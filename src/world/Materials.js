@@ -445,7 +445,10 @@ export class Materials {
     /* Metal family. */
     m.metal = pbr('steel', { color: 0x9aa1a6 }) || this._std(t.metal, { roughness: 0.62, metalness: 0.18 });
     m.rust = pbr('rust', { color: 0xd9c2ab }) || this._std(t.metal, { color: 0x8a5a3a, roughness: 0.8, metalness: 0.15 });
-    m.bridgePaint = pbr('bridgePaint', { color: 0xffffff }) || new THREE.MeshStandardMaterial({ color: 0xa8402b, roughness: 0.62, metalness: 0.25 });
+    // The source plate is heavily corroded; keep only a hint of that relief so
+    // the towers read as painted steel, not as chipped terrazzo.
+    m.bridgePaint = pbr('bridgePaint', { color: 0xffffff, normalScale: 0.3, aoIntensity: 0.45, metalness: 0.22 })
+      || new THREE.MeshStandardMaterial({ color: 0xa8402b, roughness: 0.62, metalness: 0.25 });
     m.bridgeSteel = pbr('steel', { color: 0xaeb4b8, tile: 2.6 }) || m.metal;
     m.bridgeDeck = this.pbr.retile(m.asphalt, 1 / (4.5 * 0.15)) || m.asphalt;
     if (m.bridgeDeck) {
@@ -453,7 +456,28 @@ export class Materials {
       // reflection of the overcast HDRI that otherwise reads as snow.
       m.bridgeDeck.envMapIntensity = 0.4;
       m.bridgeDeck.normalScale.setScalar(0.75);
+      m.bridgeDeck.color.setHex(0x9b958d);
     }
+
+    /* Golden Gate structural palette. */
+    // International Orange (#C0362C), generated as clean satin spray paint.
+    // The ambientCG plate underneath is chipped and corroded; on a 113 m tower
+    // it reads as leopard spots, so the bridge uses its own set.
+    m.bridgeOrange = pbr('bridgeOrange', {
+      color: 0xffffff, normalScale: 0.55, aoIntensity: 0.6, metalness: 0.06,
+      roughness: 1, envMapIntensity: 0.9,
+    }) || new THREE.MeshStandardMaterial({ color: 0xb4432f, roughness: 0.55, metalness: 0.3 });
+    // Main cables are wire rope, painted the same orange but worn to a dull,
+    // slightly darker sheen where the spinning wheels and bands sit.
+    m.bridgeCable = pbr('bridgeOrange', {
+      color: 0xd6c0b6, normalScale: 1.0, metalness: 0.18, roughness: 1.05, envMapIntensity: 0.8,
+    }) || new THREE.MeshStandardMaterial({ color: 0x8a5a48, roughness: 0.55, metalness: 0.55 });
+    m.bridgeWalk = pbr('concrete', { color: 0xc4beb0, tile: 1.4, normalScale: 0.55 })
+      || this._std(t.concrete, { color: 0xb8b2a4, roughness: 0.94 });
+    m.bridgeDark = new THREE.MeshStandardMaterial({ color: 0x23201c, roughness: 0.84, metalness: 0.2 });
+    m.roadWhite = new THREE.MeshStandardMaterial({ color: 0xd9d5c6, roughness: 0.88 });
+    m.roadYellow = new THREE.MeshStandardMaterial({ color: 0xb99a34, roughness: 0.88 });
+    m.beacon = new THREE.MeshBasicMaterial({ color: 0xff3a22 });
 
     /* Cloth. */
     m.sandbag = pbr('canvas', { color: 0xf0d0a0, tile: 0.55 }) || this._std(t.sandbag, { color: 0xe8cda0, roughness: 0.98 });
