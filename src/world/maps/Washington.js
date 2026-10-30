@@ -43,6 +43,9 @@ export function buildWashington(L) {
   L.solidBox(0, bridgeY, 162, 12, 0.4, 52, 0, { surface: 'wood' });
   L.sandbags(0, 140, Math.PI / 2, 7, { base: bridgeY });
   L.sandbags(8, 146, Math.PI / 2, 5, { base: bridgeY });
+  L.prop('crate', -4, 150, 1.5, { base: bridgeY });
+  L.prop('ammo', -4, 150.4, 1.5, { base: bridgeY, y: 0.3 });
+  L.prop('barrier', 4.5, 144, 0.06, { base: bridgeY });
   L.landingCraft(-30, 150, 1.57, { base: 0.3 });
   L.landingCraft(34, 155, 1.5, { base: 0.3 });
 
@@ -72,6 +75,11 @@ export function buildWashington(L) {
   L.batch.box(4, 5, 3, lx, ly + 4.5, lz - 2, L.mats.get('plasterWhite'));
   L.solidBox(lx, ly + 9, lz, 44, 18, 24, 0, { surface: 'concrete' });
   L.fire(lx + 14, ly + 12, lz + 6, 1.0);
+
+  // Memorial checkpoint supplies.
+  L.prop('crate', -26, 110, 0.6, { base: height(-26, 110) });
+  L.prop('barrel', 26, 110, 0, { base: height(26, 110) });
+  L.prop('ammo', 30, 104, 0.2, { base: height(30, 104) });
 
   /* ------------------------------------------------------- Washington Monument */
   const mx = 0, mz = -34;
@@ -173,6 +181,15 @@ export function buildWashington(L) {
   }
   L.barbedWire(-55, -104, 0, 30);
   L.barbedWire(25, -104, 0, 30);
+
+  // Ammunition and concrete blocks along the Capitol defence line.
+  L.prop('ammo', -30, -114, 0.1, { base: height(-30, -114) });
+  L.prop('ammo', 0, -114, 0.1, { base: height(0, -114) });
+  L.prop('ammo', 34, -114, 0.1, { base: height(34, -114) });
+  L.prop('barrier', -14, -112, 0.05, { base: height(-14, -112) });
+  L.prop('barrier', 24, -112, 0.08, { base: height(24, -112) });
+  L.prop('crate', -46, -112, 0.1, { base: height(-46, -112) });
+  L.prop('barrelRust', 48, -112, 0, { base: height(48, -112) });
   L.bunker(-16, -100, 0);
   L.bunker(22, -96, 0.1);
 
