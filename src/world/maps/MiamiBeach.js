@@ -489,7 +489,7 @@ export function buildMiamiBeach(L) {
   // Bridge sign on the island approach, facing arriving landing craft.
   const signBase = height(-74, 11.5);
   for (const z of [6.4, 16.6]) L.batch.cylinder(0.1, 0.13, 4.4, 6, -74, signBase + 2.2, z, M.woodDark);
-  addSign('MACARTHUR CAUSEWAY', -74, signBase + 4.7, 11.5, 10.5, 2.0, Math.PI / 2, { w: 768, h: 140 });
+  addSign('MACARTHUR CAUSEWAY', -74, signBase + 4.7, 11.5, 11.5, 2.0, Math.PI / 2, { w: 1024, h: 160 });
 
   // Checkpoints at each bridgehead.
   L.sandbags(-66, 8, 0.08, 9, { base: height(-66, 8) });
