@@ -147,7 +147,7 @@ function buildFromTemplate(mats, template) {
   g.add(iron);
 
   // Hands.
-  const glove = new THREE.MeshStandardMaterial({ color: 0x2f2117, roughness: 0.92, metalness: 0.0 });
+  const glove = new THREE.MeshStandardMaterial({ color: 0x6b4c32, roughness: 0.78, metalness: 0.0 });
   const sleeve = new THREE.MeshStandardMaterial({ color: 0x4f5546, roughness: 0.97, metalness: 0.0 });
   const gloveCuffMat = new THREE.MeshStandardMaterial({ color: 0x241a12, roughness: 0.94 });
   const handR = buildHand({ side: 1, glove, cuff: sleeve, cuffDark: gloveCuffMat });
@@ -155,8 +155,9 @@ function buildFromTemplate(mats, template) {
   handR.rotation.set(0.02, 0, -Math.PI / 2);
   g.add(handR);
   const handL = buildHand({ side: -1, glove, cuff: sleeve, cuffDark: gloveCuffMat });
-  handL.position.set(0.046, -0.112, -0.300);
-  handL.rotation.set(0.06, 0.45, Math.PI);
+  handL.position.set(0.044, -0.128, -0.255);
+  handL.scale.setScalar(1.12);
+  handL.rotation.set(0.10, 0.55, Math.PI);
   g.add(handL);
 
   const clipAnchor = new THREE.Object3D();
@@ -191,7 +192,7 @@ function buildProcedural(mats) {
   const dark = new THREE.MeshStandardMaterial({ color: 0x2b2e2f, roughness: 0.44, metalness: 0.86 });
   const bright = new THREE.MeshStandardMaterial({ color: 0xb9bec0, roughness: 0.26, metalness: 0.95 });
   const brass = mats.get('brass');
-  const glove = new THREE.MeshStandardMaterial({ color: 0x2f2117, roughness: 0.92, metalness: 0.0 });
+  const glove = new THREE.MeshStandardMaterial({ color: 0x6b4c32, roughness: 0.78, metalness: 0.0 });
   const sleeve = new THREE.MeshStandardMaterial({ color: 0x4f5546, roughness: 0.97, metalness: 0.0 });
   const gloveCuffMat = new THREE.MeshStandardMaterial({ color: 0x241a12, roughness: 0.94 });
 

@@ -28,3 +28,11 @@ Both are plain glTF 2.0 with external `.bin` + `textures/`. Drop in any rigged/s
 glTF with the same root names, or change the two paths in
 `src/game/weapons/RifleModel.js` and `src/game/Game.js`. The rifle's normalisation
 constants live at the top of `src/game/weapons/Type38.js`.
+
+## Iron sights and hands
+
+The scanned Mosin's tangent leaf is folded flat, so the rig carries its own sight set
+built in `src/game/weapons/Type38.js`: a 23 mm ghost-ring aperture on the receiver and a
+matching post 0.60 m ahead, both on the bore axis defined by the rifle's own rear-sight
+line. The gloved hands and the Type 30 bayonet are procedural and live in the same
+gun-space frame as the bolt.
