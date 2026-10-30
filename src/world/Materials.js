@@ -444,11 +444,10 @@ export class Materials {
     m.bridgeSteel = pbr('steel', { color: 0xaeb4b8, tile: 2.6 }) || m.metal;
     m.bridgeDeck = this.pbr.retile(m.asphalt, 1 / (4.5 * 0.15)) || m.asphalt;
     if (m.bridgeDeck) {
-      // Wet asphalt is dark and only mildly reflective; without this the
-      // overcast HDRI turns the roadway into a white mirror at grazing angles.
-      m.bridgeDeck.color.setHex(0xb0b0b0);
-      m.bridgeDeck.envMapIntensity = 0.32;
-      m.bridgeDeck.normalScale.setScalar(0.7);
+      // Asphalt albedo stays physical (dark); kill the mirror-like grazing
+      // reflection of the overcast HDRI that otherwise reads as snow.
+      m.bridgeDeck.envMapIntensity = 0.4;
+      m.bridgeDeck.normalScale.setScalar(0.75);
     }
 
     /* Cloth. */
