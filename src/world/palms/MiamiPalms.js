@@ -60,7 +60,9 @@ export function planMiamiPalms(heightAt) {
     const street = row !== 'park';
     const k = o.k ?? (street ? (rnd() < 0.12 ? 0.07 : -0.07 - rnd() * 0.05)
       : rnd() < 0.25 ? -0.1 - rnd() * 0.05 : (rnd() - 0.3) * 0.18);
-    const hs = o.hs ?? (0.8 + rnd() * 0.45);
+    // Keep the palms around the landing sight line shorter so the hotel row stays legible.
+    const nearCentre = Math.abs(z) < 80 && (row === 'edge' || row === 'park');
+    const hs = o.hs ?? (nearCentre ? 0.55 + rnd() * 0.22 : 0.8 + rnd() * 0.45);
     trees.push({
       x, z, row, ground,
       groundY: (o.groundY ?? heightAt(x, z)) + 0.02,
