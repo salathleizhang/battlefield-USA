@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Type 38 — model viewer</title>
+<style>
+  html,body{margin:0;height:100%;background:#14171a;overflow:hidden;font:12px ui-monospace,monospace;color:#bbb}
+  #hud{position:fixed;left:10px;top:10px;white-space:pre;pointer-events:none;opacity:.7}
+</style>
+</head>
+<body>
+<div id="hud"></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { buildType38 } from '/src/game/weapons/Type38.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(1);
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1b2024);
+
+const hemi = new THREE.HemisphereLight(0xc8d6e0, 0x2a2620, 1.1);
+scene.add(hemi);
+const key = new THREE.DirectionalLight(0xfff0dd, 2.4);
+key.position.set(3, 5, 2);
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x93b5d6, 1.2);
+rim.position.set(-4, 2, -3);
+scene.add(rim);
+scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+
+// Fake material table, mirroring the names Materials.js exposes.
+const mk = (color, rough, metal) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal });
+const table = new Map([
+  ['gunWood', mk(0x8a5a30, 0.62, 0.0)],
+  ['gunMetal', mk(0x6c7276, 0.42, 0.88)],
+  ['brass', mk(0xb08d3f, 0.3, 0.95)],
+  ['uniformGrey', mk(0x6d7268, 0.95, 0)],
+  ['canvas', mk(0x8a7d5c, 0.95, 0)],
+]);
+const mats = { get: (k) => table.get(k) };
+
+const params0 = new URLSearchParams(location.search);
+let gun;
+if (params0.get('t38')) {
+  const gltf = await new GLTFLoader().loadAsync('/assets/models/weapons/rifle_7_62/model.gltf');
+  gun = buildType38(mats, gltf.scene);
+} else if (params0.get('ph')) {
+  const gltf = await new GLTFLoader().loadAsync('/assets/models/weapons/ph_rifle/rifle.gltf');
+  gun = gltf.scene;
+  if (!params0.get('keepacc')) {
+    for (const n of ['bolt_action_rifle_7_62_scope', 'bolt_action_rifle_7_62_wrap', 'bolt_action_rifle_7_62_bullet_54mm']) gun.getObjectByName(n)?.removeFromParent();
+  }
+  gun.rotation.y = Math.PI / 2;
+  gun.position.set(0, -0.05, 0);
+  gun.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+  const b = new THREE.Box3().setFromObject(gun);
+  const size = b.getSize(new THREE.Vector3());
+  const s = 1.275 / Math.max(size.x, size.y, size.z);
+  gun.scale.setScalar(s);
+  const b2 = new THREE.Box3().setFromObject(gun);
+  const c = b2.getCenter(new THREE.Vector3());
+  gun.position.x -= c.x;
+  gun.position.z -= c.z;
+  gun.position.y -= b2.max.y - 0.02;
+} else {
+  gun = buildType38(mats);
+}
+scene.add(gun);
+
+// Ground grid for scale.
+const grid = new THREE.GridHelper(3, 30, 0x35424a, 0x232b30);
+grid.position.y = -0.35;
+scene.add(grid);
+
+const cam = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.005, 20);
+const params = new URLSearchParams(location.search);
+const view = params.get('view') || 'quarter';
+const controls = new OrbitControls(cam, renderer.domElement);
+controls.target.set(0, -0.06, -0.25);
+controls.enableDamping = true;
+
+if (view === 'ads') { gun.position.set(0, 0, -0.2); cam.position.set(0, 0, 0.02); cam.lookAt(0, 0, -1); controls.target.set(0, 0, -0.5); }
+else if (view === 'rearsight') { cam.position.set(0.40, 0.18, 0.34); controls.target.set(0, -0.02, 0.0); }
+else if (view === 'rearsight2') { cam.position.set(0.0, 0.30, 0.42); controls.target.set(0, 0.0, -0.02); }
+else if (view === 'side') cam.position.set(1.55, -0.02, -0.25);
+else if (view === 'top') cam.position.set(0, 1.45, -0.25);
+else if (view === 'front') cam.position.set(0.0, -0.02, -1.75);
+else if (view === 'back') cam.position.set(0.0, 0.05, 1.15);
+else if (view === 'sights') cam.position.set(0.02, 0.02, -0.02);
+else cam.position.set(0.95, 0.45, 0.75);
+
+controls.update();
+
+const hud = document.getElementById('hud');
+const box = new THREE.Box3().setFromObject(gun);
+gun.userData.bolt = gun.userData.bolt || { rotation: { z: 0 } };
+hud.textContent = `len ${(box.max.z - box.min.z).toFixed(3)} m  height ${(box.max.y - box.min.y).toFixed(3)} m  width ${(box.max.x - box.min.x).toFixed(3)} m\nbounds z ${box.min.z.toFixed(2)}..${box.max.z.toFixed(2)}  y ${box.min.y.toFixed(2)}..${box.max.y.toFixed(2)}\nview=${view}`;
+
+addEventListener('resize', () => {
+  cam.aspect = innerWidth / innerHeight;
+  cam.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+renderer.setAnimationLoop(() => {
+  controls.update();
+  gun.userData.bolt.rotation.z = -(params.get('bolt') === '1' ? 1.3 : 0);
+  renderer.render(scene, cam);
+});
+window.__gun = gun;
+window.__THREE = THREE;
+window.__ready = true;
+</script>
+</body>
+</html>
