@@ -613,9 +613,30 @@ export class Level {
     this.finalize();
   }
 
+  /**
+   * Run every world material through the shared unify pass (weathering + wetness + puddles).
+   * Called after the map is built, so procedural materials, GLB props and palm shaders all get
+   * the same response. Already-patched materials are skipped by the WeakSet in Materials.
+   */
+  applyUnify() {
+    const seen = new WeakSet();
+    this.scene.traverse((o) => {
+      if (!o.material) return;
+      const list = Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of list) {
+        if (!m || seen.has(m)) continue;
+        seen.add(m);
+        const preset = (o.name || '').startsWith('prop:') ? 'prop' : 'level';
+        this.mats.applyUnify(m, preset);
+      }
+    });
+  }
+
   finalize() {
     this.game.renderer.setEnvironment(this.campaign.env);
     this.game.audio.setAmbience(this.campaign.env.ambience);
+    this.mats.setWetness(this.campaign.env.wetness ?? 0.85);
+    this.mats.setRain(this.campaign.env.rain ?? 0);
   }
 
   update(dt, t) {

@@ -21,7 +21,7 @@ export const CAMPAIGNS = [
       groundColor: 0x8a7a64, cloudiness: 0.08,
       hemiIntensity: 2.15, hemiColor: 0xbdd9ec, hemiGround: 0xb09470,
       sunDir: { x: 0.76, y: 0.32, z: 0.36 },
-      ambience: 'coast',
+      ambience: 'coast', wetness: 0.9,
     },
   },
   {
@@ -44,7 +44,7 @@ export const CAMPAIGNS = [
       fog: 0xbdc6c5, fogDensity: 0.0016, sun: 0xfff1de, sunIntensity: 1.95,
       skyTop: 0x8e9ea5, skyHorizon: 0xc9d0ce, ground: 0x5b615c, cloudiness: 0.55,
       sunDir: { x: 0.45, y: 0.52, z: 0.72 },
-      ambience: 'bridge',
+      ambience: 'bridge', wetness: 1.0,
       hdri: 'goldenGate', envIntensity: 0.9, hdriRotation: 0.4,
     },
   },
@@ -68,7 +68,7 @@ export const CAMPAIGNS = [
       fog: 0xb3ab90, fogDensity: 0.0026, sun: 0xffd7a8, sunIntensity: 2.25,
       skyTop: 0x3f4a44, skyHorizon: 0xc0a071, ground: 0x5d5a44, cloudiness: 0.75,
       sunDir: { x: 0.62, y: 0.28, z: -0.73 },
-      ambience: 'river',
+      ambience: 'river', wetness: 1.0, rain: 0.35,
     },
   },
   {
@@ -91,7 +91,7 @@ export const CAMPAIGNS = [
       fog: 0xae9f8a, fogDensity: 0.0024, sun: 0xffcf94, sunIntensity: 2.5,
       skyTop: 0x514b50, skyHorizon: 0xd9a777, ground: 0x6b5f4e, cloudiness: 0.62,
       sunDir: { x: -0.72, y: 0.14, z: 0.68 },
-      ambience: 'city',
+      ambience: 'city', wetness: 0.85,
     },
   },
 ];

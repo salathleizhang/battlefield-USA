@@ -84,12 +84,15 @@ export class Game {
 
     this.level = new Level(this, campaign);
     this.level.build();
+    // Every world material goes through the shared weathering / wetness / puddle pass.
+    this.level.applyUnify();
     this.renderer.setEnvironment(campaign.env);
     this.renderer.setHDRI(this.materials.pbr.hdri(campaign.env.hdri), {
       intensity: campaign.env.envIntensity ?? 0.95,
       rotation: campaign.env.hdriRotation ?? 0,
     });
     this.renderer.fog.density = campaign.env.fogDensity ?? 0.0035;
+    this.renderer.applySettings(this.settings);
 
     this.effects = new Effects(this);
     this.atmosphere = new Atmosphere(this);

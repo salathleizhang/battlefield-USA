@@ -335,7 +335,171 @@ function plasterTexture(base = '#c8bda4') {
   });
 }
 
+/* ------------------------------------------------------------------------------------------------
+ * The "unify" shader patch, ported from the reference project (Ironline).
+ *
+ * One block injected into every lit material gives the whole game a single material response:
+ *   1. albedo luminance clamped into a PBR band and pulled toward the palette (no chalk / plastic);
+ *   2. shared world-space weathering: macro grime, ground-contact dirt on walls and props;
+ *   3. GLOBAL WETNESS: exposed up-facing surfaces darken and gloss, walls get rain streaks, and
+ *      ground materials collect mirror puddles in low areas of a world-noise field. Puddles drop
+ *      roughness to ~0.03 and flatten the normal to world-up, so they mirror the sky IBL and the
+ *      fire/sun specular. `uRain` adds animated ripple rings.
+ *
+ * World-space, so it works across the batcher, instanced props and GLB models alike.
+ * ---------------------------------------------------------------------------------------------- */
+
+/** Tileable 4-channel noise (R macro fbm, G detail fbm, B low-frequency puddle field, A streak noise). */
+function unifyNoiseTex(size = 512, seed = 7) {
+  const rnd = (() => { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); })();
+  const P = 256, lat = new Float32Array(P * P);
+  for (let i = 0; i < lat.length; i++) lat[i] = rnd();
+  const fade = (t) => t * t * (3 - 2 * t);
+  const vn = (x, y, fx, fy, off) => {
+    const xi = Math.floor(x), yi = Math.floor(y), tx = fade(x - xi), ty = fade(y - yi);
+    const L = (a, b) => lat[(((b % fy) + fy) % fy + off) % P * P + ((((a % fx) + fx) % fx) + off * 3) % P];
+    const a = L(xi, yi), b = L(xi + 1, yi), c = L(xi, yi + 1), d = L(xi + 1, yi + 1);
+    return a + (b - a) * tx + (c - a) * ty + (a - b - c + d) * tx * ty;
+  };
+  const fbm = (u, v, fx, fy, oct, off) => {
+    let f = 0, amp = 0.5, n = 0;
+    for (let o = 0; o < oct; o++) {
+      const m = 1 << o;
+      f += amp * vn(u * fx * m, v * fy * m, fx * m, fy * m, off + o * 17);
+      n += amp; amp *= 0.5;
+    }
+    return f / n;
+  };
+  const data = new Uint8Array(size * size * 4);
+  const st = (x) => Math.max(0, Math.min(255, Math.round(x * 255)));
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = x / size, v = y / size, i = (y * size + x) * 4;
+      const r = fbm(u, v, 4, 4, 5, 1), g = fbm(u, v, 16, 16, 4, 40);
+      const b = fbm(u, v, 2, 2, 5, 90), a = fbm(u, v, 48, 3, 3, 140);
+      const k = (n, c) => 0.5 + (n - 0.5) * c;
+      data[i] = st(k(r, 1.9)); data[i + 1] = st(k(g, 1.9));
+      data[i + 2] = st(k(b, 2.1)); data[i + 3] = st(k(a, 2.2));
+    }
+  }
+  const t = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.generateMipmaps = true;
+  t.anisotropy = 8;
+  t.needsUpdate = true;
+  return t;
+}
+
+const UNIFY_VERT_PARS = /* glsl */`
+varying vec3 vUWP; varying vec3 vUWN;`;
+const UNIFY_VERT = /* glsl */`
+{
+  vec4 uwp = vec4(transformed, 1.0);
+  #ifdef USE_INSTANCING
+    uwp = instanceMatrix * uwp;
+  #endif
+  #ifdef USE_BATCHING
+    uwp = batchingMatrix * uwp;
+  #endif
+  vUWP = (modelMatrix * uwp).xyz;
+  vec3 uwn = transformedNormal;
+  #ifdef USE_INSTANCING
+    uwn = mat3(instanceMatrix) * uwn;
+  #endif
+  #ifdef USE_BATCHING
+    uwn = mat3(batchingMatrix) * uwn;
+  #endif
+  vUWN = normalize(mat3(modelMatrix) * uwn);
+}`;
+const UNIFY_FRAG_PARS = /* glsl */`
+varying vec3 vUWP; varying vec3 vUWN;
+uniform sampler2D uNoise; uniform float uWet; uniform float uRain; uniform float uTime;
+uniform float uUnifyMode; // 0 full, 1 lite, 2 off
+uniform vec4 uUni; uniform vec4 uUni2;
+float uHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+// Expanding rain-ripple rings (returns xz normal offset).
+vec2 uRipple(vec2 p, float t) {
+  vec2 acc = vec2(0.0);
+  for (int k = 0; k < 2; k++) {
+    vec2 q = p * (k == 0 ? 2.3 : 3.7) + float(k) * 7.31;
+    vec2 c = floor(q); vec2 f = fract(q);
+    float h = uHash(c);
+    vec2 o = vec2(uHash(c + 3.1), uHash(c + 7.7)) * 0.6 + 0.2;
+    float ph = fract(t * 1.1 + h);
+    vec2 d = f - o; float r = length(d);
+    float w = sin((r - ph * 0.45) * 55.0) * smoothstep(0.0, 0.08, ph * 0.45 - r + 0.08) * smoothstep(0.45, 0.0, r) * (1.0 - ph);
+    acc += (r > 1e-4 ? d / r : vec2(0.0)) * w;
+  }
+  return acc;
+}`;
+const UNIFY_FRAG = /* glsl */`
+if (uUnifyMode < 1.5) {
+  vec3 P = vUWP; vec3 N = normalize(vUWN); vec3 aN = abs(N);
+  vec2 tp = aN.y > 0.5 ? P.xz : (aN.x > aN.z ? P.zy : P.xy);
+  vec4 n1 = texture2D(uNoise, tp * 0.021);
+  vec4 n2 = texture2D(uNoise, tp * 0.083 + 0.37);
+  float g = n1.r * 0.65 + n2.g * 0.35;
+  float up = smoothstep(0.55, 0.92, N.y);
+  // 1. albedo normalisation + palette pull
+  float lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+  diffuseColor.rgb = max(mix(vec3(lum), diffuseColor.rgb, uUni2.x), 0.0);
+  float tl = clamp(lum, 0.022, 0.70);
+  diffuseColor.rgb *= tl / max(lum, 1e-4);
+  // 2. shared weathering: macro grime / tint variation
+  float gk = uUni.x;
+  diffuseColor.rgb *= mix(1.0 - gk * 0.55, 1.0 + gk * 0.18, smoothstep(0.2, 0.8, g));
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.05, 0.97, 0.86), n2.g * gk * 0.8);
+  // ground-contact dirt band on non-horizontal faces (bottom ~0.9 m)
+  float contact = (1.0 - smoothstep(0.0, 0.9 + n2.g * 0.4, P.y)) * (1.0 - up) * uUni2.y;
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.62, 0.56, 0.48), contact * 0.75);
+  // roughness band remap
+  roughnessFactor = mix(uUni.w, 1.0, roughnessFactor) * (0.93 + n2.g * 0.14);
+  // 3. wetness
+  float wetK = uWet * uUni.y;
+  float sx = aN.x > aN.z ? P.z : P.x;
+  float streak = uUnifyMode > 0.5 ? 0.0 : texture2D(uNoise, vec2(sx * 0.11, P.y * 0.035 + n1.r * 0.08)).a;
+  streak = smoothstep(0.42, 0.78, streak) * (1.0 - up) * uUni2.z;
+  float wet = wetK * clamp(up * 0.8 + streak * 0.75 + (1.0 - up) * (0.12 + 0.3 * smoothstep(0.6, 0.0, P.y)), 0.0, 1.0);
+  wet *= mix(0.3, 1.0, smoothstep(0.3, 0.72, g));            // damp vs drying patches
+  float pud = 0.0;
+  if (uUni.z > 0.0 && up > 0.5 && uUnifyMode < 0.5) {
+    float pf = texture2D(uNoise, P.xz * 0.0105 + 0.13).b * 0.75 + n1.r * 0.25 - P.y * 1.5;
+    float rim = smoothstep(0.46, 0.55, pf);
+    pud = smoothstep(0.55, 0.585, pf) * up * uUni.z * uWet;
+    wet = max(wet, rim * up * uUni.z * uWet);
+  }
+  float porous = 1.0 - metalnessFactor * 0.7;
+  diffuseColor.rgb *= mix(1.0, 0.58, wet * porous);
+  roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.38 + 0.06, wet);
+  if (pud > 0.0) {
+    diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.45, pud);
+    roughnessFactor = mix(roughnessFactor, 0.025, pud);
+    metalnessFactor = mix(metalnessFactor, 0.0, pud);
+    vec3 nUp = vec3(0.0, 1.0, 0.0);
+    if (uRain > 0.0) { vec2 rp = uRipple(P.xz, uTime) * uRain * 0.35; nUp = normalize(vec3(rp.x, 1.0, rp.y)); }
+    vec3 vUp = normalize((viewMatrix * vec4(nUp, 0.0)).xyz);
+    normal = normalize(mix(normal, vUp, pud * 0.97));
+  }
+  roughnessFactor = clamp(roughnessFactor, 0.02, 1.0);
+}`;
+
+const UNIFY_SKIP = new Set([
+  'water', 'glass', 'skin', 'brass', 'lampWarm', 'beacon', 'flagChina', 'flagUs',
+  'fire', 'smoke', 'decalHole', 'roadWhite', 'roadYellow',
+]);
+
 export class Materials {
+  /** Shared uniforms for the unify pass (other systems animate uWet / uRain / uTime). */
+  static unify = {
+    uNoise: { value: null },
+    uUnifyMode: { value: 0 },
+    uWet: { value: 0.85 },
+    uRain: { value: 0 },
+    uTime: { value: 0 },
+  };
+
   constructor(renderer) {
     this.renderer = renderer;
     this.loader = new THREE.TextureLoader();
@@ -343,7 +507,81 @@ export class Materials {
     this.mats = {};
     this.maxAniso = renderer.renderer.capabilities.getMaxAnisotropy();
     this.pbr = new PBR(renderer);
+    this._unified = new WeakSet();
+    if (!Materials.unify.uNoise.value) Materials.unify.uNoise.value = unifyNoiseTex(512, 7);
   }
+
+  /* ------------------------------------------------------------------ unify */
+  /**
+   * Inject the shared cohesion/wetness pass. Idempotent per material object; clones (which drop
+   * `onBeforeCompile`) are picked up again. `preset` is a key of PRESETS or an explicit object.
+   */
+  applyUnify(mat, preset = 'prop') {
+    if (!mat || !(mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial)) return;
+    if (this._unified.has(mat) || mat.userData?.noUnify) return;
+    if (mat.userData?.water) return;
+    const p = typeof preset === 'string' ? Materials.PRESETS[preset] ?? Materials.PRESETS.prop : preset;
+    if (mat.transparent && !p.alphaOK) return;
+    this._unified.add(mat);
+    if (mat.normalMap && mat.normalScale) {
+      const s = THREE.MathUtils.clamp(Math.abs(mat.normalScale.x), 0.6, 2.0);
+      mat.normalScale.set(s * Math.sign(mat.normalScale.x || 1), s * Math.sign(mat.normalScale.y || 1));
+    }
+    const uUni = { value: new THREE.Vector4(p.grime ?? 0.3, p.wet ?? 0.7, p.puddle ?? 0, p.rmin ?? 0.38) };
+    const uUni2 = { value: new THREE.Vector4(p.sat ?? 0.86, p.contact ?? 1, p.streaks ?? 0.5, 0) };
+    const prev = mat.onBeforeCompile;
+    const prevKey = mat.customProgramCacheKey?.bind(mat);
+    mat.onBeforeCompile = (sh, r) => {
+      prev?.call(mat, sh, r);
+      Object.assign(sh.uniforms, Materials.unify, { uUni, uUni2 });
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>' + UNIFY_VERT_PARS)
+        .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>' + UNIFY_VERT);
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>' + UNIFY_FRAG_PARS)
+        .replace('#include <emissivemap_fragment>', 'float uIndoorK = 0.0;\n' + UNIFY_FRAG + '\n#include <emissivemap_fragment>');
+    };
+    mat.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|unify' + (p.paint ? 'P' : '');
+    mat.needsUpdate = true;
+  }
+
+  /** Preset table, mirroring the reference art pipeline. */
+  static PRESETS = {
+    level: { grime: 0.42, wet: 0.9, puddle: 0, rmin: 0.4, sat: 0.9, contact: 1, streaks: 1 },
+    ground: { grime: 0.5, wet: 1, puddle: 1, rmin: 0.34, sat: 0.9, contact: 1, streaks: 0 },
+    sand: { grime: 0.24, wet: 1, puddle: 0.3, rmin: 0.5, sat: 0.94, contact: 1, streaks: 0 },
+    wall: { grime: 0.44, wet: 0.8, puddle: 0, rmin: 0.45, sat: 0.9, contact: 1, streaks: 1 },
+    metal: { grime: 0.32, wet: 0.65, puddle: 0, rmin: 0.3, sat: 0.88, contact: 1, streaks: 0.4 },
+    cloth: { grime: 0.26, wet: 0.55, puddle: 0, rmin: 0.55, sat: 0.85, contact: 1, streaks: 0 },
+    wood: { grime: 0.38, wet: 0.85, puddle: 0, rmin: 0.5, sat: 0.88, contact: 1, streaks: 0.6 },
+    prop: { grime: 0.3, wet: 0.7, puddle: 0, rmin: 0.38, sat: 0.85, contact: 1, streaks: 0.5 },
+    character: { grime: 0.18, wet: 0.35, puddle: 0, rmin: 0.45, sat: 0.85, contact: 0.8, streaks: 0 },
+    viewmodel: { grime: 0.08, wet: 0, puddle: 0, rmin: 0.3, sat: 0.9, contact: 0, streaks: 0 },
+  };
+
+  _presetFor(key) {
+    if (UNIFY_SKIP.has(key)) return null;
+    if (/^(stucco|plaster|brick|roof)/.test(key)) return 'wall';
+    if (/^(grass|ground|terrain|rubble|sand|asphalt|concrete|bridgeDeck|bridgeWalk)/.test(key)) {
+      return key === 'sand' ? 'sand' : 'ground';
+    }
+    if (/^(metal|rust|bridge|landingHull|helmet)/.test(key)) return 'metal';
+    if (/^(wood|palmTrunk|gun)/.test(key)) return key.startsWith('gun') ? 'viewmodel' : 'wood';
+    if (/^(sandbag|canvas|uniform|leather|foliage)/.test(key)) return 'cloth';
+    if (/^road/.test(key)) return 'wall';
+    return 'prop';
+  }
+
+  _unifyAll() {
+    for (const [key, mat] of Object.entries(this.mats)) {
+      const preset = this._presetFor(key);
+      if (preset) this.applyUnify(mat, preset);
+    }
+  }
+
+  setWetness(v) { Materials.unify.uWet.value = v; }
+  setRain(v) { Materials.unify.uRain.value = v; }
+  update(dt) { Materials.unify.uTime.value += dt; }
 
   async _loadTex(file, { srgb = true, mirror = false, repeat = 1 } = {}) {
     return new Promise((resolve) => {
@@ -520,6 +758,9 @@ export class Materials {
     m.fire = new THREE.MeshBasicMaterial({ color: 0xff7a22, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
     m.smoke = new THREE.MeshBasicMaterial({ color: 0x2a2926, transparent: true, opacity: 0.5, depthWrite: false });
     m.decalHole = new THREE.MeshBasicMaterial({ color: 0x151310, transparent: true, opacity: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+
+    // One shared response for every surface (weathering + wetness + puddles).
+    this._unifyAll();
   }
 
   /**
@@ -531,6 +772,8 @@ export class Materials {
     if (base) {
       const mat = this.pbr.retile(base, repeat);
       mat.vertexColors = vertexColors;
+      // Retiling clones the material (and drops onBeforeCompile): re-apply the unify pass.
+      this.applyUnify(mat, name === 'sand' ? 'sand' : 'ground');
       return mat;
     }
     const src = this.textures.grass || this.textures.rubble;
@@ -538,7 +781,9 @@ export class Materials {
     map.needsUpdate = true;
     map.wrapS = map.wrapT = THREE.RepeatWrapping;
     map.repeat.set(repeat, repeat);
-    return new THREE.MeshStandardMaterial({ map, color, roughness: 0.97, vertexColors });
+    const mat = new THREE.MeshStandardMaterial({ map, color, roughness: 0.97, vertexColors });
+    this.applyUnify(mat, name === 'sand' ? 'sand' : 'ground');
+    return mat;
   }
 
   /** Sea material: dark dielectric surface, detail normals and HDRI reflections. */
