@@ -414,6 +414,7 @@ export class Game {
     dt = Math.min(dt, 0.05);
     this.time += dt;
     this.audio.update(dt);
+    this.audio.updateListener(this.renderer.camera);
     if (this.renderer) {
       this.renderer.update(dt, this.player?.position || new THREE.Vector3());
       if (this.debug?.cam) {
