@@ -32,6 +32,7 @@ export class Menu {
     section.id = 'menu';
     section.innerHTML = `
       <div class="menu-art" id="menu-art"></div>
+      <video class="menu-art-video" id="menu-art-video" muted loop playsinline preload="auto" aria-hidden="true"></video>
       <div class="menu-bgfx" aria-hidden="true"></div>
       <aside class="menu-side">
         <div class="brand-lockup">
@@ -84,6 +85,7 @@ export class Menu {
     this.root.appendChild(section);
     this.el = section;
     this.art = section.querySelector('#menu-art');
+    this.videoEl = section.querySelector('#menu-art-video');
     this.list = section.querySelector('#mission-list');
 
     // Settings live outside the menu so they can also open over the pause screen.
@@ -238,6 +240,49 @@ export class Menu {
     this.art.style.backgroundPosition = 'center';
     this.art.style.backgroundSize = 'cover';
     this.el.style.setProperty('--accent', c.accent);
+    this._applyVideo(c);
+  }
+
+  /**
+   * Campaign key art is a still; a few campaigns ship a looping cinematic.
+   * The video sits above the still (which stays as poster / fallback) and is
+   * skipped entirely when the user asks for reduced motion.
+   */
+  _applyVideo(c) {
+    const v = this.videoEl;
+    if (!v) return;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const useVideo = Boolean(c.video) && !reduce;
+    this.el.classList.toggle('has-video', useVideo);
+    if (!useVideo) {
+      v.pause();
+      return;
+    }
+    if (v.dataset.src !== c.video) {
+      v.dataset.src = c.video;
+      v.poster = c.art;
+      v.src = c.video;
+    }
+    this._playVideo();
+  }
+
+  _playVideo() {
+    const v = this.videoEl;
+    const played = v.play();
+    if (!played?.catch) return;
+    played.catch(() => {
+      if (this._retryBound) return;
+      this._retryBound = true;
+      const retry = () => {
+        this._retryBound = false;
+        window.removeEventListener('pointerdown', retry, true);
+        window.removeEventListener('keydown', retry, true);
+        const c = CAMPAIGN_BY_ID[this.selected];
+        if (this.isOpen && c?.video) this._playVideo();
+      };
+      window.addEventListener('pointerdown', retry, true);
+      window.addEventListener('keydown', retry, true);
+    });
   }
 
   open() {
@@ -250,6 +295,7 @@ export class Menu {
   close() {
     this.isOpen = false;
     this.el.classList.remove('open');
+    this.videoEl?.pause();
   }
 
   start(id = this.selected) {

@@ -36,6 +36,7 @@ export const CAMPAIGNS = [
     objectives: ['夺取 A 点「北塔」', '突进桥面，夺取 B 点「中跨」', '攻占 C 点「南塔 · 旧金山」'],
     weather: '浓雾 · 侧风 · 能见度 120 米',
     art: '/assets/art/golden-gate.jpg',
+    video: '/assets/video/golden-gate-war-loop.mp4',
     accent: '#b6493a',
     env: {
       fog: 0xc1c9c8, fogDensity: 0.0021, sun: 0xfff1de, sunIntensity: 1.95,
