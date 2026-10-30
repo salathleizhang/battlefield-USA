@@ -562,6 +562,7 @@ export class Game {
       this.viewmodel = null;
     }
     if (this.atmosphere) { this.atmosphere.dispose(); this.atmosphere = null; }
+    if (this.ambience) { this.ambience.dispose(); this.ambience = null; }
     if (this.effects) { this.effects.clear(); this.effects = null; }
     if (this.hud) {
       this.hud.el.hud.remove();
