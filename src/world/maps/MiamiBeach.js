@@ -213,6 +213,8 @@ export function buildMiamiBeach(L) {
   L.smokeColumn(-1.5, height(HOTEL_X, -92) + 11, -92, 1.7);
   L.fire(-1.2, height(HOTEL_X, 68) + 7, 68, 1.5);
   L.smokeColumn(-1.5, height(HOTEL_X, 68) + 9, 68, 1.6);
+  L.fire(-1.2, height(HOTEL_X, 4) + 6, 4, 1.2);
+  L.smokeColumn(-1.5, height(HOTEL_X, 4) + 8, 4, 1.3);
 
   // Collins Avenue second row (background depth).
   const second = [
