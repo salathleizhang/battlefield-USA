@@ -202,25 +202,26 @@ function waterNormalTexture(size = 768) {
   const d = img.data;
 
   // Seamless directional wave spectrum. Integer wave numbers keep the map
-  // tileable, which matters because the sea plane repeats it ~20x.
+  // tileable; a 1/k amplitude falloff and many directions avoid the regular
+  // "fish scale" interference a handful of equal sines produces.
   let seed = 0x9e3779b9;
   const rnd = () => {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
     return seed / 4294967296;
   };
   const waves = [];
-  for (let i = 0; i < 9; i++) {
-    const k = 2 + Math.floor(rnd() * 8);
+  for (let i = 0; i < 14; i++) {
+    const k = 1 + Math.floor(Math.pow(rnd(), 1.5) * 17);
     const a = rnd() * Math.PI * 2;
     waves.push({
       kx: Math.max(1, Math.round(Math.cos(a) * k)),
       ky: Math.round(Math.sin(a) * k),
-      amp: 1 / (1 + i * 0.55),
+      amp: 1 / Math.pow(k, 1.15),
       ph: rnd() * Math.PI * 2,
     });
   }
 
-  const STRENGTH = 0.12;
+  const STRENGTH = 0.05;
   for (let y = 0; y < size; y++) {
     const v = y / size;
     for (let x = 0; x < size; x++) {
@@ -540,7 +541,9 @@ export class Materials {
   /** Sea material: dark dielectric surface, detail normals and HDRI reflections. */
   waterMaterial({ color = 0x6f7f7d, opacity = 0.96, size = 900, rough = 0.1, normalRepeat = null } = {}) {
     const normal = this.textures.waterNormal.clone();
-    const r = normalRepeat ?? size / 46;
+    // One normal tile spans ~110 m, so swell reads at the right world scale
+    // instead of turning the bay into a field of identical ripples.
+    const r = normalRepeat ?? size / 110;
     normal.wrapS = normal.wrapT = THREE.RepeatWrapping;
     normal.repeat.set(r, r);
     normal.anisotropy = Math.min(8, this.maxAniso);
@@ -549,7 +552,7 @@ export class Materials {
       roughness: rough,
       metalness: 0.02,
       normalMap: normal,
-      normalScale: new THREE.Vector2(0.9, 0.9),
+      normalScale: new THREE.Vector2(0.6, 0.6),
       transparent: true,
       opacity,
       envMapIntensity: 1.6,
