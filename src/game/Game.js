@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { Renderer } from '../render/Renderer.js';
 import { Effects } from '../render/Effects.js';
 import { Physics, G } from '../core/Physics.js';
@@ -47,6 +49,7 @@ export class Game {
     this.settings = { sens: 1, volume: 0.7, recoil: 1 };
     this.worldGroup = new THREE.Group();
     this.assignT = 0;
+    this.miamiCar = null;
   }
 
   async init(onProgress) {
@@ -61,7 +64,27 @@ export class Game {
     await this.characters.load(onProgress);
     this.props = new Props();
     await this.props.load((p, label) => onProgress?.(0.9 + p * 0.08, label));
+    await this._loadMiamiCar();
     onProgress?.(1, '准备就绪');
+  }
+
+  /** Ocean Drive's hero convertible, ported from StarKnightt/ocean-drive (MIT). */
+  async _loadMiamiCar() {
+    try {
+      const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+      const gltf = await loader.loadAsync('/assets/models/miami/convertible.glb');
+      const root = gltf.scene;
+      root.getObjectByName('convertible_L1')?.removeFromParent();
+      root.traverse((o) => {
+        if (!o.isMesh) return;
+        o.castShadow = true;
+        o.receiveShadow = true;
+        if (o.material?.envMapIntensity !== undefined) o.material.envMapIntensity = 0.85;
+      });
+      this.miamiCar = root;
+    } catch (e) {
+      console.warn('[miami] convertible asset unavailable', e?.message || e);
+    }
   }
 
   /* ------------------------------------------------------------- missions */
