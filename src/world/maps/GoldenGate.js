@@ -166,6 +166,19 @@ export function buildGoldenGate(L) {
   L.barbedWire(-6, 70, Math.PI / 2, 14);
   L.batch.cylinder(0.3, 0.35, 7, 6, -9, deckY + 4, -160, L.mats.get('metal'));
 
+  // Roadblocks and supply caches at the three deck strongpoints.
+  const deck = deckY + 0.7;
+  L.prop('barrier', -6, -151, 0.12, { base: deck });
+  L.prop('barrier', 6, -151, -0.12, { base: deck });
+  L.prop('crate', -9.4, -144, 1.45, { base: deck });
+  L.prop('ammo', -9.4, -144.3, 1.45, { base: deck, y: 0.3 });
+  L.prop('crate', -6.2, 9, 0.25, { base: deck });
+  L.prop('barrel', -8.4, 11, 0, { base: deck });
+  L.prop('ammo', 2.4, 100, 0, { base: deck });
+  L.prop('barrelRust', 7, 134, 0, { base: deck });
+  L.prop('crateWood', -7, 133, 0.4, { base: deck });
+  L.prop('barrier', 5, 152, 0.05, { base: deck });
+
   /* ------------------------------------------------------------- gameplay */
   L.addCapturePoint({ id: 'A', name: '北塔', x: 0, z: -140, radius: 15, owner: -1, base: deckY + 0.7, height: 9 });
   L.addCapturePoint({ id: 'B', name: '中跨', x: 0, z: 0, radius: 15, owner: -1, base: deckY + 0.7, height: 9 });

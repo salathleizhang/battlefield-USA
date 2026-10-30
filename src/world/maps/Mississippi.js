@@ -72,6 +72,13 @@ export function buildMississippi(L) {
   L.batch.box(0.35, 0.35, 5.2, 40, height(40, 130) + 1.4, 127, L.mats.get('metal'), { rotX: 0.1 });
   L.batch.box(2.4, 1.1, 1.2, 40, height(40, 130) + 1.0, 131, L.mats.get('rust'));
 
+  // Supplies around the staging tent and bunker.
+  L.prop('crate', -62, 116, 0.2, { base: height(-62, 116) });
+  L.prop('ammo', -62.7, 116.3, 0.2, { base: height(-62, 116), y: 0.3 });
+  L.prop('barrelRust', -58, 124, 0, { base: height(-58, 124) });
+  L.prop('jerrycan', -60, 121, 0.6, { base: height(-60, 121) });
+  L.prop('ammo', 18.5, 92, 0.3, { base: height(18.5, 92) });
+
   for (let i = 0; i < 7; i++) L.palm(60 + i * 13, 150, 0.9);
   L.building({ x: -30, z: 150, w: 18, d: 12, h: 7, damage: 0.4, sign: 'FERRY' });
   L.building({ x: 10, z: 168, w: 14, d: 12, h: 8, damage: 0.2, sign: 'DEPOT' });
@@ -88,6 +95,12 @@ export function buildMississippi(L) {
   L.barbedWire(20, -68, 0, 26);
   L.batch.box(0.9, 2.6, 0.9, -30, height(-30, -84) + 1.3, -84, L.mats.get('woodDark'));
   L.batch.box(0.9, 2.6, 0.9, 34, height(34, -84) + 1.3, -84, L.mats.get('woodDark'));
+
+  // Ammunition resupply along the levee.
+  for (const x of [-90, -54, -18, 36, 72]) {
+    L.prop('ammo', x, -80, 0.1, { base: height(x, -80) });
+  }
+  L.prop('barrelRust', 90, -80, 0, { base: height(90, -80) });
 
   // Cotton fields: rows of low bushes.
   for (let x = -100; x <= 80; x += 9) {
@@ -123,6 +136,12 @@ export function buildMississippi(L) {
   // Moored barge.
   L.batch.box(26, 3, 10, -150, 1.2, -110, L.mats.get('rust'), { uv: 0.25 });
   L.batch.box(8, 4, 6, -156, 3.5, -110, L.mats.get('metal'), { uv: 0.3 });
+
+  // Cargo on the quay.
+  L.prop('crate', -142, -168, 0.2, { base: py + 0.9 });
+  L.prop('ammo', -141, -168.4, 0.2, { base: py + 0.9, y: 0.3 });
+  L.prop('crateWood', -136, -172, 1.4, { base: py + 0.9 });
+  L.prop('barrel', -104, -168, 0, { base: py + 0.9 });
   L.smokeColumn(-150, 4, -110, 1.6);
 
   // Sunk gunboat in the river.
