@@ -52,6 +52,8 @@ export class ViewModel {
 
     this.arms = new FpArms(game.materials);
     this.rig.add(this.arms.group);
+    // Hands carry the read at this range; detached forearm tubes are worse than none.
+    this.arms.group.visible = false;
 
     // Five-round charger the firing hand carries during a reload.
     this.clip = buildCharger(game.materials);
@@ -262,7 +264,6 @@ export class ViewModel {
 
     // ---------------------------------------------------------------- arms
     this.gun.updateMatrixWorld(true);
-    this.arms.update(this.handR, this.handL, this.gun);
 
     // ---------------------------------------------------------------- casing
     for (let i = this.casings.length - 1; i >= 0; i--) {
