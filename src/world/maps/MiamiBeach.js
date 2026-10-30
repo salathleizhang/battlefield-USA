@@ -471,6 +471,12 @@ export function buildMiamiBeach(L) {
   L.landingCraft(142, -158, -0.03, { base: 0.28 });
 
   // Supply dumps at the beach strongpoints.
+  // Street furniture from the CC0 Poly Haven prop library.
+  L.prop('hydrant', 16.3, -132, 0.2, { base: height(16.3, -132) });
+  L.prop('hydrant', 16.3, -18, 1.1, { base: height(16.3, -18) });
+  L.prop('hydrant', 16.3, 96, -0.4, { base: height(16.3, 96) });
+  L.prop('manhole', 7.6, -64, 0, { base: height(7.6, -64), solid: false });
+  L.prop('manhole', 7.6, 34, 0.6, { base: height(7.6, 34), solid: false });
   L.prop('crate', 36, -10, 0.2, { base: height(36, -10) });
   L.prop('ammo', 36.7, -9.7, 0.2, { base: height(36, -10), y: 0.3 });
   L.prop('barrel', 38, 20, 0, { base: height(38, 20) });

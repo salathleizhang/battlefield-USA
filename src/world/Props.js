@@ -18,6 +18,8 @@ const CATALOG = {
   barrelRust: { file: 'barrel_rust.glb', surface: 'metal' },
   ammo: { file: 'ammo_box.glb', surface: 'metal', scale: 2.4 },
   jerrycan: { file: 'jerrycan.glb', surface: 'metal', scale: 0.7 },
+  hydrant: { file: 'fire_hydrant/model.gltf', surface: 'metal' },
+  manhole: { file: 'water_manhole_cover/model.gltf', surface: 'metal' },
 };
 
 const UP = new THREE.Vector3(0, 1, 0);
