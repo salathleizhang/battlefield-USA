@@ -50,9 +50,11 @@ npm run build    # 生产构建到 dist/
 
 ## 美术资产
 
-- 战场纹理（弹孔灰泥墙、瓦砾地面、沙袋、海水）由 AI 图像生成后人工筛选，存放于 `public/assets/textures/`。
-- 其余建筑、武器、士兵、植被、桥梁、纪念碑等全部为 **程序化建模**，没有复用参考项目的任何美术资源。
-- UI 视觉为「漆红 + 描金 + 印章」的中国风：标题、菜单项与按钮使用自托管的毛笔楷书 **Ma Shan Zheng**（SIL OFL 1.1），按项目实际用字子集化为 270KB 的 woff2；正文使用宋体系统字体栈，数字与英文使用等宽字体。字体文件与授权见 `public/fonts/`，不依赖外部字体 CDN。
+- **PBR 材质管线**：所有表面使用完整的 albedo / normal / roughness / metalness / AO 贴图组，配合每关一张 HDRI 环境光（PMREM + ACES 色调映射）。清单在 `public/assets/pbr/manifest.json`，素材来源与授权见 [CREDITS.md](public/assets/pbr/CREDITS.md)。
+- 当前 13 组材质全部来自 **CC0 1.0** 素材库（ambientCG / Poly Haven），可商用、可再分发；桥塔的国际橙涂装在原图基础上做了色相校正。
+- **换成付费正版资产不需要改代码**：把贴图按 `albedo / normal / roughness / metalness / ao` 五个文件名放进 `public/assets/pbr/<材质名>/`，或在 manifest 里新增条目即可。具体命名映射见 CREDITS.md。
+- 建筑、武器、士兵、植被、桥梁、纪念碑等全部为 **程序化建模**，没有复用参考项目的任何美术资源。
+- UI 版式参考 [Ironline](https://github.com/cktang88/3d-fps)：深色战术面板、切角、金色单强调、左栏战役导航、圆形小地图与紧凑比分区；字体换成自托管的毛笔楷书 **Ma Shan Zheng**（SIL OFL 1.1），按项目实际用字子集化为约 280KB 的 woff2，正文为宋体系统字体栈，数字与英文为等宽字体。字体与授权见 `public/fonts/`，不依赖外部字体 CDN。
 
 ## 参考与致谢
 
