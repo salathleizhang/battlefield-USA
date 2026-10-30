@@ -61,8 +61,12 @@ export class Input {
 
   lock() {
     if (this.locked) return;
-    const p = this.canvas.requestPointerLock?.({ unadjustedMovement: true });
-    if (p && p.catch) p.catch(() => this.canvas.requestPointerLock());
+    // Pointer lock can be refused (unfocused window, embedded frame, automated
+    // browser). Never let that abort mission start.
+    try {
+      const p = this.canvas.requestPointerLock?.({ unadjustedMovement: true });
+      if (p && p.catch) p.catch(() => { try { this.canvas.requestPointerLock(); } catch { /* ignored */ } });
+    } catch { /* ignored */ }
   }
   unlock() { if (document.pointerLockElement) document.exitPointerLock(); }
 
