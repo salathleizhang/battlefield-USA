@@ -1,0 +1,75 @@
+<!doctype html><html><head><meta charset="utf-8"><title>viewer</title>
+<style>html,body{margin:0;height:100%;background:#0b0f12;overflow:hidden}canvas{display:block}</style></head>
+<body>
+<script type="module">
+import * as THREE from '/node_modules/three/build/three.module.js';
+import { GLTFLoader } from '/node_modules/three/examples/jsm/loaders/GLTFLoader.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(1);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0f12);
+scene.add(new THREE.HemisphereLight(0xbfd0da, 0x30302a, 2.2));
+const sun = new THREE.DirectionalLight(0xfff0dd, 2.2); sun.position.set(1, 1.4, 0.8); scene.add(sun);
+
+const cam = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 100000);
+const params = new URLSearchParams(location.search);
+const view = params.get('view') || 'quarter';
+const model = params.get('m') || 'golden_gate_warehouse.glb';
+const only = params.get('only') || '';
+
+new GLTFLoader().load('/assets/models/bridge/' + model, (g) => {
+  const root = g.scene;
+  if (only === 'bridge') {
+    const hide = [];
+    root.traverse((o) => {
+      const n = (o.name || '').toLowerCase();
+      const mat = o.isMesh && o.material ? (o.material.name || '').toLowerCase() : '';
+      if (n.includes('terrain') || n.includes('google') || n.includes('snapshot') || n.includes('ground')
+        || mat.includes('google') || mat.includes('snapshot')) hide.push(o);
+    });
+    for (const o of hide) o.traverse((c) => { c.visible = false; });
+  }
+  scene.add(root);
+
+  // bbox of visible meshes only
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3();
+  root.traverse((o) => {
+    if (!o.isMesh || !o.visible) return;
+    let p = o, vis = true;
+    while (p) { if (!p.visible) { vis = false; break; } p = p.parent; }
+    if (vis) box.expandByObject(o);
+  });
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const max = Math.max(size.x, size.y, size.z) || 1;
+  const s = 100 / max;
+  root.scale.setScalar(s);
+  root.position.copy(center).multiplyScalar(-s);
+  root.updateMatrixWorld(true);
+
+  const b2 = new THREE.Box3();
+  root.traverse((o) => {
+    if (!o.isMesh || !o.visible) return;
+    let p = o, vis = true;
+    while (p) { if (!p.visible) { vis = false; break; } p = p.parent; }
+    if (vis) b2.expandByObject(o);
+  });
+  const c = b2.getCenter(new THREE.Vector3());
+  document.title = `size ${size.x.toFixed(1)} ${size.y.toFixed(1)} ${size.z.toFixed(1)} | bridge ${b2.getSize(new THREE.Vector3()).toArray().map(v=>v.toFixed(1)).join(' ')}`;
+
+  const dist = 150;
+  if (view === 'side') cam.position.set(c.x + dist * 0.95, c.y + 4, c.z);
+  else if (view === 'front') cam.position.set(c.x, c.y + 6, c.z + dist * 0.95);
+  else if (view === 'top') cam.position.set(c.x, c.y + dist, c.z + 0.01);
+  else if (view === 'close') cam.position.set(c.x + 35, c.y + 18, c.z + 35);
+  else cam.position.set(c.x + dist * 0.62, c.y + dist * 0.38, c.z + dist * 0.62);
+  cam.lookAt(c);
+  renderer.render(scene, cam);
+  window.__ready = true;
+}, undefined, (e) => { document.title = 'ERR ' + e.message; });
+</script>
+</body></html>
