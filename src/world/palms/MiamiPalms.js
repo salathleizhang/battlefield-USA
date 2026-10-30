@@ -85,12 +85,12 @@ export function planMiamiPalms(heightAt) {
   };
 
   // Hotel-side sidewalk row, in front of the Art Deco facades.
-  row(1.15, 'hotel', 0, (z) => Math.abs(z) < 15 || [-140, -44, 52, 148].some((c) => Math.abs(z - c) < 8));
+  row(1.15, 'hotel', 0, (z) => Math.abs(z - 10) < 22 || [-140, -44, 52, 148].some((c) => Math.abs(z - c) < 8));
   // Lummus Park edge, just behind the promenade wall.
-  row(18.4, 'edge', 1, (z) => Math.abs(z) < 15);
+  row(18.4, 'edge', 1, (z) => Math.abs(z - 10) < 26);
   // Park clusters, kept clear of the Lido pavilion and the central sight line.
   for (let z = -196; z <= 196; z += 10 + rnd() * 8) {
-    if (Math.abs(z) < 14) continue;
+    if (Math.abs(z - 10) < 26) continue;
     const cx = 23 + rnd() * 10;
     const n = rnd() < 0.35 ? 1 : rnd() < 0.75 ? 2 : 3;
     const pts = [];
@@ -524,27 +524,7 @@ varying float vOdK;`)
 varying float vOdK;`)
       .replace('#include <map_fragment>', MAP_REPLACE)
       .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = normalize(vNormal);')
-      .replace('#include <aomap_fragment>', `#include <aomap_fragment>
-        #ifdef USE_FOG
-        {
-          vec3 odV = -normalize(vFogOffset);
-          vec3 odNg = normalize(cross(dFdx(vFogOffset), dFdy(vFogOffset)));
-          odNg *= sign(dot(odNg, odV));
-          // the bent normals would light every blade; only the face we actually see
-          // being sunward gets direct light (backlit fronds stay dark silhouettes)
-          float odFace = dot(odNg, OD_SUN);
-          float odLit = smoothstep(-0.1, 0.3, odFace);
-          reflectedLight.directDiffuse *= mix(0.1, 1.0, odLit);
-          reflectedLight.directSpecular *= odLit;
-          reflectedLight.directDiffuse += diffuseColor.rgb * directLight.color * 0.1 * odLit;
-          // modest olive-gold transmission through single leaflet layers toward the sun
-          float odT = max(-odFace, 0.0) * pow(max(dot(-odV, OD_SUN), 0.0), 3.0);
-          reflectedLight.directDiffuse += diffuseColor.rgb * vec3(0.85, 0.75, 0.2) * directLight.color * 0.1 * odT;
-          // crown interior in deep shade
-          reflectedLight.indirectDiffuse *= 0.35 + 0.65 * vOdK;
-          reflectedLight.directDiffuse *= 0.55 + 0.45 * vOdK;
-        }
-        #endif`);
+
   };
   m.customProgramCacheKey = () => 'palm-frond-v3';
   const depth = new THREE.MeshDepthMaterial({ map: atlas, alphaTest: 0.5, side: THREE.DoubleSide });
