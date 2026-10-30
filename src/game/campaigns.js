@@ -15,9 +15,9 @@ export const CAMPAIGNS = [
     art: '/assets/art/santa-barbara.jpg',
     accent: '#c9764a',
     env: {
-      fog: 0xaaa79b, fogDensity: 0.0019, sun: 0xffe3c3, sunIntensity: 2.55,
-      skyTop: 0x45566c, skyHorizon: 0xd2c3a8, ground: 0x6d6452, cloudiness: 0.52,
-      sunDir: { x: -0.55, y: 0.2, z: -0.78 },
+      fog: 0xb4bcbe, fogDensity: 0.0017, sun: 0xfff1dd, sunIntensity: 2.65,
+      skyTop: 0x516478, skyHorizon: 0xd3d0c3, ground: 0x6a6c62, cloudiness: 0.58,
+      sunDir: { x: -0.38, y: 0.42, z: -0.82 },
       ambience: 'coast',
     },
   },

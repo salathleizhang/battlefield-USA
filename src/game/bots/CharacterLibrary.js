@@ -34,15 +34,15 @@ export class CharacterLibrary {
       });
       onProgress?.(0.15, '载入写实士兵');
       const [china, us, us2, anims, weapons] = await Promise.all([
-        load('greenberet.glb'),
+        load('rifleman_v00.glb'),
         load('marine.glb'),
         load('sapper.glb'),
         load('commando_anims.glb'),
         load('weapons.glb'),
       ]);
       onProgress?.(0.9, '绑定骨骼动画');
-      this.templates.china = us.scene;
-      this.templates.us = us.scene;
+      this.templates.china = china.scene;
+      this.templates.us = us2.scene;
       this.templates.us2 = us2.scene;
       this.clips = anims.animations;
       const kar = weapons.scene.getObjectByName('kar98k');
@@ -66,23 +66,16 @@ export class CharacterLibrary {
     const hit = this.matCache.get(key);
     if (hit) return hit;
     const mat = source.clone();
-    mat.color.setHex(0xffffff);
-    mat.envMapIntensity = 1.25;
-    mat.roughness = 0.88;
-    mat.metalness = 0.02;
-    mat.emissive = new THREE.Color(0xffffff);
-    mat.emissiveIntensity = 0.26;
-    mat.emissiveMap = mat.map;
     if (/alpha/i.test(mat.name)) {
       mat.depthWrite = false;
-    } else if (mat.map) {
-      const tk = team + '|' + mat.map.uuid;
-      let tex = this.texCache.get(tk);
-      if (!tex) {
-        tex = recolourAtlas(mat.map, team);
-        if (tex) this.texCache.set(tk, tex);
-      }
-      if (tex) { mat.map = tex; mat.emissiveMap = tex; }
+    } else {
+      // 八路军: cool blue-grey cotton over field-grey; US: sun-faded olive drab.
+      mat.color.setHex(team === 0 ? 0x9fb0c6 : 0xb9ab80);
+      mat.roughness = 0.93;
+      mat.metalness = 0.02;
+      mat.envMapIntensity = 1.1;
+      mat.emissive = new THREE.Color(team === 0 ? 0x1c2228 : 0x241f14);
+      mat.emissiveIntensity = 0.32;
     }
     mat.needsUpdate = true;
     this.matCache.set(key, mat);
@@ -92,7 +85,7 @@ export class CharacterLibrary {
   create(team, variant = 0) {
     if (!this.ready) return null;
     let key = team === 0 ? 'china' : 'us';
-    if (team === 1 && variant % 3 === 0) key = 'us2';
+    if (team === 1 && variant % 5 === 3) key = 'us2';
     return new PbrSoldier(this, this.game, this.templates[key], this.clips, this.weapons, team, variant);
   }
 }
@@ -187,29 +180,48 @@ class PbrSoldier {
 
   _addCap() {
     if (!this.head) return;
-    const capMat = new THREE.MeshStandardMaterial({ color: 0x6b7370, roughness: 0.95, metalness: 0 });
+    const capMat = new THREE.MeshStandardMaterial({ color: 0x4f5b66, roughness: 1.0, metalness: 0 });
     const cap = new THREE.Group();
-    const crown = new THREE.Mesh(new THREE.SphereGeometry(0.108, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.52), capMat);
-    crown.scale.set(1, 0.86, 1.04);
-    crown.position.y = 0.028;
+    // Flat-top soft cloth cap (Mao/八路军 field cap).
+    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.093, 0.103, 0.072, 16), capMat);
+    crown.position.y = 0.048;
     cap.add(crown);
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.109, 0.109, 0.022, 16), capMat);
-    band.position.y = 0.008;
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.092, 0.093, 0.008, 16), capMat);
+    top.position.y = 0.087;
+    cap.add(top);
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.104, 0.104, 0.026, 18), capMat);
+    band.position.y = 0.010;
     cap.add(band);
-    const brim = new THREE.Mesh(new THREE.BoxGeometry(0.175, 0.009, 0.075), capMat);
-    brim.position.set(0, 0.012, -0.105);
-    brim.rotation.x = -0.12;
-    cap.add(brim);
-    const star = new THREE.Mesh(new THREE.CircleGeometry(0.024, 5), new THREE.MeshStandardMaterial({
-      color: 0xb3271d, roughness: 0.68, metalness: 0,
+
+    const starShape = new THREE.Shape();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5;
+      const r = i % 2 === 0 ? 0.030 : 0.0125;
+      if (i === 0) starShape.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+      else starShape.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    starShape.closePath();
+    const starGeo = new THREE.ExtrudeGeometry(starShape, { depth: 0.005, bevelEnabled: false });
+    starGeo.center();
+    const starMat = new THREE.MeshStandardMaterial({ color: 0xb3271d, roughness: 0.64, metalness: 0, emissive: 0x3a0806, emissiveIntensity: 0.6 });
+    for (const side of [-1, 1]) {
+      const star = new THREE.Mesh(starGeo, starMat);
+      star.position.set(0, 0.042, side * 0.105);
+      star.rotation.y = side > 0 ? 0 : Math.PI;
+      cap.add(star);
+    }
+
+    const starSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: starTexture(), transparent: true, depthTest: true, depthWrite: false,
     }));
-    star.position.set(0, 0.038, -0.113);
-    star.rotation.y = Math.PI;
-    cap.add(star);
-    cap.position.set(0, 0.055, 0.004);
-    cap.rotation.x = -0.04;
+    starSprite.scale.set(0.072, 0.072, 1);
+    starSprite.position.set(0, 0.026, 0.113);
+    cap.add(starSprite);
+
+    cap.position.set(0, 0.056, 0.004);
+    cap.rotation.x = -0.025;
     this.head.add(cap);
-    cap.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    cap.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     this.cap = cap;
   }
 
@@ -420,5 +432,29 @@ function recolourAtlas(source, team) {
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.magFilter = THREE.LinearFilter;
   tex.needsUpdate = true;
+  return tex;
+}
+
+function starTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 96;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, 96, 96);
+  ctx.translate(48, 48);
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const r = i % 2 === 0 ? 42 : 18;
+    const x = Math.cos(a) * r, y = Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = '#c33a24';
+  ctx.fill();
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = '#e8c35a';
+  ctx.stroke();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
