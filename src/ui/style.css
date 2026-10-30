@@ -725,18 +725,21 @@ html, body {
 .minimap-wrap {
   position: absolute; left: 32px; top: 30px;
   width: 184px; height: 184px; border-radius: 50%; overflow: visible;
-  background: radial-gradient(circle, rgba(14, 20, 16, 0.75), rgba(6, 9, 7, 0.85));
-  box-shadow: 0 0 0 1px rgba(216, 172, 92, 0.5), 0 8px 26px rgba(0, 0, 0, 0.4);
+  background: radial-gradient(circle, rgba(40, 13, 7, 0.82), rgba(10, 4, 2, 0.92));
+  box-shadow:
+    0 0 0 1px rgba(255, 193, 46, 0.55),
+    0 0 0 4px rgba(90, 12, 5, 0.35),
+    0 8px 28px rgba(0, 0, 0, 0.5);
 }
 .minimap { width: 184px; height: 184px; display: block; border-radius: 50%; }
 .mm-ring {
   position: absolute; inset: 5px; border-radius: 50%; pointer-events: none;
-  border: 1px dashed rgba(232, 223, 200, 0.16);
+  border: 1px dashed rgba(255, 193, 46, 0.22);
 }
 .mm-north {
   position: absolute; left: 50%; top: 6px; transform: translateX(-50%);
   font-family: var(--brush); font-size: 12px; line-height: 1;
-  color: var(--gold); text-shadow: 0 1px 3px #000;
+  color: var(--gold-bright); text-shadow: 0 1px 3px #000;
 }
 .mm-title {
   position: absolute; left: 0; bottom: -21px; width: 100%;
@@ -745,7 +748,7 @@ html, body {
 }
 .mm-scan {
   position: absolute; inset: 0; pointer-events: none; border-radius: 50%;
-  background: linear-gradient(180deg, rgba(216, 172, 92, 0.05), transparent 42%);
+  background: linear-gradient(180deg, rgba(255, 150, 20, 0.08), transparent 42%);
 }
 
 /* objective */
@@ -753,13 +756,15 @@ html, body {
   position: absolute; left: 50%; bottom: 98px; transform: translateX(-50%);
   display: flex; align-items: center; gap: 10px;
   padding: 7px 16px 8px;
-  background: var(--panel); border-left: 2px solid var(--gold);
+  background: linear-gradient(180deg, rgba(60, 14, 7, 0.72), rgba(16, 5, 3, 0.8));
+  border-left: 2px solid var(--gold);
+  box-shadow: inset 0 0 0 1px rgba(255, 193, 46, 0.14), 0 4px 16px rgba(0, 0, 0, 0.35);
   clip-path: var(--cut-s);
   backdrop-filter: blur(4px);
   white-space: nowrap; max-width: 82vw;
 }
 .obj-k {
-  font-family: var(--brush); font-size: 12px; letter-spacing: 0.16em;
+  font-family: var(--hei); font-weight: 600; font-size: 12px; letter-spacing: 0.16em;
   color: var(--gold-bright);
 }
 .obj-k::before { content: "★"; font-size: 7px; margin-right: 6px; vertical-align: 2px; color: var(--gold); }
@@ -771,22 +776,23 @@ html, body {
 .vitals::before {
   content: "生命 / HEALTH"; position: absolute; left: 0; top: -16px;
   font-family: var(--mono); font-size: 8px; letter-spacing: 0.2em;
-  color: var(--paper-faint);
+  color: rgba(255, 193, 46, 0.55);
 }
 .hp-wrap { display: flex; align-items: flex-end; gap: 11px; }
 .hp-bar {
-  flex: 1; height: 9px; background: rgba(255, 255, 255, 0.08);
+  flex: 1; height: 10px; background: rgba(30, 8, 4, 0.85);
+  box-shadow: inset 0 0 0 1px rgba(255, 193, 46, 0.3);
   position: relative; overflow: hidden; clip-path: var(--cut-s);
 }
 .hp-bar i { display: block; height: 100%; width: 100%; transition: width 0.2s, background 0.4s; }
 .hp-num {
   font-family: var(--brush); font-size: 46px; font-weight: 400; line-height: 0.78;
   color: var(--paper); min-width: 64px; text-align: right;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.75), 0 4px 12px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 2px 0 rgba(80, 8, 3, 0.9), 0 4px 16px rgba(255, 90, 10, 0.18);
 }
 .vitals-row {
   display: flex; justify-content: space-between; margin-top: 7px;
-  font-family: var(--serif); font-size: 9px; letter-spacing: 0.16em;
+  font-family: var(--hei); font-size: 9px; letter-spacing: 0.16em;
   color: var(--paper-faint);
 }
 .vitals-row .stance { color: var(--gold); }
@@ -798,7 +804,7 @@ html, body {
 .ammo-num {
   font-family: var(--brush); font-size: 62px; font-weight: 400; line-height: 0.9;
   color: var(--paper);
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.75), 0 8px 22px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 2px 0 rgba(80, 8, 3, 0.9), 0 8px 26px rgba(255, 90, 10, 0.16);
   min-width: 48px;
 }
 .ammo-num.low { color: var(--gold-bright); }
@@ -806,7 +812,7 @@ html, body {
 .ammo-num.pulse { animation: ammoPulse 0.18s ease; }
 @keyframes ammoPulse { 0% { transform: scale(1.14); } 100% { transform: scale(1); } }
 .ammo-res { font-family: var(--mono); font-size: 18px; color: var(--paper-dim); }
-.ammo-res::before { content: "/"; margin-right: 4px; color: var(--paper-faint); }
+.ammo-res::before { content: "/"; margin-right: 4px; color: rgba(255, 193, 46, 0.5); }
 .weapon-name {
   margin-top: 1px;
   font-family: var(--brush); font-size: 15px; letter-spacing: 0.1em;
@@ -817,11 +823,11 @@ html, body {
   color: var(--paper-faint);
 }
 .ammo-pips { display: flex; gap: 2px; justify-content: flex-end; margin-top: 6px; }
-.ammo-pips i { width: 4px; height: 11px; background: rgba(232, 223, 200, 0.16); }
-.ammo-pips i.on { background: var(--paper); }
+.ammo-pips i { width: 4px; height: 11px; background: rgba(255, 200, 90, 0.16); }
+.ammo-pips i.on { background: linear-gradient(180deg, #fff0ad, #f2a61c); box-shadow: 0 0 6px rgba(255, 150, 20, 0.35); }
 .reload-hint {
   margin-top: 8px;
-  font-family: var(--serif); font-size: 9.5px; letter-spacing: 0.06em;
+  font-family: var(--hei); font-size: 9.5px; letter-spacing: 0.06em;
   color: var(--paper-faint);
 }
 .reload-hint.active { color: var(--gold); animation: blink 1s infinite; }
@@ -833,12 +839,12 @@ html, body {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   width: 40px; height: 40px; transition: opacity 0.15s;
 }
-.ch { position: absolute; background: rgba(250, 240, 220, 0.9); box-shadow: 0 0 2px rgba(0, 0, 0, 0.9); }
+.ch { position: absolute; background: rgba(255, 214, 120, 0.92); box-shadow: 0 0 2px rgba(0, 0, 0, 0.9), 0 0 6px rgba(255, 140, 20, 0.25); }
 .ch.t { width: 1.5px; height: 8px; left: 50%; top: calc(50% - var(--gap) - 8px); transform: translateX(-50%); }
 .ch.b { width: 1.5px; height: 8px; left: 50%; top: calc(50% + var(--gap)); transform: translateX(-50%); }
 .ch.l { width: 8px; height: 1.5px; top: 50%; left: calc(50% - var(--gap) - 8px); transform: translateY(-50%); }
 .ch.r { width: 8px; height: 1.5px; top: 50%; left: calc(50% + var(--gap)); transform: translateY(-50%); }
-.ch-dot { position: absolute; left: 50%; top: 50%; width: 2px; height: 2px; transform: translate(-50%, -50%); background: rgba(250, 240, 220, 0.9); }
+.ch-dot { position: absolute; left: 50%; top: 50%; width: 2px; height: 2px; transform: translate(-50%, -50%); background: rgba(255, 224, 150, 0.95); }
 
 .hitmarker {
   position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; transform: translate(-50%, -50%);
@@ -861,14 +867,16 @@ html, body {
 .kf {
   display: flex; align-items: center; gap: 8px;
   padding: 4px 10px 5px;
-  background: var(--panel); clip-path: var(--cut-s);
-  font-family: var(--serif); font-size: 11px; letter-spacing: 0.03em;
+  background: linear-gradient(180deg, rgba(52, 13, 7, 0.72), rgba(14, 5, 3, 0.8));
+  box-shadow: inset 0 0 0 1px rgba(255, 193, 46, 0.16);
+  clip-path: var(--cut-s);
+  font-family: var(--hei); font-size: 11px; letter-spacing: 0.03em;
   transition: opacity 0.3s; backdrop-filter: blur(4px);
 }
 .kf b { font-weight: 600; }
-.kf .t0 { color: #ec7a63; }
-.kf .t1 { color: #8fb4d8; }
-.kf-w { font-family: var(--mono); font-size: 9px; color: var(--paper-faint); }
+.kf .t0 { color: #ff7256; }
+.kf .t1 { color: #9cc6ec; }
+.kf-w { font-family: var(--mono); font-size: 9px; color: rgba(255, 193, 46, 0.55); }
 
 /* banner */
 .banner {
@@ -880,15 +888,20 @@ html, body {
   margin: 0;
   font-family: var(--brush); font-weight: 400;
   font-size: clamp(34px, 4.2vw, 56px); letter-spacing: 0.08em; text-indent: 0.08em;
-  color: var(--gold-bright);
-  text-shadow: 0 2px 0 rgba(50, 12, 4, 0.85), 0 12px 30px rgba(0, 0, 0, 0.8);
+  background: var(--gold-grad);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+  filter:
+    drop-shadow(0 2px 0 rgba(88, 10, 4, 0.95))
+    drop-shadow(0 3px 0 rgba(50, 5, 2, 0.85))
+    drop-shadow(0 14px 30px rgba(0, 0, 0, 0.8));
 }
 .banner p {
   margin: 10px 0 0;
-  font-family: var(--serif); font-size: 11.5px; letter-spacing: 0.22em;
+  font-family: var(--hei); font-size: 11.5px; letter-spacing: 0.22em;
   color: var(--paper-dim); text-indent: 0.22em;
 }
-.banner-line { width: 64px; height: 1px; margin: 15px auto 0; background: var(--gold); opacity: 0.7; }
+.banner-line { width: 64px; height: 2px; margin: 15px auto 0; background: linear-gradient(90deg, transparent, var(--gold), transparent); opacity: 0.85; }
 
 .subtitle {
   position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%);
