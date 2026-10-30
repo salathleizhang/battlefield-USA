@@ -138,11 +138,10 @@ export function buildSantaBarbara(L) {
     L.batch.cylinder(0.18, 0.22, 2.6, 6, x, -0.2, -30 + Math.sin(i) * 30, L.mats.get('woodDark'), { rotZ: 0.3 });
   }
   // Craters on the sand.
-  for (let i = 0; i < 14; i++) {
-    const x = -36 + Math.random() * 22;
-    const z = -120 + Math.random() * 220;
-    L.batch.cylinder(1.4 + Math.random() * 1.8, 2.2 + Math.random() * 2.2, 0.14, 14,
-      x, height(x, z) + 0.07, z, L.mats.get('sand'), { uv: 0.8 });
+  for (let i = 0; i < 16; i++) {
+    const x = -38 + Math.random() * 26;
+    const z = -130 + Math.random() * 230;
+    L.crater(x, z, 1.6 + Math.random() * 1.8);
   }
 
   // Pier entrance sign.

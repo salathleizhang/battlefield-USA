@@ -88,14 +88,6 @@ export class Menu {
         </div>
       </footer>
 
-      <div class="settings-panel" id="settings-panel">
-        <h2>作战设置</h2>
-        <div class="setting-row"><label>鼠标灵敏度</label><input type="range" id="set-sens" min="0.2" max="2" step="0.05"><span class="val" id="val-sens">1.00</span></div>
-        <div class="setting-row"><label>主音量</label><input type="range" id="set-vol" min="0" max="1" step="0.05"><span class="val" id="val-vol">70%</span></div>
-        <div class="setting-row"><label>后坐力强度</label><input type="range" id="set-rec" min="0" max="1.5" step="0.05"><span class="val" id="val-rec">100%</span></div>
-        <button class="btn settings-close" id="btn-settings-close">返回</button>
-      </div>
-
       <div class="deploy" id="deploy">
         <div class="deploy-inner">
           <div class="deploy-k">DEPLOYING · 1947</div>
@@ -111,6 +103,22 @@ export class Menu {
     this.list = section.querySelector('#mission-list');
     this.deploy = section.querySelector('#deploy');
 
+    // Settings live outside the menu so they can also open over the pause screen.
+    const settingsPanel = document.createElement('div');
+    settingsPanel.className = 'settings-panel';
+    settingsPanel.id = 'settings-panel';
+    settingsPanel.innerHTML = `
+      <div class="settings-card">
+        <div class="seal settings-seal" aria-hidden="true">军令</div>
+        <h2>作战设置</h2>
+        <div class="setting-row"><label>鼠标灵敏度</label><input type="range" id="set-sens" min="0.2" max="2" step="0.05"><span class="val" id="val-sens">1.00</span></div>
+        <div class="setting-row"><label>主音量</label><input type="range" id="set-vol" min="0" max="1" step="0.05"><span class="val" id="val-vol">70%</span></div>
+        <div class="setting-row"><label>后坐力强度</label><input type="range" id="set-rec" min="0" max="1.5" step="0.05"><span class="val" id="val-rec">100%</span></div>
+        <button class="btn settings-close" id="btn-settings-close">返回</button>
+      </div>`;
+    this.root.appendChild(settingsPanel);
+    this.settingsEl = settingsPanel;
+
     this._buildList();
 
     // Pause overlay.
@@ -119,6 +127,7 @@ export class Menu {
     pause.id = 'pause';
     pause.innerHTML = `
       <div class="pause-card">
+        <div class="seal pause-seal" aria-hidden="true">休整</div>
         <h2>战斗暂停</h2>
         <div class="sub" id="pause-sub">P A U S E D</div>
         <button class="btn primary" id="btn-resume">继续战斗</button>
@@ -169,7 +178,7 @@ export class Menu {
   _wire() {
     this.el.querySelector('#btn-start').addEventListener('click', () => this.start());
     this.el.querySelector('#btn-settings').addEventListener('click', () => this.toggleSettings(true));
-    this.el.querySelector('#btn-settings-close').addEventListener('click', () => this.toggleSettings(false));
+    this.settingsEl.querySelector('#btn-settings-close').addEventListener('click', () => this.toggleSettings(false));
     this.pauseEl.querySelector('#btn-resume').addEventListener('click', () => this.resume());
     this.pauseEl.querySelector('#btn-restart').addEventListener('click', () => {
       const id = this.game.campaign?.id;
@@ -186,9 +195,9 @@ export class Menu {
     this.endEl.querySelector('#btn-end-menu').addEventListener('click', () => this.exit());
 
     const bind = (id, key, fmt) => {
-      const input = this.el.querySelector(id);
+      const input = this.settingsEl.querySelector(id);
       input.value = this.settings[key];
-      const out = this.el.querySelector(id.replace('set-', 'val-'));
+      const out = this.settingsEl.querySelector(id.replace('set-', 'val-'));
       out.textContent = fmt(this.settings[key]);
       input.addEventListener('input', () => {
         this.settings[key] = parseFloat(input.value);
@@ -211,7 +220,7 @@ export class Menu {
   }
 
   toggleSettings(open) {
-    this.el.querySelector('#settings-panel').classList.toggle('open', open);
+    this.settingsEl.classList.toggle('open', open);
   }
 
   select(id) {
@@ -232,7 +241,7 @@ export class Menu {
   open() {
     this.isOpen = true;
     this.el.classList.add('open');
-    this.el.querySelector('#settings-panel').classList.remove('open');
+    this.settingsEl.classList.remove('open');
     this.select(this.selected);
   }
 

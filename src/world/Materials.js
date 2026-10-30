@@ -222,6 +222,28 @@ function waterNormalTexture() {
   return t;
 }
 
+function craterTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(128, 128, 4, 128, 128, 126);
+  g.addColorStop(0, 'rgba(28,22,15,0.85)');
+  g.addColorStop(0.45, 'rgba(46,36,24,0.55)');
+  g.addColorStop(0.72, 'rgba(120,100,72,0.28)');
+  g.addColorStop(0.9, 'rgba(180,160,120,0.22)');
+  g.addColorStop(1, 'rgba(180,160,120,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(128, 128, 126, 0, 7); ctx.fill();
+  for (let i = 0; i < 120; i++) {
+    const a = Math.random() * 6.28, r = 15 + Math.random() * 100;
+    ctx.fillStyle = `rgba(30,24,16,${Math.random() * 0.35})`;
+    ctx.beginPath(); ctx.arc(128 + Math.cos(a) * r, 128 + Math.sin(a) * r, 1 + Math.random() * 5, 0, 7); ctx.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 function foamTexture() {
   return canvasTex(512, 256, (ctx, w, h) => {
     ctx.clearRect(0, 0, w, h);
@@ -325,6 +347,7 @@ export class Materials {
     this.textures.grass = grassTexture();
     this.textures.foam = foamTexture();
     this.textures.waterNormal = waterNormalTexture();
+    this.textures.crater = craterTexture();
     this.textures.asphalt = asphaltTexture();
     this.textures.concrete = concreteTexture();
     onProgress?.(1, '材质');

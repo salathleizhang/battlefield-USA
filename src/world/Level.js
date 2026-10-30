@@ -467,6 +467,20 @@ export class Level {
     return this._smokeTex;
   }
 
+  crater(x, z, radius = 3, y = null) {
+    const gy = y ?? this.groundHeight(x, z);
+    const mat = new THREE.MeshBasicMaterial({
+      map: this.mats.textures.crater, transparent: true, opacity: 0.9,
+      depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1,
+    });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(radius * 2, radius * 2), mat);
+    m.rotation.x = -Math.PI / 2;
+    m.rotation.z = this.rand() * 6.28;
+    m.position.set(x, gy + 0.04, z);
+    this.scene.add(m);
+    return m;
+  }
+
   skyline(points) {
     const mat = new THREE.MeshStandardMaterial({ color: 0x5b5e58, roughness: 1, metalness: 0 });
     for (const p of points) {

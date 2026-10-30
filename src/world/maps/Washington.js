@@ -186,10 +186,10 @@ export function buildWashington(L) {
   L.smokeColumn(-120, 4, 40, 1.6);
 
   // Craters.
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 22; i++) {
     const x = -70 + Math.random() * 140;
     const z = -120 + Math.random() * 210;
-    L.batch.cylinder(2.4 + Math.random() * 2.6, 4 + Math.random() * 2.6, 0.18, 12, x, height(x, z) + 0.08, z, L.mats.get('ground'), { uv: 0.5 });
+    L.crater(x, z, 2 + Math.random() * 3);
   }
 
   // Distant skyline across the river.
