@@ -51,7 +51,9 @@ npm run build    # 生产构建到 dist/
 ## 美术资产
 
 - **PBR 材质管线**：所有表面使用完整的 albedo / normal / roughness / metalness / AO 贴图组，配合每关一张 HDRI 环境光（PMREM + ACES 色调映射）。清单在 `public/assets/pbr/manifest.json`，素材来源与授权见 [CREDITS.md](public/assets/pbr/CREDITS.md)。
-- 当前 13 组材质全部来自 **CC0 1.0** 素材库（ambientCG / Poly Haven），可商用、可再分发；桥塔的国际橙涂装在原图基础上做了色相校正。
+- 当前 14 组材质全部来自 **CC0 1.0** 素材库（ambientCG / Poly Haven）或本项目自制，可商用、可再分发；桥塔改用单生成的国际橙喷涂贴图组 `bridge_orange`。
+- **金门大桥为 1:2 结构复刻**：主跨 640 m、桥面净空 33.5 m、塔顶 113.5 m，与真实桥的 1280 / 67 / 227 m 严格同比；双塔为带竖向凹槽与分层收分的 Art Deco 钢塔，塔间 6 道门式横撑，主缆按真实垂度成抛物线并在中跨落到桥面，吊索按 7.6 m 间距成对布置、带索夹，桥面下有 3.8 m 加劲桁架、伸缩缝、六车道标线与 1937 年式路灯。全部构件按材质合批，桥体仍是十余个 draw call。
+- 环境按真实海峡重建：北侧马林岬角、南侧旧金山要塞区、西面恶魔岛、雾中锚泊的货轮，以及贴着桥面漂移的体积雾团；能见度压到 2 km 以内以还原金门雾。
 - **换成付费正版资产不需要改代码**：把贴图按 `albedo / normal / roughness / metalness / ao` 五个文件名放进 `public/assets/pbr/<材质名>/`，或在 manifest 里新增条目即可。具体命名映射见 CREDITS.md。
 - 建筑、武器、士兵、植被、桥梁、纪念碑等主体仍为 **程序化建模**；战壕沙袋改为参考项目的「压扁球体 + 收口」堆垛方式（4 层错缝、双层垛），不再是方盒贴图。
 - 场景小道具复用参考项目的 **CC0 GLB 模型**：混凝土路障、军用木箱、木条箱、油桶、弹药箱、汽油桶，按实例化批渲染放入四张地图的据点与补给点，授权与来源见 [props/CREDITS.md](public/assets/models/props/CREDITS.md)。
