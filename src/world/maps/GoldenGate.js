@@ -17,22 +17,27 @@ export function buildGoldenGate(L) {
     return lerp(-14, 42, t) + Math.sin(x * 0.05) * 3 * t;
   };
   L.addTerrain({
-    size: 900, segments: 150, height, texture: 'grass', tile: 12,
+    size: 900, segments: 150, height, texture: 'grass', tile: 6,
     color: (x, z, y, c) => {
-      if (y < 2) c.setHex(0x4a5048);
-      else c.setHex(0x66684a).lerp(new THREE.Color(0x3f4436), Math.random() * 0.5);
+      if (y < 2) c.setHex(0x7c8278);
+      else c.setHex(0xa5a37c).lerp(new THREE.Color(0x737a62), Math.random() * 0.5);
     },
   });
-  L.addWater({ y: 0, size: 2000, color: 0x5c6a68, opacity: 0.98, rough: 0.14 });
+  L.addWater({ y: 0, size: 2000, color: 0x4f5c5a, opacity: 0.98, rough: 0.09 });
   L.worldGround = deckY;
 
   /* ---------------------------------------------------------------- deck */
-  const orange = new THREE.MeshStandardMaterial({ color: 0xa8402b, roughness: 0.62, metalness: 0.25 });
+  const orange = L.mats.get('bridgePaint');
   L.mats.mats.bridgeOrange = orange;
-  const deckMat = L.mats.get('asphalt');
+  const deckMat = L.mats.get('bridgeDeck') || L.mats.get('asphalt');
   const walkMat = L.mats.get('concrete');
+  const steelMat = L.mats.get('bridgeSteel');
   L.batch.box(24, 1.3, 500, 0, deckY, 0, deckMat, { uv: 0.15 });
   L.solidBox(0, deckY, 0, 24, 1.3, 500, 0, { surface: 'concrete' });
+  // Underside girders catch light from the water and give the deck an edge.
+  for (const side of [-1, 1]) {
+    L.batch.box(1.1, 1.9, 500, side * 9.4, deckY - 1.5, 0, steelMat, { uv: 0.2 });
+  }
   // Sidewalks & railings.
   for (const side of [-1, 1]) {
     L.batch.box(2.2, 0.5, 500, side * 10.6, deckY + 0.9, 0, walkMat, { uv: 0.3 });
@@ -44,8 +49,8 @@ export function buildGoldenGate(L) {
     L.solidBox(side * 11.7, deckY + 1.6, 0, 0.25, 1.4, 500, 0, { surface: 'metal' });
     // Lamp posts every 24 m.
     for (let z = -240; z <= 240; z += 24) {
-      L.batch.cylinder(0.07, 0.09, 5.5, 6, side * 11.2, deckY + 3.2, z, L.mats.get('metal'));
-      L.batch.sphere(0.22, side * 11.2, deckY + 6, z, new THREE.MeshStandardMaterial({ color: 0xffddaa, emissive: 0xffb060, emissiveIntensity: 1.6 }));
+      L.batch.cylinder(0.07, 0.09, 5.5, 6, side * 11.2, deckY + 3.2, z, steelMat);
+      L.batch.sphere(0.22, side * 11.2, deckY + 6, z, L.mats.get('lampWarm'));
     }
   }
   // Road markings.
@@ -93,7 +98,11 @@ export function buildGoldenGate(L) {
   }
 
   /* --------------------------------------------------------------- cables */
-  const cableMat = new THREE.MeshStandardMaterial({ color: 0x8e3a28, roughness: 0.6, metalness: 0.4 });
+  // Main cables are wire rope, not painted plate: tight roughness, high metalness.
+  const cableMat = new THREE.MeshStandardMaterial({
+    color: 0x8a4a3a, roughness: 0.42, metalness: 0.72, envMapIntensity: 1.2,
+  });
+  const ropeMat = new THREE.MeshStandardMaterial({ color: 0x4a332c, roughness: 0.6, metalness: 0.35 });
   for (const side of [-1, 1]) {
     const cableX = side * 14;
     const pts = [];
@@ -113,7 +122,6 @@ export function buildGoldenGate(L) {
     L.scene.add(tube);
 
     // Suspender ropes.
-    const ropeMat = new THREE.MeshBasicMaterial({ color: 0x5e3a30 });
     for (let z = -235; z <= 235; z += 9) {
       const t = (z + 250) / 500;
       const p = curve.getPoint(t);
@@ -137,8 +145,9 @@ export function buildGoldenGate(L) {
     { x: 140, z: 345, w: 70, h: 24, d: 50 },
   ]);
   // Distant Alcatraz-ish island.
-  L.batch.box(60, 24, 40, -170, 6, 60, new THREE.MeshStandardMaterial({ color: 0x4d5148, roughness: 1 }));
-  L.batch.box(20, 12, 16, -170, 24, 60, new THREE.MeshStandardMaterial({ color: 0x5b5d50, roughness: 1 }));
+  const islandMat = L.mats.get('ground');
+  L.batch.box(60, 24, 40, -170, 6, 60, islandMat, { uv: 0.1 });
+  L.batch.box(20, 12, 16, -170, 24, 60, islandMat, { uv: 0.1 });
 
   // Fog banks drifting on the deck.
   const fogMat = new THREE.MeshBasicMaterial({ color: 0xc3c8c6, transparent: true, opacity: 0.10, depthWrite: false });

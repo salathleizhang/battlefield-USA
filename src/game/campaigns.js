@@ -37,10 +37,11 @@ export const CAMPAIGNS = [
     art: '/assets/art/golden-gate.jpg',
     accent: '#b6493a',
     env: {
-      fog: 0xb4bbbb, fogDensity: 0.0056, sun: 0xf6ead8, sunIntensity: 2.0,
+      fog: 0xb4bbbb, fogDensity: 0.0056, sun: 0xf6ead8, sunIntensity: 1.6,
       skyTop: 0x5f6a6f, skyHorizon: 0xb9bec0, ground: 0x5a5f5c, cloudiness: 0.85,
       sunDir: { x: 0.2, y: 0.42, z: 0.88 },
       ambience: 'bridge',
+      hdri: 'goldenGate', envIntensity: 0.9, hdriRotation: 0.4,
     },
   },
   {

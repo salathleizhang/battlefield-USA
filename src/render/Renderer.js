@@ -186,6 +186,27 @@ export class Renderer {
     pmrem.dispose();
   }
 
+  /**
+   * Replaces the placeholder sky-gradient IBL with a real HDR environment.
+   * Called once per mission with the campaign's HDRI.
+   */
+  setHDRI(texture, { intensity = 0.95, rotation = 0 } = {}) {
+    if (!texture) return false;
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    pmrem.compileEquirectangularShader();
+    const rt = pmrem.fromEquirectangular(texture);
+    this._envRT?.dispose();
+    this._envRT = rt;
+    this.scene.environment = rt.texture;
+    this.scene.environmentIntensity = intensity;
+    this.scene.environmentRotation.y = rotation;
+    this.viewScene.environment = rt.texture;
+    this.viewScene.environmentIntensity = Math.min(1.25, intensity + 0.2);
+    this.viewScene.environmentRotation.y = rotation;
+    pmrem.dispose();
+    return true;
+  }
+
   resize() {
     const w = innerWidth, h = innerHeight;
     this.camera.aspect = w / h;

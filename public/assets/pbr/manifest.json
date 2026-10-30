@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "basePath": "/assets/pbr/",
+  "note": "Drop-in PBR library. Each set folder holds albedo/normal/roughness/metalness/ao as plain JPG/PNG. Replace a folder with a licensed set of the same name to swap it in.",
+  "sets": {
+    "bridgePaint": {
+      "dir": "bridge_paint",
+      "tile": 2.0,
+      "credit": {
+        "title": "Painted Metal 008",
+        "author": "ambientCG / Lennart Demes",
+        "license": "CC0 1.0",
+        "url": "https://ambientcg.com/view?id=PaintedMetal008",
+        "modification": "Hue-shifted and flattened toward International Orange #C0362C"
+      }
+    },
+    "steel": {
+      "dir": "steel",
+      "tile": 2.2,
+      "credit": {
+        "title": "Metal Plates 013",
+        "author": "ambientCG / Lennart Demes",
+        "license": "CC0 1.0",
+        "url": "https://ambientcg.com/view?id=MetalPlates013"
+      }
+    },
+    "concrete": {
+      "dir": "concrete",
+      "tile": 2.0,
+      "credit": {
+        "title": "Concrete 042 A",
+        "author": "ambientCG / Lennart Demes",
+        "license": "CC0 1.0",
+        "url": "https://ambientcg.com/view?id=Concrete042A"
+      }
+    },
+    "asphalt": {
+      "dir": "asphalt",
+      "tile": 3.0,
+      "credit": {
+        "title": "Road 013 A",
+        "author": "ambientCG / Lennart Demes",
+        "license": "CC0 1.0",
+        "url": "https://ambientcg.com/view?id=Road013A"
+      }
+    },
+    "terrain": {
+      "dir": "terrain",
+      "tile": 4.0,
+      "credit": {
+        "title": "Ground 037",
+        "author": "ambientCG / Lennart Demes",
+        "license": "CC0 1.0",
+        "url": "https://ambientcg.com/view?id=Ground037"
+      }
+    },
+    "wood": {
+      "dir": "wood",
+      "tile": 1.6,
+      "credit": {
+        "title": "Wood 080",
+        "author": "ambientCG / Lennart Demes",
+        "license": "CC0 1.0",
+        "url": "https://ambientcg.com/view?id=Wood080"
+      }
+    },
+    "rust": {
+      "dir": "rust",
+      "tile": 2.0,
+      "credit": {
+        "title": "Metal 041 B",
+        "author": "ambientCG / Lennart Demes",
+        "license": "CC0 1.0",
+        "url": "https://ambientcg.com/view?id=Metal041B"
+      }
+    },
+    "canvas": {
+      "dir": "canvas",
+      "tile": 0.7,
+      "credit": {
+        "title": "Fabric 066",
+        "author": "ambientCG / Lennart Demes",
+        "license": "CC0 1.0",
+        "url": "https://ambientcg.com/view?id=Fabric066"
+      }
+    },
+    "brick": {
+      "dir": "brick",
+      "tile": 1.5,
+      "credit": {
+        "title": "Bricks 105",
+        "author": "ambientCG / Lennart Demes",
+        "license": "CC0 1.0",
+        "url": "https://ambientcg.com/view?id=Bricks105"
+      }
+    },
+    "roof": {
+      "dir": "roof",
+      "tile": 2.0,
+      "credit": {
+        "title": "Roofing Tiles 014 B",
+        "author": "ambientCG / Lennart Demes",
+        "license": "CC0 1.0",
+        "url": "https://ambientcg.com/view?id=RoofingTiles014B"
+      }
+    },
+    "plaster": {
+      "dir": "plaster",
+      "tile": 2.0,
+      "credit": {
+        "title": "Plaster 002",
+        "author": "ambientCG / Lennart Demes",
+        "license": "CC0 1.0",
+        "url": "https://ambientcg.com/view?id=Plaster002"
+      }
+    },
+    "sand": {
+      "dir": "sand",
+      "tile": 3.0,
+      "credit": {
+        "title": "Ground 080",
+        "author": "ambientCG / Lennart Demes",
+        "license": "CC0 1.0",
+        "url": "https://ambientcg.com/view?id=Ground080"
+      }
+    },
+    "rubble": {
+      "dir": "rubble",
+      "tile": 2.5,
+      "credit": {
+        "title": "Ground 111",
+        "author": "ambientCG / Lennart Demes",
+        "license": "CC0 1.0",
+        "url": "https://ambientcg.com/view?id=Ground111"
+      }
+    }
+  },
+  "hdri": {
+    "goldenGate": {
+      "file": "hdri/golden_gate.hdr",
+      "credit": {
+        "title": "Kloofendal Overcast (Pure Sky)",
+        "author": "Greg Zaal / Poly Haven",
+        "license": "CC0 1.0",
+        "url": "https://polyhaven.com/a/kloofendal_overcast_puresky"
+      }
+    }
+  }
+}

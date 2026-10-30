@@ -33,7 +33,7 @@ export class Level {
   }
 
   /* ------------------------------------------------------------- terrain */
-  addTerrain({ size = 600, segments = 120, height = () => 0, color = null, material = null, texture = 'rubble', tile = 9 }) {
+  addTerrain({ size = 600, segments = 120, height = () => 0, color = null, material = null, texture = 'rubble', tile = 9, tint = 0xffffff }) {
     this.heightFn = height;
     const geo = new THREE.PlaneGeometry(size, size, segments, segments);
     geo.rotateX(-Math.PI / 2);
@@ -51,17 +51,14 @@ export class Level {
     }
     if (colors) geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.computeVertexNormals();
-    const src = this.mats.textures[texture] || this.mats.textures.rubble;
-    const map = src.clone();
-    map.needsUpdate = true;
-    const mat = material || new THREE.MeshStandardMaterial({
-      map, vertexColors: !!colors, roughness: 0.97, metalness: 0,
-      bumpMap: this.mats.textures.rubble, bumpScale: 0.25,
+
+    // Texel density is fixed in metres: one tile every `tile` metres.
+    const set = texture === 'grass' ? 'terrain' : texture === 'sand' ? 'sand' : 'rubble';
+    const mat = material || this.mats.terrain(set, {
+      repeat: size / tile,
+      color: tint,
+      vertexColors: !!colors,
     });
-    if (mat.map) {
-      mat.map.wrapS = mat.map.wrapT = THREE.RepeatWrapping;
-      mat.map.repeat.set(size / tile, size / tile);
-    }
     const mesh = new THREE.Mesh(geo, mat);
     mesh.receiveShadow = true;
     mesh.castShadow = false;
@@ -110,13 +107,7 @@ export class Level {
 
   addWater({ y = 0, size = 900, color = 0x8b9a94, opacity = 0.94, rough = 0.2 }) {
     this.waterY = y;
-    const tex = this.mats.textures.water.clone();
-    tex.needsUpdate = true;
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(size / 55, size / 55);
-    const mat = new THREE.MeshStandardMaterial({
-      map: tex, color, roughness: rough, metalness: 0.4, transparent: true, opacity,
-    });
+    const mat = this.mats.waterMaterial({ color, opacity, size, rough });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.y = y;
@@ -125,12 +116,6 @@ export class Level {
     this.water = mesh;
     this.waterMat = mat;
     this.waterBaseRepeat = size / 55;
-    if (mat.normalMap) {
-      mat.normalMap = mat.normalMap.clone();
-      mat.normalMap.needsUpdate = true;
-      mat.normalMap.wrapS = mat.normalMap.wrapT = THREE.RepeatWrapping;
-      mat.normalMap.repeat.set(size / 60, size / 60);
-    }
     return mesh;
   }
 

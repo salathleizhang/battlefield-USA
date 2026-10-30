@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { PBR } from './PBR.js';
 
 const BASE = '/assets/textures/';
 
@@ -193,32 +194,62 @@ function concreteTexture() {
   });
 }
 
-function waterNormalTexture() {
-  const size = 256;
+function waterNormalTexture(size = 768) {
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const ctx = c.getContext('2d');
   const img = ctx.createImageData(size, size);
   const d = img.data;
+
+  // Seamless directional wave spectrum. Integer wave numbers keep the map
+  // tileable, which matters because the sea plane repeats it ~20x.
+  let seed = 0x9e3779b9;
+  const rnd = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  const waves = [];
+  for (let i = 0; i < 9; i++) {
+    const k = 2 + Math.floor(rnd() * 8);
+    const a = rnd() * Math.PI * 2;
+    waves.push({
+      kx: Math.max(1, Math.round(Math.cos(a) * k)),
+      ky: Math.round(Math.sin(a) * k),
+      amp: 1 / (1 + i * 0.55),
+      ph: rnd() * Math.PI * 2,
+    });
+  }
+
+  const STRENGTH = 0.12;
   for (let y = 0; y < size; y++) {
+    const v = y / size;
     for (let x = 0; x < size; x++) {
-      const u = (x / size) * Math.PI * 2;
-      const v = (y / size) * Math.PI * 2;
-      const h = Math.sin(u * 3 + Math.sin(v * 2) * 0.8) * 0.5 + Math.sin(v * 4 + u) * 0.35 + Math.sin((u + v) * 6) * 0.15;
-      const dx = Math.cos(u * 3 + Math.sin(v * 2) * 0.8) * 3 * 0.5 + Math.cos((u + v) * 6) * 6 * 0.15;
-      const dy = Math.cos(v * 4 + u) * 4 * 0.35 + Math.cos((u + v) * 6) * 6 * 0.15;
-      const len = Math.hypot(dx, dy, 1);
-      const i = (y * size + x) * 4;
-      d[i] = Math.floor((-dx / len * 0.5 + 0.5) * 255);
-      d[i + 1] = Math.floor((-dy / len * 0.5 + 0.5) * 255);
-      d[i + 2] = Math.floor((1 / len * 0.5 + 0.5) * 255);
-      d[i + 3] = 255;
+      const u = x / size;
+      let gx = 0;
+      let gy = 0;
+      for (let i = 0; i < waves.length; i++) {
+        const w = waves[i];
+        const arg = 2 * Math.PI * (w.kx * u + w.ky * v) + w.ph;
+        const s = Math.cos(arg) * w.amp * 2 * Math.PI;
+        gx += s * w.kx;
+        gy += s * w.ky;
+      }
+      const nx = -gx * STRENGTH;
+      const ny = -gy * STRENGTH;
+      const len = Math.hypot(nx, ny, 1);
+      const idx = (y * size + x) * 4;
+      d[idx] = Math.round((nx / len * 0.5 + 0.5) * 255);
+      d[idx + 1] = Math.round((ny / len * 0.5 + 0.5) * 255);
+      d[idx + 2] = Math.round((1 / len * 0.5 + 0.5) * 255);
+      d[idx + 3] = 255;
     }
   }
   ctx.putImageData(img, 0, 0);
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.colorSpace = THREE.NoColorSpace;
+  t.anisotropy = 8;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
   return t;
 }
 
@@ -310,6 +341,7 @@ export class Materials {
     this.textures = {};
     this.mats = {};
     this.maxAniso = renderer.renderer.capabilities.getMaxAnisotropy();
+    this.pbr = new PBR(renderer);
   }
 
   async _loadTex(file, { srgb = true, mirror = false, repeat = 1 } = {}) {
@@ -325,6 +357,11 @@ export class Materials {
   }
 
   async load(onProgress) {
+    // PBR sets first: they carry the look of every surface in the game.
+    await this.pbr.load((p, label) => onProgress?.(p * 0.72, label));
+
+    // Legacy hand-authored maps remain as a fallback when the PBR library is
+    // unavailable, and for effects that have no PBR equivalent (crater, foam).
     const files = [
       ['wall_stucco', 'wall_stucco.jpg', { mirror: true }],
       ['rubble', 'ground_rubble.jpg', { mirror: true }],
@@ -334,7 +371,7 @@ export class Materials {
     for (let i = 0; i < files.length; i++) {
       const [key, file, opt] = files[i];
       this.textures[key] = await this._loadTex(file, { ...opt, repeat: 1 });
-      onProgress?.((i + 1) / (files.length + 4), '战地纹理');
+      onProgress?.(0.72 + (0.18 * (i + 1)) / files.length, '战地纹理');
     }
     this.textures.brick = brickTexture();
     this.textures.wood = woodTexture(false);
@@ -350,8 +387,9 @@ export class Materials {
     this.textures.crater = craterTexture();
     this.textures.asphalt = asphaltTexture();
     this.textures.concrete = concreteTexture();
-    onProgress?.(1, '材质');
+    onProgress?.(0.96, '材质');
     this._build();
+    onProgress?.(1, '材质');
   }
 
   _std(map, { color = 0xffffff, roughness = 0.92, metalness = 0.0, repeat, bump = true, roughnessMap = null, normalScale = 1 } = {}) {
@@ -373,53 +411,123 @@ export class Materials {
   _build() {
     const t = this.textures;
     const m = this.mats;
-    m.stucco = this._std(t.wall_stucco, { color: 0xffffff, roughness: 0.95 });
-    m.stuccoWhite = this._std(t.wall_stucco, { color: 0xd8d2c4, roughness: 0.95 });
-    m.stuccoCream = this._std(t.wall_stucco, { color: 0xe6cfa2, roughness: 0.95 });
-    m.stuccoOchre = this._std(t.wall_stucco, { color: 0xd8b07c, roughness: 0.95 });
-    m.stuccoPink = this._std(t.wall_stucco, { color: 0xd9b09a, roughness: 0.95 });
-    m.stuccoGrey = this._std(t.wall_stucco, { color: 0xa8a696, roughness: 0.95 });
-    m.grass = this._std(t.grass, { roughness: 0.98, bump: false, repeat: [8, 8] });
-    m.plaster = this._std(t.plaster, { roughness: 0.95 });
-    m.plasterWhite = this._std(t.plasterWhite, { roughness: 0.93 });
-    m.brick = this._std(t.brick, { roughness: 0.95 });
-    m.roof = this._std(t.roof, { roughness: 0.85 });
-    m.wood = this._std(t.wood, { roughness: 0.9, repeat: [2, 2] });
-    m.woodDark = this._std(t.woodDark, { roughness: 0.92, repeat: [2, 2] });
-    m.woodPlain = this._std(t.wood, { color: 0x9a8264, roughness: 0.87 });
-    m.metal = this._std(t.metal, { roughness: 0.62, metalness: 0.18 });
-    m.rust = this._std(t.metal, { color: 0x8a5a3a, roughness: 0.8, metalness: 0.15 });
-    m.sand = this._std(t.sand, { roughness: 0.98, repeat: [6, 6], bump: false });
-    m.ground = this._std(t.rubble, { roughness: 0.97, repeat: [1, 1] });
-    m.asphalt = this._std(t.asphalt, { roughness: 0.94, repeat: [4, 4] });
-    m.concrete = this._std(t.concrete, { roughness: 0.92 });
-    m.sandbag = this._std(t.sandbag, { roughness: 0.98 });
-    m.water = new THREE.MeshStandardMaterial({
-      map: t.water, color: 0x93a6a6, roughness: 0.08, metalness: 0.35,
-      normalMap: t.waterNormal, normalScale: new THREE.Vector2(1.1, 1.1),
-      transparent: true, opacity: 0.95,
-    });
-    m.canvas = this._std(null, { color: 0x6f7258, roughness: 0.98, bump: false });
-    m.canvasTan = this._std(null, { color: 0x9a8a62, roughness: 0.98, bump: false });
-    m.uniformGrey = new THREE.MeshStandardMaterial({ color: 0x6d7268, roughness: 0.95 });
-    m.uniformBlue = new THREE.MeshStandardMaterial({ color: 0x4f5a5e, roughness: 0.95 });
-    m.uniformOlive = new THREE.MeshStandardMaterial({ color: 0x5d5f3f, roughness: 0.95 });
-    m.helmetUs = new THREE.MeshStandardMaterial({ color: 0x54563c, roughness: 0.72, metalness: 0.15 });
+    const pbr = (name, opts) => this.pbr.material(name, opts);
+
+    /* Masonry: one plaster set, tinted per California palette. */
+    m.stucco = pbr('plaster', { color: 0xf2ebdd }) || this._std(t.wall_stucco, { color: 0xffffff, roughness: 0.95 });
+    m.stuccoWhite = pbr('plaster', { color: 0xe8e2d5 }) || this._std(t.wall_stucco, { color: 0xd8d2c4, roughness: 0.95 });
+    m.stuccoCream = pbr('plaster', { color: 0xecd4a8 }) || this._std(t.wall_stucco, { color: 0xe6cfa2, roughness: 0.95 });
+    m.stuccoOchre = pbr('plaster', { color: 0xd9b27f }) || this._std(t.wall_stucco, { color: 0xd8b07c, roughness: 0.95 });
+    m.stuccoPink = pbr('plaster', { color: 0xddb4a1 }) || this._std(t.wall_stucco, { color: 0xd9b09a, roughness: 0.95 });
+    m.stuccoGrey = pbr('plaster', { color: 0xb4b2a3 }) || this._std(t.wall_stucco, { color: 0xa8a696, roughness: 0.95 });
+    m.plaster = pbr('plaster', { color: 0xcec7b7 }) || this._std(t.plaster, { roughness: 0.95 });
+    m.plasterWhite = pbr('plaster', { color: 0xefeae0 }) || this._std(t.plasterWhite, { roughness: 0.93 });
+    m.brick = pbr('brick', { color: 0xffffff }) || this._std(t.brick, { roughness: 0.95 });
+    m.roof = pbr('roof', { color: 0xffffff }) || this._std(t.roof, { roughness: 0.85 });
+
+    /* Ground and structure. */
+    m.grass = pbr('terrain', { color: 0x909b70, tile: 4 }) || this._std(t.grass, { roughness: 0.98, bump: false, repeat: [8, 8] });
+    m.sand = pbr('sand', { color: 0xffffff }) || this._std(t.sand, { roughness: 0.98, repeat: [6, 6], bump: false });
+    m.ground = pbr('rubble', { color: 0xffffff }) || this._std(t.rubble, { roughness: 0.97, repeat: [1, 1] });
+    m.asphalt = pbr('asphalt', { color: 0xffffff }) || this._std(t.asphalt, { roughness: 0.94, repeat: [4, 4] });
+    m.concrete = pbr('concrete', { color: 0xffffff }) || this._std(t.concrete, { roughness: 0.92 });
+
+    m.wood = pbr('wood', { color: 0xb08a5f }) || this._std(t.wood, { roughness: 0.9, repeat: [2, 2] });
+    m.woodDark = pbr('wood', { color: 0x6d5238 }) || this._std(t.woodDark, { roughness: 0.92, repeat: [2, 2] });
+    m.woodPlain = pbr('wood', { color: 0xc3a077 }) || this._std(t.wood, { color: 0x9a8264, roughness: 0.87 });
+    m.palmTrunk = pbr('wood', { color: 0xa08a66, tile: 1.2 }) || this._std(t.wood, { color: 0x8a7758, roughness: 0.95 });
+
+    /* Metal family. */
+    m.metal = pbr('steel', { color: 0x9aa1a6 }) || this._std(t.metal, { roughness: 0.62, metalness: 0.18 });
+    m.rust = pbr('rust', { color: 0xd9c2ab }) || this._std(t.metal, { color: 0x8a5a3a, roughness: 0.8, metalness: 0.15 });
+    m.bridgePaint = pbr('bridgePaint', { color: 0xffffff }) || new THREE.MeshStandardMaterial({ color: 0xa8402b, roughness: 0.62, metalness: 0.25 });
+    m.bridgeSteel = pbr('steel', { color: 0xaeb4b8, tile: 2.6 }) || m.metal;
+    m.bridgeDeck = this.pbr.retile(m.asphalt, 1 / (4.5 * 0.15)) || m.asphalt;
+    if (m.bridgeDeck) {
+      // Wet asphalt is dark and only mildly reflective; without this the
+      // overcast HDRI turns the roadway into a white mirror at grazing angles.
+      m.bridgeDeck.color.setHex(0xb0b0b0);
+      m.bridgeDeck.envMapIntensity = 0.32;
+      m.bridgeDeck.normalScale.setScalar(0.7);
+    }
+
+    /* Cloth. */
+    m.sandbag = pbr('canvas', { color: 0xd6c39a, tile: 0.55 }) || this._std(t.sandbag, { roughness: 0.98 });
+    m.canvas = pbr('canvas', { color: 0x6f7258, tile: 0.5 }) || this._std(null, { color: 0x6f7258, roughness: 0.98, bump: false });
+    m.canvasTan = pbr('canvas', { color: 0x9a8a62, tile: 0.5 }) || this._std(null, { color: 0x9a8a62, roughness: 0.98, bump: false });
+
+    const cloth = (color) => pbr('canvas', { color, tile: 0.4, normalScale: 0.9 })
+      || new THREE.MeshStandardMaterial({ color, roughness: 0.95 });
+    m.uniformGrey = cloth(0x6d7268);
+    m.uniformBlue = cloth(0x4f5a5e);
+    m.uniformOlive = cloth(0x5d5f3f);
+    m.leather = pbr('canvas', { color: 0x4a3526, repeat: 1.6, normalScale: 1.2 })
+      || new THREE.MeshStandardMaterial({ color: 0x3d2f22, roughness: 0.8 });
+
+    m.helmetUs = pbr('steel', { color: 0x5d6140, repeat: 1.3, metalness: 0.55 })
+      || new THREE.MeshStandardMaterial({ color: 0x54563c, roughness: 0.72, metalness: 0.15 });
+
     m.skin = new THREE.MeshStandardMaterial({ color: 0xb98d6b, roughness: 0.85 });
-    m.leather = new THREE.MeshStandardMaterial({ color: 0x3d2f22, roughness: 0.8 });
     m.rubber = new THREE.MeshStandardMaterial({ color: 0x1d1f1f, roughness: 0.95 });
     m.black = new THREE.MeshStandardMaterial({ color: 0x141616, roughness: 0.8 });
-    m.gunWood = this._std(t.woodDark, { color: 0x9a6f45, roughness: 0.72 });
-    m.gunMetal = new THREE.MeshStandardMaterial({ color: 0x34383a, roughness: 0.46, metalness: 0.55 });
-    m.brass = new THREE.MeshStandardMaterial({ color: 0xb08d3f, roughness: 0.35, metalness: 0.9 });
+    m.gunWood = pbr('wood', { color: 0xa8763f, tile: 0.3, repeat: 1.7 })
+      || this._std(t.woodDark, { color: 0x9a6f45, roughness: 0.72 });
+    m.gunMetal = pbr('steel', { color: 0x767d82, repeat: 1.1, metalness: 0.9 })
+      || new THREE.MeshStandardMaterial({ color: 0x34383a, roughness: 0.46, metalness: 0.55 });
+    m.brass = new THREE.MeshStandardMaterial({ color: 0xb08d3f, roughness: 0.32, metalness: 0.95 });
     m.flagChina = new THREE.MeshStandardMaterial({ color: 0xb2271e, roughness: 0.9, side: THREE.DoubleSide });
     m.flagUs = new THREE.MeshStandardMaterial({ color: 0x2f3f6b, roughness: 0.9, side: THREE.DoubleSide });
-    m.glass = new THREE.MeshStandardMaterial({ color: 0x1b2626, roughness: 0.15, metalness: 0.4, transparent: true, opacity: 0.65 });
-    m.foliage = new THREE.MeshStandardMaterial({ color: 0x3f4a2f, roughness: 0.95 });
-    m.palmTrunk = this._std(t.wood, { color: 0x8a7758, roughness: 0.95 });
+    m.glass = new THREE.MeshStandardMaterial({ color: 0x1b2626, roughness: 0.12, metalness: 0.5, transparent: true, opacity: 0.6 });
+    m.foliage = new THREE.MeshStandardMaterial({ color: 0x3f4a2f, roughness: 0.95, side: THREE.DoubleSide });
+
+    m.water = this.waterMaterial({ color: 0x6f7f7d, opacity: 0.96, size: 900 });
+    m.lampWarm = new THREE.MeshStandardMaterial({
+      color: 0xffddaa, emissive: 0xffb060, emissiveIntensity: 1.8, roughness: 0.5,
+    });
+
     m.fire = new THREE.MeshBasicMaterial({ color: 0xff7a22, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
     m.smoke = new THREE.MeshBasicMaterial({ color: 0x2a2926, transparent: true, opacity: 0.5, depthWrite: false });
     m.decalHole = new THREE.MeshBasicMaterial({ color: 0x151310, transparent: true, opacity: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+  }
+
+  /**
+   * Terrain material whose texel density is fixed in metres, independent of
+   * terrain width: `repeat` is simply size / tile.
+   */
+  terrain(name = 'terrain', { repeat = 60, color = 0xffffff, vertexColors = false } = {}) {
+    const base = this.pbr.material(name, { color });
+    if (base) {
+      const mat = this.pbr.retile(base, repeat);
+      mat.vertexColors = vertexColors;
+      return mat;
+    }
+    const src = this.textures.grass || this.textures.rubble;
+    const map = src.clone();
+    map.needsUpdate = true;
+    map.wrapS = map.wrapT = THREE.RepeatWrapping;
+    map.repeat.set(repeat, repeat);
+    return new THREE.MeshStandardMaterial({ map, color, roughness: 0.97, vertexColors });
+  }
+
+  /** Sea material: dark dielectric surface, detail normals and HDRI reflections. */
+  waterMaterial({ color = 0x6f7f7d, opacity = 0.96, size = 900, rough = 0.1, normalRepeat = null } = {}) {
+    const normal = this.textures.waterNormal.clone();
+    const r = normalRepeat ?? size / 46;
+    normal.wrapS = normal.wrapT = THREE.RepeatWrapping;
+    normal.repeat.set(r, r);
+    normal.anisotropy = Math.min(8, this.maxAniso);
+    const mat = new THREE.MeshStandardMaterial({
+      color,
+      roughness: rough,
+      metalness: 0.02,
+      normalMap: normal,
+      normalScale: new THREE.Vector2(0.9, 0.9),
+      transparent: true,
+      opacity,
+      envMapIntensity: 1.6,
+    });
+    mat.userData.water = true;
+    return mat;
   }
 
   get(name) { return this.mats[name] || this.mats.plaster; }
