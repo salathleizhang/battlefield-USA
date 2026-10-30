@@ -155,8 +155,8 @@ function buildFromTemplate(mats, template) {
   handR.rotation.set(0.02, 0, -Math.PI / 2);
   g.add(handR);
   const handL = buildHand({ side: -1, glove, cuff: sleeve, cuffDark: gloveCuffMat });
-  handL.position.set(0.016, -0.104, -0.300);
-  handL.rotation.set(0.04, 0.20, Math.PI);
+  handL.position.set(0.046, -0.112, -0.300);
+  handL.rotation.set(0.06, 0.45, Math.PI);
   g.add(handL);
 
   const clipAnchor = new THREE.Object3D();
@@ -433,14 +433,10 @@ function buildHand({ side = 1, glove, cuff, cuffDark }) {
   thumb.add(t2);
   group.add(thumb);
 
-  // Glove cuff + sleeve stub.
-  const cuffSleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.036, 0.050, 12), cuff);
-  cuffSleeve.rotation.x = Math.PI / 2;
-  cuffSleeve.position.set(0, 0, -0.042);
-  group.add(cuffSleeve);
-  const gloveCuff = new THREE.Mesh(new THREE.CylinderGeometry(0.030, 0.032, 0.020, 12), cuffDark);
+  // Glove cuff only: a sleeve stub would read as a pipe in first person.
+  const gloveCuff = new THREE.Mesh(new THREE.CylinderGeometry(0.029, 0.031, 0.024, 12), cuffDark);
   gloveCuff.rotation.x = Math.PI / 2;
-  gloveCuff.position.set(0, 0, -0.012);
+  gloveCuff.position.set(0, 0, -0.010);
   group.add(gloveCuff);
 
   group.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
