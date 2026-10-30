@@ -143,7 +143,7 @@ export class Menu {
     deploy.innerHTML = `
       <div class="deploy-inner">
         <div class="deploy-k">DEPLOYING · 1947</div>
-        <h2 id="deploy-title">圣塔芭芭拉登陆战</h2>
+        <h2 id="deploy-title">迈阿密海滩登陆战</h2>
         <div class="deploy-sub" id="deploy-sub">正在部署部队…</div>
         <div class="deploy-bar"><i></i></div>
       </div>`;

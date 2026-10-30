@@ -216,7 +216,7 @@ export class Renderer {
     this.renderer.setSize(w, h);
   }
 
-  setEnvironment({ fogColor, fogDensity, sunColor, sunIntensity, sunDir, skyTop, skyHorizon, cloudiness, groundColor }) {
+  setEnvironment({ fogColor, fogDensity, sunColor, sunIntensity, sunDir, skyTop, skyHorizon, cloudiness, cloudColor, groundColor }) {
     if (fogColor !== undefined) this.fog.color.set(fogColor);
     if (fogDensity !== undefined) this.fog.density = fogDensity;
     if (sunColor !== undefined) this.sun.color.set(sunColor);
@@ -229,7 +229,7 @@ export class Renderer {
     if (skyHorizon !== undefined) this.skyUniforms.uHorizon.value.set(skyHorizon);
     if (cloudiness !== undefined) this.skyUniforms.uCloudiness.value = cloudiness;
     if (groundColor !== undefined) this.skyUniforms.uGround.value.set(groundColor);
-    this.skyUniforms.uCloud.value.set(0x4e5257);
+    this.skyUniforms.uCloud.value.set(cloudColor ?? 0x4e5257);
     this.skyUniforms.uSunColor.value.set(sunColor ?? 0xffd9a0);
   }
 

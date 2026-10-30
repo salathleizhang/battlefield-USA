@@ -1,23 +1,24 @@
 export const CAMPAIGNS = [
   {
-    id: 'santa-barbara',
+    id: 'miami-beach',
     index: '01',
-    name: '圣塔芭芭拉登陆战',
-    en: 'OPERATION LANDING · SANTA BARBARA',
+    name: '迈阿密海滩登陆战',
+    en: 'OPERATION LANDING · MIAMI BEACH',
     date: '1947 年 3 月 12 日',
-    location: '美国 · 加利福尼亚州 · 圣塔芭芭拉海岸',
+    location: '美国 · 佛罗里达州 · 迈阿密海滩',
     year: '1947',
     briefing:
-      '黎明前，远征军第九兵团搭乘登陆艇驶向圣塔芭芭拉。美军的岸防炮正从悬崖上的要塞倾泻火力，码头的仓库已经起火。' +
-      '夺取滩头、控制栈桥、撕开滨海大道，为后续重装部队打开通往洛杉矶的门户。',
-    objectives: ['抢滩登陆，夺取 A 点「血色沙滩」', '沿栈桥推进，夺取 B 点「燃烧码头」', '攻占 C 点「圣塔芭芭拉要塞」'],
-    weather: '阴云 · 晨雾 · 海风 6 级',
-    art: '/assets/art/santa-barbara.jpg',
-    accent: '#c9764a',
+      '黎明前，远征军第九兵团搭乘登陆艇驶向迈阿密海滩。大西洋舰队的舰炮正在压制岸防，海洋大道上的装饰艺术酒店已经起火。' +
+      '夺取滩头、撕开海滨酒店防线、冲过麦克阿瑟堤道，为后续重装部队打开迈阿密港的门户。',
+    objectives: ['抢滩登陆，夺取 A 点「血色沙滩」', '沿海洋大道推进，夺取 B 点「装饰艺术街区」', '攻占 C 点「麦克阿瑟堤道」'],
+    weather: '晴 · 晨光 · 海风 5 级',
+    art: '/assets/art/miami-beach.jpg',
+    accent: '#e0906d',
     env: {
-      fog: 0xb4bcbe, fogDensity: 0.0017, sun: 0xfff1dd, sunIntensity: 2.65,
-      skyTop: 0x516478, skyHorizon: 0xd3d0c3, ground: 0x6a6c62, cloudiness: 0.58,
-      sunDir: { x: -0.38, y: 0.42, z: -0.82 },
+      fogColor: 0xe9d3b8, fogDensity: 0.0011, sunColor: 0xffd0a0, sunIntensity: 3.1,
+      skyTop: 0x3f6f9a, skyHorizon: 0xf7d4ad, cloudColor: 0xd9b9a4,
+      groundColor: 0x8a7a64, cloudiness: 0.2,
+      sunDir: { x: 0.76, y: 0.32, z: 0.36 },
       ambience: 'coast',
     },
   },

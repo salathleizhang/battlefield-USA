@@ -420,6 +420,11 @@ export class Materials {
     m.stuccoOchre = pbr('plaster', { color: 0xd9b27f }) || this._std(t.wall_stucco, { color: 0xd8b07c, roughness: 0.95 });
     m.stuccoPink = pbr('plaster', { color: 0xddb4a1 }) || this._std(t.wall_stucco, { color: 0xd9b09a, roughness: 0.95 });
     m.stuccoGrey = pbr('plaster', { color: 0xb4b2a3 }) || this._std(t.wall_stucco, { color: 0xa8a696, roughness: 0.95 });
+    // Miami Beach Art Deco pastels.
+    m.stuccoMint = pbr('plaster', { color: 0xbfe0d2 }) || this._std(t.wall_stucco, { color: 0xb5d8c8, roughness: 0.93 });
+    m.stuccoBlue = pbr('plaster', { color: 0xbfd8e6 }) || this._std(t.wall_stucco, { color: 0xb4ccdc, roughness: 0.93 });
+    m.stuccoCoral = pbr('plaster', { color: 0xe8b6a6 }) || this._std(t.wall_stucco, { color: 0xe0ab99, roughness: 0.93 });
+    m.stuccoLilac = pbr('plaster', { color: 0xd6c6e0 }) || this._std(t.wall_stucco, { color: 0xcbbad6, roughness: 0.93 });
     m.plaster = pbr('plaster', { color: 0xcec7b7 }) || this._std(t.plaster, { roughness: 0.95 });
     m.plasterWhite = pbr('plaster', { color: 0xefeae0 }) || this._std(t.plasterWhite, { roughness: 0.93 });
     m.brick = pbr('brick', { color: 0xffffff }) || this._std(t.brick, { roughness: 0.95 });
@@ -451,7 +456,7 @@ export class Materials {
     }
 
     /* Cloth. */
-    m.sandbag = pbr('canvas', { color: 0xd6c39a, tile: 0.55 }) || this._std(t.sandbag, { roughness: 0.98 });
+    m.sandbag = pbr('canvas', { color: 0xf0d0a0, tile: 0.55 }) || this._std(t.sandbag, { color: 0xe8cda0, roughness: 0.98 });
     m.canvas = pbr('canvas', { color: 0x6f7258, tile: 0.5 }) || this._std(null, { color: 0x6f7258, roughness: 0.98, bump: false });
     m.canvasTan = pbr('canvas', { color: 0x9a8a62, tile: 0.5 }) || this._std(null, { color: 0x9a8a62, roughness: 0.98, bump: false });
 

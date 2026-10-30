@@ -48,7 +48,7 @@ export class HUD {
           <div class="mm-ring"></div>
           <div class="mm-north">北</div>
           <div class="mm-scan"></div>
-          <div class="mm-title" data-mm-title>圣塔芭芭拉</div>
+          <div class="mm-title" data-mm-title>迈阿密海滩</div>
         </div>
 
         <div class="objective-strip"><span class="obj-k">作战目标</span><span class="obj-v" data-objective>夺取据点</span></div>
