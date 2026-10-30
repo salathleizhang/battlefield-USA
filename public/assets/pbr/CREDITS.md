@@ -33,7 +33,8 @@ bridge_paint/
 
 | 用途 | 资产 | 来源 |
 | --- | --- | --- |
-| 桥塔国际橙涂装 | Painted Metal 008（色相调向 #C0362C） | [ambientCG](https://ambientcg.com/view?id=PaintedMetal008) |
+| 桥塔 / 缆索国际橙涂装 | International Orange 喷涂钢板（程序生成，基色 #B22F25） | 本项目自制 |
+| 桥塔旧涂装（备选） | Painted Metal 008（色相调向 #C0362C） | [ambientCG](https://ambientcg.com/view?id=PaintedMetal008) |
 | 结构钢板 / 桥面梁 | Metal Plates 013 | [ambientCG](https://ambientcg.com/view?id=MetalPlates013) |
 | 混凝土（桥面、人行道） | Concrete 042 A | [ambientCG](https://ambientcg.com/view?id=Concrete042A) |
 | 沥青路面 | Road 013 A | [ambientCG](https://ambientcg.com/view?id=Road013A) |
@@ -49,4 +50,9 @@ bridge_paint/
 | 金门大桥环境光 | Kloofendal Overcast (Pure Sky) 1K HDR | [Poly Haven](https://polyhaven.com/a/kloofendal_overcast_puresky) |
 
 ambientCG 与 Poly Haven 的素材均为 CC0 1.0（公共领域），无需署名；此表用于追溯来源。
-`bridge_paint/albedo.jpg` 以国际橙 #C0362C 为基色、用原图亮度重建，并压缩了掉漆对比，避免桥塔看起来像水磨石；法线 / 粗糙度 / 金属度仍来自原图。
+
+`bridge_orange/` 是为金门大桥单独生成的喷涂钢板贴图组：以 1937 年国际橙配方
+（#C0362C，实际基色取 #B22F25 以抵消 ACES + 暖阳的提亮）为底色，叠加低对比
+大尺度色差、极淡的垂直雨痕和橘皮法线，roughness 统一在 0.38–0.56。原来的
+`bridge_paint/` 来自掉漆严重的旧漆板，铺到 113 米高的桥塔上会出现大块“豹斑”，
+因此只保留作备选。
