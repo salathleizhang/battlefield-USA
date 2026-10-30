@@ -27,25 +27,28 @@ export class HUD {
         <div class="hud-grade"></div>
 
         <div class="top">
-          <div class="team-block cn">
-            <div class="team-row"><span class="team-name">中国远征军</span><span class="team-score" data-cn>320</span></div>
-            <div class="ticket-bar"><i data-cn-bar></i></div>
+          <div class="compass-wrap"><canvas class="compass" width="460" height="34"></canvas>
+            <div class="compass-center"></div>
           </div>
-          <div class="flags" data-flags></div>
-          <div class="team-block us">
-            <div class="team-row"><span class="team-score" data-us>320</span><span class="team-name">美军</span></div>
-            <div class="ticket-bar us"><i data-us-bar></i></div>
+          <div class="score-row">
+            <div class="team-block cn">
+              <div class="team-row"><span class="team-name">中国远征军</span><span class="team-score" data-cn>320</span></div>
+              <div class="ticket-bar"><i data-cn-bar></i></div>
+            </div>
+            <div class="flags" data-flags></div>
+            <div class="team-block us">
+              <div class="team-row"><span class="team-score" data-us>320</span><span class="team-name">美军</span></div>
+              <div class="ticket-bar us"><i data-us-bar></i></div>
+            </div>
           </div>
-        </div>
-
-        <div class="compass-wrap"><canvas class="compass" width="760" height="42"></canvas>
-          <div class="compass-center"></div>
         </div>
 
         <div class="minimap-wrap">
           <canvas class="minimap" width="210" height="210"></canvas>
-          <div class="mm-title" data-mm-title>圣塔芭芭拉</div>
+          <div class="mm-ring"></div>
+          <div class="mm-north">北</div>
           <div class="mm-scan"></div>
+          <div class="mm-title" data-mm-title>圣塔芭芭拉</div>
         </div>
 
         <div class="objective-strip"><span class="obj-k">作战目标</span><span class="obj-v" data-objective>夺取据点</span></div>
@@ -64,8 +67,9 @@ export class HUD {
         </div>
 
         <div class="ammo">
-          <div class="ammo-row"><span class="ammo-num" data-ammo>5</span><span class="ammo-res" data-reserve>/ 60</span></div>
+          <div class="ammo-row"><span class="ammo-num" data-ammo>5</span><span class="ammo-res" data-reserve>60</span></div>
           <div class="weapon-name">三八式步枪 <span>6.5mm</span></div>
+          <div class="ammo-pips" data-pips><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
           <div class="reload-hint" data-reload>R 装填 · V 刺刀 · G 手榴弹</div>
         </div>
 
@@ -103,7 +107,7 @@ export class HUD {
       hitmarker: q('[data-hitmarker]'),
       hp: q('[data-hp]'), hpNum: q('[data-hpnum]'),
       stance: q('[data-stance]'), wound: q('[data-wound]'),
-      ammo: q('[data-ammo]'), reserve: q('[data-reserve]'), reload: q('[data-reload]'),
+      ammo: q('[data-ammo]'), reserve: q('[data-reserve]'), reload: q('[data-reload]'), pips: q('[data-pips]'),
       banner: q('[data-banner]'), bannerTitle: q('[data-banner] h2'), bannerSub: q('[data-banner] p'),
       subtitle: q('[data-subtitle]'),
       death: q('[data-death]'), deathBy: q('[data-death-by]'), respawn: q('[data-respawn]'), deathTip: q('[data-death-tip]'),
@@ -246,8 +250,14 @@ export class HUD {
         void this.el.ammo.offsetWidth;
         this.el.ammo.classList.add('pulse');
       }
-      this.el.reserve.textContent = `/ ${w.reserve}`;
-      this.el.ammo.classList.toggle('low', w.ammo <= 1);
+      this.el.reserve.textContent = String(w.reserve);
+      this.el.ammo.classList.toggle('low', w.ammo <= 1 && w.ammo > 0);
+      this.el.ammo.classList.toggle('empty', w.ammo === 0);
+      if (this.lastPips !== w.ammo) {
+        this.lastPips = w.ammo;
+        const mag = w.def?.magazine ?? 5;
+        this.el.pips.innerHTML = Array.from({ length: mag }, (_, i) => `<i class="${i < w.ammo ? 'on' : ''}"></i>`).join('');
+      }
     }
 
     // Crosshair spread.

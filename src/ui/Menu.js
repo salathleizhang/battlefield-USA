@@ -32,76 +32,59 @@ export class Menu {
     section.id = 'menu';
     section.innerHTML = `
       <div class="menu-art" id="menu-art"></div>
-      <div class="menu-ribbon" aria-hidden="true">打过太平洋·解放全美利坚</div>
-      <header class="menu-head">
-        <div class="brand">
-          <i class="brand-star" aria-hidden="true"></i>
-          <b>战地 · 解放<em>美利坚</em></b>
-          <span>BATTLEFIELD · LIBERATE AMERICA</span>
+      <div class="menu-bgfx" aria-hidden="true"></div>
+      <aside class="menu-side">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></div>
+          <div class="brand-word">解放美利坚<small>BATTLEFIELD · LIBERATE AMERICA</small></div>
         </div>
-        <div class="meta">
-          <span>太平洋远征军 · 第九兵团</span>
-          <span>作战室 / WAR ROOM</span>
-          <span id="menu-clock">1947</span>
-        </div>
-      </header>
-      <div class="menu-body">
-        <div class="menu-left">
-          <div class="menu-eyebrow">战役档案 / CAMPAIGN ARCHIVE</div>
-          <div class="menu-title-wrap">
-            <h1 class="menu-title">解放<span>美利坚</span><i class="menu-title-seal seal" aria-hidden="true">远征</i></h1>
-            <div class="title-flourish" aria-hidden="true"><i></i><b>★</b><i></i></div>
-            <div class="menu-sub">1947 · 西海岸反攻 · 四场战役</div>
+        <div class="side-sub">战役档案 <em>CAMPAIGN ARCHIVE</em></div>
+        <nav class="mission-list" id="mission-list"></nav>
+        <div class="side-foot">
+          <div class="keys">
+            <span><b>WASD</b> 移动</span>
+            <span><b>左键</b> 射击</span>
+            <span><b>右键</b> 瞄准</span>
+            <span><b>R</b> 装填</span>
+            <span><b>V</b> 刺刀</span>
+            <span><b>G</b> 手榴弹</span>
+            <span><b>Shift</b> 冲刺</span>
+            <span><b>C</b> 蹲下</span>
           </div>
-          <div class="mission-list" id="mission-list"></div>
+          <div class="side-ver">v0.1 · 原型构建中</div>
         </div>
-        <div class="menu-right">
-          <div class="brief-card">
-            <div class="brief-seal seal" aria-hidden="true">绝密</div>
-            <div class="brief-year" id="brief-year"></div>
-            <h2 class="brief-title" id="brief-title"></h2>
-            <div class="brief-loc" id="brief-loc"></div>
-            <p class="brief-text" id="brief-text"></p>
-            <div class="brief-objs" id="brief-objs"></div>
-            <div class="brief-sign"><span>作战命令 / OPERATION ORDER</span><b>第九兵团</b></div>
-            <div class="menu-actions">
-              <button class="btn primary" id="btn-start">开始战役</button>
-              <button class="btn ghost" id="btn-settings">设置</button>
-            </div>
+      </aside>
+      <main class="menu-main">
+        <section class="card card-brief">
+          <div class="brief-seal seal" aria-hidden="true">绝密</div>
+          <h3>作战简报 <span>OPERATION BRIEF</span></h3>
+          <div class="brief-year" id="brief-year"></div>
+          <h2 class="brief-title" id="brief-title"></h2>
+          <div class="brief-loc" id="brief-loc"></div>
+          <p class="brief-text" id="brief-text"></p>
+        </section>
+        <section class="card card-objectives">
+          <h3>战役目标 <span>OBJECTIVES</span></h3>
+          <div class="brief-objs" id="brief-objs"></div>
+        </section>
+        <section class="card card-situation">
+          <h3>战场态势 <span>SITUATION</span></h3>
+          <div class="situation">
+            <div><b>天气</b><span id="situation-weather"></span></div>
+            <div><b>地点</b><span id="situation-loc"></span></div>
+            <div><b>日期</b><span id="situation-date"></span></div>
           </div>
+        </section>
+        <div class="menu-actions">
+          <button class="btn primary" id="btn-start">开始战役</button>
+          <button class="btn ghost" id="btn-settings">设置</button>
         </div>
-      </div>
-      <footer class="menu-foot">
-        <div class="keys">
-          <span><b>WASD</b> 移动</span>
-          <span><b>左键</b> 射击</span>
-          <span><b>右键</b> 瞄准</span>
-          <span><b>R</b> 装填</span>
-          <span><b>V</b> 刺刀</span>
-          <span><b>G</b> 手榴弹</span>
-          <span><b>Shift</b> 冲刺</span>
-          <span><b>C</b> 蹲下</span>
-        </div>
-        <div class="menu-foot-right">
-          <span class="slogan">誓死保卫 · 解放全美利坚</span>
-          <span>v0.1 · 原型构建中</span>
-        </div>
-      </footer>
-
-      <div class="deploy" id="deploy">
-        <div class="deploy-inner">
-          <div class="deploy-k">DEPLOYING · 1947</div>
-          <h2 id="deploy-title">圣塔芭芭拉登陆战</h2>
-          <div class="deploy-sub" id="deploy-sub">正在部署部队…</div>
-          <div class="deploy-bar"><i></i></div>
-        </div>
-      </div>
+      </main>
     `;
     this.root.appendChild(section);
     this.el = section;
     this.art = section.querySelector('#menu-art');
     this.list = section.querySelector('#mission-list');
-    this.deploy = section.querySelector('#deploy');
 
     // Settings live outside the menu so they can also open over the pause screen.
     const settingsPanel = document.createElement('div');
@@ -127,7 +110,6 @@ export class Menu {
     pause.id = 'pause';
     pause.innerHTML = `
       <div class="pause-card">
-        <div class="seal pause-seal" aria-hidden="true">休整</div>
         <h2>战斗暂停</h2>
         <div class="sub" id="pause-sub">P A U S E D</div>
         <button class="btn primary" id="btn-resume">继续战斗</button>
@@ -154,19 +136,34 @@ export class Menu {
       </div>`;
     this.root.appendChild(end);
     this.endEl = end;
+
+    const deploy = document.createElement('div');
+    deploy.className = 'deploy';
+    deploy.id = 'deploy';
+    deploy.innerHTML = `
+      <div class="deploy-inner">
+        <div class="deploy-k">DEPLOYING · 1947</div>
+        <h2 id="deploy-title">圣塔芭芭拉登陆战</h2>
+        <div class="deploy-sub" id="deploy-sub">正在部署部队…</div>
+        <div class="deploy-bar"><i></i></div>
+      </div>`;
+    this.root.appendChild(deploy);
+    this.deployEl = deploy;
+
     this._wire();
   }
 
   _buildList() {
-    this.list.innerHTML = CAMPAIGNS.map((c) => `
+    this.list.innerHTML = CAMPAIGNS.map((c) => {
+      const date = c.date.replace(/[年月]/g, '.').replace('日', '').replace(/\s+/g, '');
+      return `
       <button class="mission" data-id="${c.id}">
         <span class="idx">${c.index}</span>
-        <span>
-          <div class="m-name">${c.name}</div>
-          <div class="m-meta">${c.date} · ${c.location.split('·').pop().trim()}</div>
-        </span>
+        <span class="m-name">${c.name}</span>
+        <span class="m-meta">${date} · ${c.location.split('·').pop().trim()}</span>
         <span class="m-tag">可出击</span>
-      </button>`).join('');
+      </button>`;
+    }).join('');
     this.list.querySelectorAll('.mission').forEach((btn) => {
       btn.addEventListener('click', () => {
         this.game.audio.ui('click');
@@ -231,8 +228,13 @@ export class Menu {
     this.el.querySelector('#brief-title').textContent = c.name;
     this.el.querySelector('#brief-loc').textContent = c.location;
     this.el.querySelector('#brief-text').textContent = c.briefing;
-    this.el.querySelector('#brief-objs').innerHTML = c.objectives.map((o) => `<div>${o}</div>`).join('');
-    this.art.style.backgroundImage = `linear-gradient(90deg, rgba(8,10,7,0.97) 0%, rgba(8,10,7,0.62) 44%, rgba(8,10,7,0.12) 72%, rgba(8,10,7,0.55) 100%), url("${c.art}")`;
+    this.el.querySelector('#brief-objs').innerHTML = c.objectives
+      .map((o, i) => `<div><b>0${i + 1}</b><span>${o}</span></div>`)
+      .join('');
+    this.el.querySelector('#situation-weather').textContent = c.weather;
+    this.el.querySelector('#situation-loc').textContent = c.location;
+    this.el.querySelector('#situation-date').textContent = c.date;
+    this.art.style.backgroundImage = `url("${c.art}")`;
     this.art.style.backgroundPosition = 'center';
     this.art.style.backgroundSize = 'cover';
     this.el.style.setProperty('--accent', c.accent);
@@ -255,16 +257,16 @@ export class Menu {
     if (!c) return;
     this.game.audio.ensure();
     this.game.audio.ui('click');
-    this.deploy.querySelector('#deploy-title').textContent = c.name;
-    this.deploy.querySelector('#deploy-sub').textContent = c.location;
-    this.deploy.classList.add('open');
+    this.deployEl.querySelector('#deploy-title').textContent = c.name;
+    this.deployEl.querySelector('#deploy-sub').textContent = c.location;
+    this.deployEl.classList.add('open');
     this.close();
     this.pauseEl.classList.remove('open');
     this.game.input.lock();
     this.endEl.classList.remove('open');
     setTimeout(() => {
       this.game.startMission(id);
-      this.deploy.classList.remove('open');
+      this.deployEl.classList.remove('open');
     }, 120);
   }
 
