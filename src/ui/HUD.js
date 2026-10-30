@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { clamp, lerp } from '../core/MathUtil.js';
 
-const TEAM_HEX = ['#d1483a', '#5b86b8'];
+const TEAM_HEX = ['#e2321c', '#5f9ad2'];
 const TEAM_CN = ['中国远征军', '美军'];
 
 export class HUD {
@@ -328,7 +328,7 @@ export class HUD {
       const x = cx + d * pxPerDeg;
       const isCard = Math.abs(bearing % 45) < 2.5;
       const major = Math.abs(bearing % 15) < 2;
-      ctx.strokeStyle = isCard ? 'rgba(239,228,201,0.85)' : major ? 'rgba(239,228,201,0.45)' : 'rgba(239,228,201,0.18)';
+      ctx.strokeStyle = isCard ? 'rgba(255,236,196,0.9)' : major ? 'rgba(255,222,160,0.5)' : 'rgba(255,214,150,0.2)';
       ctx.lineWidth = isCard ? 1.6 : 1;
       ctx.beginPath();
       ctx.moveTo(x, h - 4);
@@ -336,7 +336,7 @@ export class HUD {
       ctx.stroke();
       if (isCard) {
         const label = bearing < 22.5 || bearing > 337.5 ? '北' : bearing < 67.5 ? '东北' : bearing < 112.5 ? '东' : bearing < 157.5 ? '东南' : bearing < 202.5 ? '南' : bearing < 247.5 ? '西南' : bearing < 292.5 ? '西' : '西北';
-        ctx.fillStyle = label === '北' ? '#e2452d' : 'rgba(239,228,201,0.92)';
+        ctx.fillStyle = label === '北' ? '#ff3a1f' : 'rgba(255,236,196,0.92)';
         ctx.fillText(label, x, h - 16);
       }
     }
@@ -375,10 +375,10 @@ export class HUD {
     const Z = (z) => oz + (z - b.minZ) * s;
 
     ctx.clearRect(0, 0, size, size);
-    ctx.fillStyle = 'rgba(14,9,6,0.76)';
+    ctx.fillStyle = 'rgba(24,8,4,0.78)';
     ctx.fillRect(0, 0, size, size);
     // Grid.
-    ctx.strokeStyle = 'rgba(201,161,90,0.13)';
+    ctx.strokeStyle = 'rgba(255,193,46,0.15)';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
       const t = pad + (size - pad * 2) * (i / 4);
@@ -386,7 +386,7 @@ export class HUD {
       ctx.beginPath(); ctx.moveTo(pad, t); ctx.lineTo(size - pad, t); ctx.stroke();
     }
     // Map border.
-    ctx.strokeStyle = 'rgba(201,161,90,0.35)';
+    ctx.strokeStyle = 'rgba(255,193,46,0.4)';
     ctx.strokeRect(ox, oz, (b.maxX - b.minX) * s, (b.maxZ - b.minZ) * s);
 
     // Capture points.
