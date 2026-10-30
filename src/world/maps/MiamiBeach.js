@@ -116,6 +116,7 @@ export function buildMiamiBeach(L) {
     const tex = signTexture(text, { bg: '#221b24', fg: '#ffe6c2', border: '#9a7152', ...colors });
     const mat = new THREE.MeshStandardMaterial({
       map: tex, roughness: 0.7, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.28,
+      side: THREE.DoubleSide,
     });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
     mesh.position.set(x, y, z);
@@ -485,10 +486,10 @@ export function buildMiamiBeach(L) {
       L.batch.sphere(0.16, x, deckY + 4.9, z + (z > 0 ? -1.1 : 1.1), lampMat);
     }
   }
-  // Bridge sign on the island approach.
-  const signBase = height(-74, 9.5);
-  for (const x of [-78, -70]) L.batch.cylinder(0.1, 0.13, 4.4, 6, x, signBase + 2.2, 9.5, M.woodDark);
-  addSign('MACARTHUR CAUSEWAY', -74, signBase + 4.7, 9.4, 10.5, 2.0, 0, { w: 768, h: 140 });
+  // Bridge sign on the island approach, facing arriving landing craft.
+  const signBase = height(-74, 11.5);
+  for (const z of [6.4, 16.6]) L.batch.cylinder(0.1, 0.13, 4.4, 6, -74, signBase + 2.2, z, M.woodDark);
+  addSign('MACARTHUR CAUSEWAY', -74, signBase + 4.7, 11.5, 10.5, 2.0, Math.PI / 2, { w: 768, h: 140 });
 
   // Checkpoints at each bridgehead.
   L.sandbags(-66, 8, 0.08, 9, { base: height(-66, 8) });
@@ -575,9 +576,11 @@ export function buildMiamiBeach(L) {
   L.warship(700, 250, 0.3, 0.5);
 
   /* ------------------------------------------------------------------ combat */
-  L.addCapturePoint({ id: 'A', name: '血色沙滩', x: 50, z: 0, radius: 18, owner: -1 });
-  L.addCapturePoint({ id: 'B', name: '装饰艺术街区', x: 8, z: 0, radius: 16, owner: -1 });
-  L.addCapturePoint({ id: 'C', name: '麦克阿瑟堤道', x: -140, z: 0, radius: 15, owner: 1, base: deckY, height: 7 });
+  const cpA = L.addCapturePoint({ id: 'A', name: '血色沙滩', x: 50, z: 0, radius: 18, owner: -1 });
+  const cpB = L.addCapturePoint({ id: 'B', name: '装饰艺术街区', x: 8, z: 0, radius: 16, owner: -1 });
+  const cpC = L.addCapturePoint({ id: 'C', name: '麦克阿瑟堤道', x: -140, z: 0, radius: 15, owner: 1, base: deckY, height: 7 });
+  // Face the flags across the American advance (east → west) so they read from the beach.
+  for (const cp of [cpA, cpB, cpC]) cp.marker.rotation.y = Math.PI / 2;
 
   L.setPlayerSpawn(58, 10, Math.PI / 2);
   L.addSpawn(0, 56, -12, Math.PI / 2);
