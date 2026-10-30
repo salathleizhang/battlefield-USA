@@ -17,7 +17,7 @@ export function buildGoldenGate(L) {
     return lerp(-14, 42, t) + Math.sin(x * 0.05) * 3 * t;
   };
   L.addTerrain({
-    size: 900, segments: 150, height,
+    size: 900, segments: 150, height, texture: 'grass', tile: 12,
     color: (x, z, y, c) => {
       if (y < 2) c.setHex(0x4a5048);
       else c.setHex(0x66684a).lerp(new THREE.Color(0x3f4436), Math.random() * 0.5);
@@ -30,13 +30,18 @@ export function buildGoldenGate(L) {
   const orange = new THREE.MeshStandardMaterial({ color: 0xa8402b, roughness: 0.62, metalness: 0.25 });
   L.mats.mats.bridgeOrange = orange;
   const deckMat = L.mats.get('asphalt');
+  const walkMat = L.mats.get('concrete');
   L.batch.box(24, 1.3, 500, 0, deckY, 0, deckMat, { uv: 0.15 });
   L.solidBox(0, deckY, 0, 24, 1.3, 500, 0, { surface: 'concrete' });
   // Sidewalks & railings.
   for (const side of [-1, 1]) {
-    L.batch.box(2.2, 0.5, 500, side * 10.6, deckY + 0.9, 0, L.mats.get('plaster'), { uv: 0.3 });
-    L.batch.box(0.18, 1.25, 500, side * 11.7, deckY + 1.6, 0, orange, { uv: 0.3 });
-    L.solidBox(side * 11.7, deckY + 1.2, 0, 0.4, 1.6, 500, 0, { surface: 'metal' });
+    L.batch.box(2.2, 0.5, 500, side * 10.6, deckY + 0.9, 0, walkMat, { uv: 0.3 });
+    L.batch.box(0.12, 0.10, 500, side * 11.7, deckY + 2.05, 0, orange, { uv: 0.3 });
+    L.batch.box(0.08, 0.08, 500, side * 11.7, deckY + 1.55, 0, orange, { uv: 0.3 });
+    for (let z = -248; z <= 248; z += 4) {
+      L.batch.box(0.1, 1.15, 0.1, side * 11.7, deckY + 1.55, z, orange);
+    }
+    L.solidBox(side * 11.7, deckY + 1.6, 0, 0.25, 1.4, 500, 0, { surface: 'metal' });
     // Lamp posts every 24 m.
     for (let z = -240; z <= 240; z += 24) {
       L.batch.cylinder(0.07, 0.09, 5.5, 6, side * 11.2, deckY + 3.2, z, L.mats.get('metal'));
@@ -160,7 +165,7 @@ export function buildGoldenGate(L) {
   const SPAWN_Y = deckY + 0.7;
   L.setPlayerSpawn(0, -230, Math.PI, { base: SPAWN_Y });
   L.addSpawn(0, 0, -228, Math.PI, { base: SPAWN_Y });
-  L.addSpawn(0, -6, -205, Math.PI, { base: SPAWN_Y });
+  L.addSpawn(0, -6, -212, Math.PI, { base: SPAWN_Y });
   L.addSpawn(0, 6, -195, Math.PI, { base: SPAWN_Y });
   L.addSpawn(0, 0, -160, Math.PI, { base: SPAWN_Y });
   L.addSpawn(1, 0, 228, 0, { base: SPAWN_Y });

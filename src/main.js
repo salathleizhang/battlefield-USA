@@ -39,8 +39,10 @@ async function boot() {
   game.menu = menu;
   menu.open();
 
+  let hadLock = false;
   game.input.onLockChange = (locked) => {
-    if (!locked && game.started && !game.paused && game.match?.state === 'live') {
+    if (locked) hadLock = true;
+    if (!locked && hadLock && game.started && !game.paused && game.match?.state === 'live') {
       game.paused = true;
       menu.openPause();
     }

@@ -3,6 +3,10 @@ import * as THREE from 'three';
 /** Procedural 三八大盖 (Type 38 Arisaka) + Type 30 bayonet, first-person presentation. */
 export function buildType38(mats) {
   const g = new THREE.Group();
+  const butt = new THREE.Group();
+  g.add(butt);
+  const leftArm = new THREE.Group();
+  g.add(leftArm);
   const wood = mats.get('gunWood');
   const metal = mats.get('gunMetal');
   const brass = mats.get('brass');
@@ -11,11 +15,11 @@ export function buildType38(mats) {
   const stock = new THREE.Mesh(new THREE.BoxGeometry(0.062, 0.135, 0.44), wood);
   stock.position.set(0, -0.035, 0.30);
   stock.rotation.x = -0.06;
-  g.add(stock);
+  butt.add(stock);
   // Wrist.
   const wrist = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.095, 0.22), wood);
   wrist.position.set(0, -0.02, 0.06);
-  g.add(wrist);
+  butt.add(wrist);
   // Receiver.
   const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.07, 0.30), metal);
   receiver.position.set(0, 0.015, -0.10);
@@ -70,10 +74,10 @@ export function buildType38(mats) {
   bolt.add(boltBody);
   const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.10, 6), metal);
   handle.rotation.z = Math.PI / 2;
-  handle.position.set(0.055, 0.02, 0.02);
+  handle.position.set(0.045, 0.015, 0.02);
   bolt.add(handle);
-  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.017, 8, 6), metal);
-  knob.position.set(0.10, 0.02, 0.02);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 6), metal);
+  knob.position.set(0.082, 0.015, 0.02);
   bolt.add(knob);
   g.add(bolt);
 
@@ -124,20 +128,20 @@ export function buildType38(mats) {
 
   const rightHand = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.062, 0.10), skin);
   rightHand.position.set(0.012, -0.052, 0.105);
-  g.add(rightHand);
-  g.add(limb([0.12, -0.28, 0.12], [0.035, -0.09, 0.12], 0.05, 0.038, sleeve));
+  butt.add(rightHand);
+  butt.add(limb([0.12, -0.28, 0.12], [0.035, -0.09, 0.12], 0.05, 0.038, sleeve));
   const rightFingers = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.022, 0.075), skin);
   rightFingers.position.set(0.012, -0.075, 0.10);
-  g.add(rightFingers);
+  butt.add(rightFingers);
 
   const leftHand = new THREE.Mesh(new THREE.BoxGeometry(0.058, 0.05, 0.095), skin);
   leftHand.position.set(-0.004, -0.04, -0.42);
   leftHand.rotation.x = -0.2;
-  g.add(leftHand);
-  g.add(limb([-0.16, -0.27, -0.20], [-0.02, -0.075, -0.39], 0.052, 0.036, sleeve));
+  leftArm.add(leftHand);
+  leftArm.add(limb([-0.16, -0.27, -0.20], [-0.02, -0.075, -0.39], 0.052, 0.036, sleeve));
   const leftFingers = new THREE.Mesh(new THREE.BoxGeometry(0.062, 0.022, 0.075), skin);
   leftFingers.position.set(-0.004, -0.062, -0.43);
-  g.add(leftFingers);
+  leftArm.add(leftFingers);
 
   // Muzzle flash sprite + light.
   const flashTex = makeFlashTexture();
@@ -151,7 +155,7 @@ export function buildType38(mats) {
   g.add(flash);
 
   g.traverse((o) => { o.castShadow = false; o.receiveShadow = false; });
-  g.userData = { bolt, bayonet, flash };
+  g.userData = { bolt, bayonet, flash, butt, leftArm };
   return g;
 }
 

@@ -12,6 +12,7 @@ import { ViewModel } from './weapons/ViewModel.js';
 import { Bot } from './bots/Bot.js';
 import { Match } from './Match.js';
 import { HUD } from '../ui/HUD.js';
+import { Atmosphere } from '../render/Atmosphere.js';
 import { CAMPAIGN_BY_ID } from './campaigns.js';
 import { rand, clamp } from '../core/MathUtil.js';
 
@@ -80,6 +81,7 @@ export class Game {
     this.renderer.fog.density = campaign.env.fogDensity ?? 0.0035;
 
     this.effects = new Effects(this);
+    this.atmosphere = new Atmosphere(this);
     this.player = new Player(this);
     this.player.recoilScale = this.settings.recoil ?? 1;
     const spawn = this.level.playerSpawn || { position: new THREE.Vector3(0, 2, 0), yaw: 0 };
@@ -101,6 +103,7 @@ export class Game {
     this.debug = {
       freeze: new URLSearchParams(location.search).has('freeze'),
       god: new URLSearchParams(location.search).has('god'),
+      aim: new URLSearchParams(location.search).has('aim'),
     };
     const q = new URLSearchParams(location.search);
     if (q.has('look')) {
@@ -249,7 +252,9 @@ export class Game {
 
   damageActor(actor, amount, attacker, info = {}) {
     if (!actor || !actor.alive) return;
+    const wasAlive = actor.alive;
     actor.damage(amount, attacker, info);
+    if (attacker === this.player && actor.alive && wasAlive) this.hud?.hitmarker(false);
     if (actor.isPlayer) {
       this.hud?.el?.hitflash?.classList.add('show');
       setTimeout(() => this.hud?.el?.hitflash?.classList.remove('show'), 250);
@@ -376,6 +381,7 @@ export class Game {
 
     this.physics.step(dt);
     const cmd = this.input.cmd();
+    if (this.debug?.aim) cmd.aim = true;
     const look = this.input.takeMouseDelta();
 
     if (this.player.alive) {
@@ -412,6 +418,7 @@ export class Game {
     this.updateProjectiles(dt);
     this.updateGrenades(dt);
     this.level.update(dt, this.time);
+    this.atmosphere.update(dt);
     this.effects.update(dt);
     if (!frozen) {
       this.match.update(dt);
@@ -432,6 +439,7 @@ export class Game {
         `colliders ${this.physics.world.colliders.len()} bodies ${this.physics.world.bodies.len()}`,
         `terrain ${this.level.terrainMesh ? this.level.terrainMesh.visible : 'none'}`,
         `points ${this.level.capturePoints.map((c) => c.id + ':' + (c.owner === -1 ? 'N' : c.owner) + ':' + c.captureT.toFixed(0)).join(' ')}`,
+        this.viewmodel ? `gun ads ${this.viewmodel.ads.toFixed(2)} rot ${this.viewmodel.gun.rotation.x.toFixed(2)} ${this.viewmodel.gun.rotation.y.toFixed(2)} ${this.viewmodel.gun.rotation.z.toFixed(2)} pos ${this.viewmodel.gun.position.x.toFixed(2)} ${this.viewmodel.gun.position.y.toFixed(2)} ${this.viewmodel.gun.position.z.toFixed(2)}` : '',
       ].join('\n');
     }
     this.audio.setVolume(this.settings.volume);
@@ -468,6 +476,7 @@ export class Game {
       this.viewmodel.rig.removeFromParent();
       this.viewmodel = null;
     }
+    if (this.atmosphere) { this.atmosphere.dispose(); this.atmosphere = null; }
     if (this.effects) { this.effects.clear(); this.effects = null; }
     if (this.hud) {
       this.hud.el.hud.remove();

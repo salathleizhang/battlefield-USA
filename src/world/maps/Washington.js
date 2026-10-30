@@ -21,7 +21,7 @@ export function buildWashington(L) {
   };
 
   L.addTerrain({
-    size: 820, segments: 140, height,
+    size: 820, segments: 140, height, texture: 'grass', tile: 8,
     color: (x, z, y, c) => {
       if (z > 150) c.setHex(0x6e6a4f);
       else if (Math.abs(x) < 64 && z < 120 && z > -130) c.setHex(0x5f6c46).lerp(new THREE.Color(0x4a5738), Math.random() * 0.4);

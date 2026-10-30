@@ -8,7 +8,7 @@ export const TYPE38 = {
   kind: '栓动步枪',
   magazine: 5,
   reserve: 60,
-  damage: 78,
+  damage: 105,
   headshot: 2.4,
   velocity: 760,
   cycleTime: 0.78,

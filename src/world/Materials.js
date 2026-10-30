@@ -145,6 +145,54 @@ function sandTexture() {
   });
 }
 
+function asphaltTexture() {
+  return canvasTex(512, 512, (ctx, w, h) => {
+    noiseFill(ctx, w, h, '#3b3b38', 22);
+    for (let i = 0; i < 9000; i++) {
+      const g = 40 + Math.random() * 55;
+      ctx.fillStyle = `rgba(${g},${g},${g},${0.2 + Math.random() * 0.4})`;
+      ctx.fillRect(Math.random() * w, Math.random() * h, 1.5, 1.5);
+    }
+    for (let i = 0; i < 14; i++) {
+      ctx.strokeStyle = 'rgba(18,18,16,0.55)';
+      ctx.lineWidth = 1 + Math.random() * 1.5;
+      ctx.beginPath();
+      let x = Math.random() * w, y = Math.random() * h;
+      ctx.moveTo(x, y);
+      for (let k = 0; k < 5; k++) { x += Math.random() * 40 - 20; y += Math.random() * 40 - 20; ctx.lineTo(x, y); }
+      ctx.stroke();
+    }
+    for (let i = 0; i < 8; i++) {
+      ctx.fillStyle = `rgba(20,22,20,${0.1 + Math.random() * 0.2})`;
+      ctx.beginPath(); ctx.ellipse(Math.random() * w, Math.random() * h, 20 + Math.random() * 40, 8 + Math.random() * 20, Math.random() * 3, 0, 7); ctx.fill();
+    }
+  });
+}
+
+function concreteTexture() {
+  return canvasTex(512, 512, (ctx, w, h) => {
+    noiseFill(ctx, w, h, '#8d8b82', 20);
+    for (let i = 0; i < 5000; i++) {
+      const g = 90 + Math.random() * 60;
+      ctx.fillStyle = `rgba(${g},${g},${g},${0.2 + Math.random() * 0.3})`;
+      ctx.fillRect(Math.random() * w, Math.random() * h, 1.4, 1.4);
+    }
+    ctx.strokeStyle = 'rgba(60,58,52,0.35)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath(); ctx.moveTo(0, (i * h) / 4); ctx.lineTo(w, (i * h) / 4); ctx.stroke();
+    }
+    for (let i = 0; i < 10; i++) {
+      ctx.strokeStyle = 'rgba(50,48,42,0.18)';
+      ctx.beginPath();
+      let x = Math.random() * w, y = Math.random() * h;
+      ctx.moveTo(x, y);
+      for (let k = 0; k < 4; k++) { x += Math.random() * 30 - 15; y += Math.random() * 30 - 15; ctx.lineTo(x, y); }
+      ctx.stroke();
+    }
+  });
+}
+
 function grassTexture() {
   return canvasTex(512, 512, (ctx, w, h) => {
     noiseFill(ctx, w, h, '#6f7448', 34);
@@ -225,6 +273,8 @@ export class Materials {
     this.textures.plaster = plasterTexture();
     this.textures.plasterWhite = plasterTexture('#cfc8b8');
     this.textures.grass = grassTexture();
+    this.textures.asphalt = asphaltTexture();
+    this.textures.concrete = concreteTexture();
     onProgress?.(1, '材质');
     this._build();
   }
@@ -254,7 +304,7 @@ export class Materials {
     m.stuccoOchre = this._std(t.wall_stucco, { color: 0xd8b07c, roughness: 0.95 });
     m.stuccoPink = this._std(t.wall_stucco, { color: 0xd9b09a, roughness: 0.95 });
     m.stuccoGrey = this._std(t.wall_stucco, { color: 0xa8a696, roughness: 0.95 });
-    m.grass = this._std(t.grass, { roughness: 0.98, bump: false });
+    m.grass = this._std(t.grass, { roughness: 0.98, bump: false, repeat: [8, 8] });
     m.plaster = this._std(t.plaster, { roughness: 0.95 });
     m.plasterWhite = this._std(t.plasterWhite, { roughness: 0.93 });
     m.brick = this._std(t.brick, { roughness: 0.95 });
@@ -266,7 +316,8 @@ export class Materials {
     m.rust = this._std(t.metal, { color: 0x8a5a3a, roughness: 0.8, metalness: 0.15 });
     m.sand = this._std(t.sand, { roughness: 0.98, repeat: [6, 6], bump: false });
     m.ground = this._std(t.rubble, { roughness: 0.97, repeat: [1, 1] });
-    m.asphalt = this._std(t.rubble, { color: 0x8f8d86, roughness: 0.96 });
+    m.asphalt = this._std(t.asphalt, { roughness: 0.94, repeat: [4, 4] });
+    m.concrete = this._std(t.concrete, { roughness: 0.92 });
     m.sandbag = this._std(t.sandbag, { roughness: 0.98 });
     m.water = new THREE.MeshStandardMaterial({
       map: t.water, color: 0x8d9d9d, roughness: 0.2, metalness: 0.15,

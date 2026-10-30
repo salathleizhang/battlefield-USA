@@ -23,7 +23,7 @@ export function buildMississippi(L) {
   };
 
   L.addTerrain({
-    size: 760, segments: 140, height,
+    size: 760, segments: 140, height, texture: 'sand', tile: 9,
     color: (x, z, y, c) => {
       if (y < 1.2) c.setHex(0x8f7c55);
       else if (z < -60) c.setHex(0x777a4e).lerp(new THREE.Color(0x5e6040), Math.random() * 0.4);

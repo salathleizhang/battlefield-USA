@@ -131,7 +131,7 @@ export function buildSantaBarbara(L) {
     [48, 1, 108, 8, 0], [48, -40, 96, 7, 0], [48, 43, 96, 7, 0],
     [22, 1, 7, 108, 0], [72, 1, 7, 108, 0],
   ]) {
-    L.batch.box(w, 0.12, d, x, height(x, z) + 0.06, z, L.mats.get('asphalt'), { rotY: rot, uv: 0.3 });
+    L.batch.box(w, 0.12, d, x, height(x, z) + 0.06, z, L.mats.get('asphalt'), { rotY: rot, uv: 0.6 });
   }
 
   /* ------------------------------------------------------------- hill fort */
