@@ -19,6 +19,7 @@ export const CAMPAIGNS = [
       fogColor: 0xefd9bd, fogDensity: 0.0009, sunColor: 0xffd6a8, sunIntensity: 3.1,
       skyTop: 0x2f5f8e, skyHorizon: 0xf3c9a3, cloudColor: 0xe8c7a6,
       groundColor: 0x8a7a64, cloudiness: 0.08,
+      hemiIntensity: 2.15, hemiColor: 0xbdd9ec, hemiGround: 0xb09470,
       sunDir: { x: 0.76, y: 0.32, z: 0.36 },
       ambience: 'coast',
     },
