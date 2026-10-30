@@ -72,6 +72,42 @@ export class Level {
     return mesh;
   }
 
+  addShoreFoam({ x, z, w = 6, d = 200, rotY = 0, opacity = 0.55 }) {
+    const tex = this.mats.textures.foam.clone();
+    tex.needsUpdate = true;
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(w / 12, d / 14);
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex, transparent: true, opacity, depthWrite: false, color: 0xe8f0ec,
+    });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.rotation.z = rotY;
+    mesh.position.set(x, this.waterY + 0.07, z);
+    this.scene.add(mesh);
+    this.animated.push({ type: 'foam', mesh, mat, speed: 0.006 });
+    return mesh;
+  }
+
+  warship(x, z, rot = 0, scale = 1, team = 1) {
+    const mat = this.mats.get('metal');
+    const rust = this.mats.get('rust');
+    const c = Math.cos(rot), s = Math.sin(rot);
+    const at = (lx, lz) => [x + lx * c + lz * s, z - lx * s + lz * c];
+    const hullH = 7 * scale, hullL = 90 * scale, hullW = 14 * scale;
+    this.batch.box(hullL, hullH, hullW, x, this.waterY + hullH / 2 - 1.5, z, mat, { rotY: rot, uv: 0.15 });
+    this.batch.box(hullL * 0.55, hullH * 0.7, hullW * 0.86, x, this.waterY + hullH + 1.2, z, mat, { rotY: rot, uv: 0.2 });
+    const [sx, sz] = at(0, 0);
+    this.batch.box(18 * scale, 12 * scale, hullW * 0.5, x, this.waterY + hullH + 8, z, mat, { rotY: rot, uv: 0.25 });
+    this.batch.cylinder(1.2 * scale, 1.6 * scale, 20 * scale, 6, x, this.waterY + hullH + 22, z, rust);
+    this.batch.box(4 * scale, 3 * scale, 4 * scale, x + 18 * c, this.waterY + hullH + 12, z - 18 * s, rust, { rotY: rot });
+    const [bx, bz] = at(-hullL * 0.32, 0);
+    this.batch.box(22 * scale, 1.2 * scale, hullW * 0.9, bx, this.waterY + hullH + 2, bz, mat, { rotY: rot });
+    this.batch.cylinder(0.8 * scale, 1.0 * scale, 12 * scale, 6, bx, this.waterY + hullH + 8, bz, rust, { rotY: rot });
+    this.smokeColumn(x + 12 * c, this.waterY + hullH + 12, z - 12 * s, 2.2 * scale);
+    this.fire(bx + 8 * c, this.waterY + hullH + 2, bz - 8 * s, 1.2 * scale);
+  }
+
   addWater({ y = 0, size = 900, color = 0x8b9a94, opacity = 0.94, rough = 0.2 }) {
     this.waterY = y;
     const tex = this.mats.textures.water.clone();
@@ -89,6 +125,12 @@ export class Level {
     this.water = mesh;
     this.waterMat = mat;
     this.waterBaseRepeat = size / 55;
+    if (mat.normalMap) {
+      mat.normalMap = mat.normalMap.clone();
+      mat.normalMap.needsUpdate = true;
+      mat.normalMap.wrapS = mat.normalMap.wrapT = THREE.RepeatWrapping;
+      mat.normalMap.repeat.set(size / 60, size / 60);
+    }
     return mesh;
   }
 
@@ -530,6 +572,10 @@ export class Level {
     if (this.waterMat?.map) {
       this.waterMat.map.offset.x += dt * 0.006;
       this.waterMat.map.offset.y += dt * 0.0035;
+      if (this.waterMat.normalMap) {
+        this.waterMat.normalMap.offset.x = Math.sin(t * 0.05) * 0.02 + t * 0.002;
+        this.waterMat.normalMap.offset.y = t * 0.0016;
+      }
     }
     for (const f of this.fires) {
       f.t += dt;
@@ -545,7 +591,10 @@ export class Level {
       s.sprite.material.opacity = 0.4 * (1 - ((s.t * 1.6) % 18) / 18);
     }
     for (const a of this.animated) {
-      if (a.type === 'flag') {
+      if (a.type === 'foam') {
+        a.mat.map.offset.x += dt * a.speed;
+        a.mat.map.offset.y = Math.sin(t * 0.7 + a.mesh.position.z) * 0.02;
+      } else if (a.type === 'flag') {
         const pos = a.base.attributes.position;
         for (let i = 0; i < pos.count; i++) {
           const x = pos.getX(i);

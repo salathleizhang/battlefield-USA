@@ -62,6 +62,7 @@ export class Game {
   startMission(id) {
     const campaign = CAMPAIGN_BY_ID[id];
     if (!campaign) return;
+    const q = new URLSearchParams(location.search);
     this.teardown();
     this.campaign = campaign;
     this.stats = { kills: 0, deaths: 0 };
@@ -99,13 +100,17 @@ export class Game {
     this.spawnBots();
     this.assignObjectives();
     this.match.start();
+    if (q.has('tickets')) {
+      const t = Number(q.get('tickets')) || 20;
+      this.match.tickets = [t, t];
+      this.match.maxTickets = t;
+    }
 
     this.debug = {
-      freeze: new URLSearchParams(location.search).has('freeze'),
-      god: new URLSearchParams(location.search).has('god'),
-      aim: new URLSearchParams(location.search).has('aim'),
+      freeze: q.has('freeze'),
+      god: q.has('god'),
+      aim: q.has('aim'),
     };
-    const q = new URLSearchParams(location.search);
     if (q.has('look')) {
       const [ly, lp] = q.get('look').split(',').map(Number);
       this.player.yaw = ly || 0;
@@ -451,6 +456,7 @@ export class Game {
     this.paused = true;
     this.input.unlock();
     this.hud?.show(false);
+    if (this.debugEl) this.debugEl.style.display = 'none';
     this.onEnd?.(winner);
     this.menu?.showEnd(winner);
   }
@@ -465,6 +471,7 @@ export class Game {
 
   teardown() {
     if (this._debugHandler) { removeEventListener('bf:debug', this._debugHandler); this._debugHandler = null; }
+    if (this.debugEl) { this.debugEl.remove(); this.debugEl = null; }
     this.input?.unlock();
     for (const b of this.bots) b.dispose?.();
     this.bots = [];

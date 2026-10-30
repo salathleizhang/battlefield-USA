@@ -86,6 +86,7 @@ export class HUD {
         <div class="hit-flash" data-hitflash></div>
         <div class="capture-toast" data-toast></div>
         <div class="lowhp" data-lowhp></div>
+        <div class="lock-hint" data-lock>点击画面 · 锁定鼠标</div>
       </div>`;
 
     const q = (s) => this.root.querySelector(s);
@@ -107,7 +108,7 @@ export class HUD {
       subtitle: q('[data-subtitle]'),
       death: q('[data-death]'), deathBy: q('[data-death-by]'), respawn: q('[data-respawn]'), deathTip: q('[data-death-tip]'),
       damage: q('[data-damage]'), hitflash: q('[data-hitflash]'),
-      toast: q('[data-toast]'), lowhp: q('[data-lowhp]'),
+      toast: q('[data-toast]'), lowhp: q('[data-lowhp]'), lock: q('[data-lock]'),
       mmTitle: q('[data-mm-title]'),
     };
     this.ctx = this.el.compass.getContext('2d');
@@ -294,6 +295,8 @@ export class HUD {
       this.el.deathTip.textContent = tips[Math.floor((this.time * 0.25) % tips.length)];
     }
 
+    if (this.el.lock) this.el.lock.classList.toggle('show', !g.input.locked && !g.paused && g.match.state === 'live');
+
     this._drawCompass();
     this._drawMinimap();
   }
@@ -308,23 +311,23 @@ export class HUD {
     const cx = w / 2;
     const pxPerDeg = w / 120;
     // Background ticks.
-    ctx.font = '600 10px "SF Mono", monospace';
+    ctx.font = '400 15px "Ma Shan Zheng", "Kaiti SC", serif';
     ctx.textAlign = 'center';
     for (let d = -60; d <= 60; d += 5) {
       const bearing = (heading + d + 360) % 360;
       const x = cx + d * pxPerDeg;
       const isCard = Math.abs(bearing % 45) < 2.5;
       const major = Math.abs(bearing % 15) < 2;
-      ctx.strokeStyle = isCard ? 'rgba(228,220,200,0.85)' : major ? 'rgba(228,220,200,0.5)' : 'rgba(228,220,200,0.2)';
+      ctx.strokeStyle = isCard ? 'rgba(239,228,201,0.85)' : major ? 'rgba(239,228,201,0.45)' : 'rgba(239,228,201,0.18)';
       ctx.lineWidth = isCard ? 1.6 : 1;
       ctx.beginPath();
       ctx.moveTo(x, h - 4);
       ctx.lineTo(x, h - (isCard ? 13 : major ? 9 : 6));
       ctx.stroke();
       if (isCard) {
-        const label = bearing < 22.5 || bearing > 337.5 ? 'N' : bearing < 67.5 ? 'NE' : bearing < 112.5 ? 'E' : bearing < 157.5 ? 'SE' : bearing < 202.5 ? 'S' : bearing < 247.5 ? 'SW' : bearing < 292.5 ? 'W' : 'NW';
-        ctx.fillStyle = label === 'N' ? '#e04a33' : 'rgba(228,220,200,0.9)';
-        ctx.fillText(label, x, h - 17);
+        const label = bearing < 22.5 || bearing > 337.5 ? '北' : bearing < 67.5 ? '东北' : bearing < 112.5 ? '东' : bearing < 157.5 ? '东南' : bearing < 202.5 ? '南' : bearing < 247.5 ? '西南' : bearing < 292.5 ? '西' : '西北';
+        ctx.fillStyle = label === '北' ? '#e2452d' : 'rgba(239,228,201,0.92)';
+        ctx.fillText(label, x, h - 16);
       }
     }
     // Objective markers.
@@ -340,7 +343,7 @@ export class HUD {
       ctx.fillStyle = cp.owner === 0 ? TEAM_HEX[0] : cp.owner === 1 ? TEAM_HEX[1] : '#e4dcc8';
       ctx.beginPath();
       ctx.moveTo(x, 4); ctx.lineTo(x + 6, 12); ctx.lineTo(x - 6, 12); ctx.closePath(); ctx.fill();
-      ctx.font = '700 9px "SF Mono", monospace';
+      ctx.font = '400 11px "Ma Shan Zheng", "Kaiti SC", serif';
       ctx.fillStyle = '#0c0e0b';
       ctx.fillText(cp.id, x, 11);
     }
@@ -362,10 +365,10 @@ export class HUD {
     const Z = (z) => oz + (z - b.minZ) * s;
 
     ctx.clearRect(0, 0, size, size);
-    ctx.fillStyle = 'rgba(10,13,9,0.72)';
+    ctx.fillStyle = 'rgba(14,9,6,0.76)';
     ctx.fillRect(0, 0, size, size);
     // Grid.
-    ctx.strokeStyle = 'rgba(201,161,90,0.10)';
+    ctx.strokeStyle = 'rgba(201,161,90,0.13)';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
       const t = pad + (size - pad * 2) * (i / 4);
@@ -386,8 +389,8 @@ export class HUD {
       ctx.strokeStyle = cp.owner === 0 ? TEAM_HEX[0] : cp.owner === 1 ? TEAM_HEX[1] : 'rgba(228,220,200,0.6)';
       ctx.lineWidth = 1.4;
       ctx.stroke();
-      ctx.fillStyle = '#e4dcc8';
-      ctx.font = '700 10px "SF Mono", monospace';
+      ctx.fillStyle = '#efe4c9';
+      ctx.font = '400 14px "Ma Shan Zheng", "Kaiti SC", serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(cp.id, x, z + 0.5);
     }

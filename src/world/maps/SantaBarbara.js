@@ -35,6 +35,14 @@ export function buildSantaBarbara(L) {
   });
   L.addWater({ y: 0, size: 1800, color: 0x7e8f8d, opacity: 0.95 });
   L.worldGround = 0.9;
+  L.addShoreFoam({ x: -55, z: 0, w: 8, d: 420, opacity: 0.5 });
+  L.addShoreFoam({ x: -60, z: -40, w: 5, d: 300, opacity: 0.33 });
+  L.addShoreFoam({ x: -66, z: 90, w: 6, d: 260, opacity: 0.26 });
+  L.addShoreFoam({ x: -72, z: -120, w: 4, d: 180, opacity: 0.2 });
+  // Distant Pacific squadron.
+  L.warship(-265, -70, 0.18, 0.95);
+  L.warship(-300, 140, -0.12, 0.8);
+  L.warship(-245, 240, 0.35, 0.6);
 
   /* ------------------------------------------------------------- the pier */
   const pierY = 2.35;
@@ -91,6 +99,56 @@ export function buildSantaBarbara(L) {
 
   // Beach palms / boardwalk.
   for (let i = 0; i < 12; i++) L.palm(-14 - Math.random() * 10, -120 + i * 21, 0.85 + Math.random() * 0.3);
+
+  // Boardwalk along the sand.
+  const deckMatB = L.mats.get('wood');
+  L.batch.box(3.4, 0.22, 300, -10, 1.35, -10, deckMatB, { uv: 0.6 });
+  L.solidBox(-10, 1.35, -10, 3.4, 0.22, 300, 0, { surface: 'wood' });
+  for (let z = -158; z <= 140; z += 5) {
+    L.batch.box(0.12, 1.0, 0.12, -11.5, 1.95, z, L.mats.get('woodDark'));
+    L.batch.box(0.1, 0.09, 5, -11.5, 2.4, z, L.mats.get('woodDark'));
+  }
+
+  // Street lamps along the main road.
+  for (let x = 4; x <= 104; x += 16) {
+    for (const z of [-7, 9]) {
+      const gy = height(x, z);
+      L.batch.cylinder(0.08, 0.11, 5.2, 6, x, gy + 2.6, z, L.mats.get('metal'));
+      L.batch.box(1.1, 0.08, 0.08, x, gy + 5.15, z + (z > 0 ? -0.5 : 0.5), L.mats.get('metal'));
+      L.batch.sphere(0.16, x, gy + 5.05, z + (z > 0 ? -1.0 : 1.0), new THREE.MeshStandardMaterial({ color: 0xffe9bb, emissive: 0xffb45a, emissiveIntensity: 2.2 }));
+    }
+  }
+
+  // Awnings + market stalls.
+  for (const [x, z, w, color] of [[32, -18, 10, 0x8c3a2a], [64, -18, 9, 0x3f5a4a], [31, 22, 10, 0x8a7440], [82, 22, 9, 0x6b3e35]]) {
+    const gy = height(x, z);
+    L.batch.box(w, 0.12, 3.2, x, gy + 3.4, z, new THREE.MeshStandardMaterial({ color, roughness: 0.95 }), { rotY: 0 });
+    for (const ox of [-w / 2 + 0.4, w / 2 - 0.4]) {
+      L.batch.cylinder(0.05, 0.05, 3.4, 5, x + ox, gy + 1.7, z + 1.5, L.mats.get('metal'));
+    }
+  }
+
+  // Surf obstacles and a beached LCVP.
+  for (let i = 0; i < 12; i++) {
+    const z = -150 + i * 27;
+    L.tankTrap(-64 + Math.sin(i * 1.7) * 3, z, { base: 0.1 });
+  }
+  for (let i = 0; i < 18; i++) {
+    const x = -90 + i * 6;
+    L.batch.cylinder(0.18, 0.22, 2.6, 6, x, -0.2, -30 + Math.sin(i) * 30, L.mats.get('woodDark'), { rotZ: 0.3 });
+  }
+  // Craters on the sand.
+  for (let i = 0; i < 14; i++) {
+    const x = -36 + Math.random() * 22;
+    const z = -120 + Math.random() * 220;
+    L.batch.cylinder(1.4 + Math.random() * 1.8, 2.2 + Math.random() * 2.2, 0.14, 14,
+      x, height(x, z) + 0.07, z, L.mats.get('sand'), { uv: 0.8 });
+  }
+
+  // Pier entrance sign.
+  for (const ox of [-3.4, 3.4]) L.batch.cylinder(0.12, 0.15, 4.4, 6, -40 + ox, 3.2, 66, L.mats.get('woodDark'));
+  L.batch.box(8.4, 1.6, 0.25, -40, 5.3, 66, L.mats.get('woodDark'));
+  L.batch.plane(7.6, 1.2, -40, 5.3, 65.85, new THREE.MeshStandardMaterial({ map: L.mats.textures.rubble, color: 0x9a8560, roughness: 1, side: THREE.DoubleSide }), { rotY: Math.PI, uv: 0.5 });
 
   /* ------------------------------------------------------------- the town */
   const buildings = [

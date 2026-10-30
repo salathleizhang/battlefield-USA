@@ -5,16 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>战地 · 解放美利坚</title>
   <meta name="description" content="《战地·解放美利坚》— 20世纪中国远征军跨海进攻美国的大战场第一人称射击游戏。" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23121410'/><path d='M16 4l3.2 7.2L27 12l-5.6 5.4 1.4 7.6L16 21.2 9.2 25l1.4-7.6L5 12l7.8-.8z' fill='%23c8352a'/></svg>" />
+  <link rel="preload" href="/fonts/ma-shan-zheng.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23120a07'/><path d='M16 4l3.2 7.2L27 12l-5.6 5.4 1.4 7.6L16 21.2 9.2 25l1.4-7.6L5 12l7.8-.8z' fill='%23c8352a'/></svg>" />
 </head>
 <body>
   <canvas id="game"></canvas>
 
   <div id="loading">
+    <div class="load-glow"></div>
+    <div class="load-star"></div>
     <div class="load-inner">
       <div class="load-kicker">1947 · 太平洋远征军</div>
-      <h1 class="load-title">解放<span>美利坚</span></h1>
-      <div class="load-rule"><i></i></div>
+      <div class="load-title-wrap">
+        <h1 class="load-title">解放<span>美利坚</span></h1>
+        <div class="seal seal-load" aria-hidden="true">远征</div>
+      </div>
+      <div class="load-rule"><i></i><b>★</b><i></i></div>
       <div class="load-msg">正在集结部队…</div>
       <div class="load-bar"><i></i></div>
       <div class="load-tip"></div>

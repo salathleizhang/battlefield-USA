@@ -193,6 +193,56 @@ function concreteTexture() {
   });
 }
 
+function waterNormalTexture() {
+  const size = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const d = img.data;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = (x / size) * Math.PI * 2;
+      const v = (y / size) * Math.PI * 2;
+      const h = Math.sin(u * 3 + Math.sin(v * 2) * 0.8) * 0.5 + Math.sin(v * 4 + u) * 0.35 + Math.sin((u + v) * 6) * 0.15;
+      const dx = Math.cos(u * 3 + Math.sin(v * 2) * 0.8) * 3 * 0.5 + Math.cos((u + v) * 6) * 6 * 0.15;
+      const dy = Math.cos(v * 4 + u) * 4 * 0.35 + Math.cos((u + v) * 6) * 6 * 0.15;
+      const len = Math.hypot(dx, dy, 1);
+      const i = (y * size + x) * 4;
+      d[i] = Math.floor((-dx / len * 0.5 + 0.5) * 255);
+      d[i + 1] = Math.floor((-dy / len * 0.5 + 0.5) * 255);
+      d[i + 2] = Math.floor((1 / len * 0.5 + 0.5) * 255);
+      d[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.NoColorSpace;
+  return t;
+}
+
+function foamTexture() {
+  return canvasTex(512, 256, (ctx, w, h) => {
+    ctx.clearRect(0, 0, w, h);
+    for (let i = 0; i < 900; i++) {
+      const x = Math.random() * w;
+      const y = Math.random() * h;
+      const len = 6 + Math.random() * 60;
+      ctx.strokeStyle = `rgba(255,255,255,${0.05 + Math.random() * 0.35})`;
+      ctx.lineWidth = 0.6 + Math.random() * 1.8;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.bezierCurveTo(x + len * 0.3, y + (Math.random() * 6 - 3), x + len * 0.7, y + (Math.random() * 4 - 2), x + len, y + (Math.random() * 4 - 2));
+      ctx.stroke();
+    }
+    for (let i = 0; i < 24; i++) {
+      ctx.fillStyle = `rgba(255,255,255,${0.04 + Math.random() * 0.12})`;
+      ctx.beginPath(); ctx.ellipse(Math.random() * w, Math.random() * h, 20 + Math.random() * 40, 2 + Math.random() * 6, 0, 0, 7); ctx.fill();
+    }
+  });
+}
+
 function grassTexture() {
   return canvasTex(512, 512, (ctx, w, h) => {
     noiseFill(ctx, w, h, '#6f7448', 34);
@@ -273,6 +323,8 @@ export class Materials {
     this.textures.plaster = plasterTexture();
     this.textures.plasterWhite = plasterTexture('#cfc8b8');
     this.textures.grass = grassTexture();
+    this.textures.foam = foamTexture();
+    this.textures.waterNormal = waterNormalTexture();
     this.textures.asphalt = asphaltTexture();
     this.textures.concrete = concreteTexture();
     onProgress?.(1, '材质');
@@ -320,8 +372,9 @@ export class Materials {
     m.concrete = this._std(t.concrete, { roughness: 0.92 });
     m.sandbag = this._std(t.sandbag, { roughness: 0.98 });
     m.water = new THREE.MeshStandardMaterial({
-      map: t.water, color: 0x8d9d9d, roughness: 0.2, metalness: 0.15,
-      transparent: true, opacity: 0.92,
+      map: t.water, color: 0x93a6a6, roughness: 0.08, metalness: 0.35,
+      normalMap: t.waterNormal, normalScale: new THREE.Vector2(1.1, 1.1),
+      transparent: true, opacity: 0.95,
     });
     m.canvas = this._std(null, { color: 0x6f7258, roughness: 0.98, bump: false });
     m.canvasTan = this._std(null, { color: 0x9a8a62, roughness: 0.98, bump: false });

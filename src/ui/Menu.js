@@ -32,8 +32,10 @@ export class Menu {
     section.id = 'menu';
     section.innerHTML = `
       <div class="menu-art" id="menu-art"></div>
+      <div class="menu-ribbon" aria-hidden="true">打过太平洋·解放全美利坚</div>
       <header class="menu-head">
         <div class="brand">
+          <i class="brand-star" aria-hidden="true"></i>
           <b>战地 · 解放<em>美利坚</em></b>
           <span>BATTLEFIELD · LIBERATE AMERICA</span>
         </div>
@@ -46,17 +48,22 @@ export class Menu {
       <div class="menu-body">
         <div class="menu-left">
           <div class="menu-eyebrow">战役档案 / CAMPAIGN ARCHIVE</div>
-          <h1 class="menu-title">解放<br/>美利坚</h1>
-          <div class="menu-sub">1947 · 西海岸反攻 · 四场战役</div>
+          <div class="menu-title-wrap">
+            <h1 class="menu-title">解放<span>美利坚</span><i class="menu-title-seal seal" aria-hidden="true">远征</i></h1>
+            <div class="title-flourish" aria-hidden="true"><i></i><b>★</b><i></i></div>
+            <div class="menu-sub">1947 · 西海岸反攻 · 四场战役</div>
+          </div>
           <div class="mission-list" id="mission-list"></div>
         </div>
         <div class="menu-right">
           <div class="brief-card">
+            <div class="brief-seal seal" aria-hidden="true">绝密</div>
             <div class="brief-year" id="brief-year"></div>
             <h2 class="brief-title" id="brief-title"></h2>
             <div class="brief-loc" id="brief-loc"></div>
             <p class="brief-text" id="brief-text"></p>
             <div class="brief-objs" id="brief-objs"></div>
+            <div class="brief-sign"><span>作战命令 / OPERATION ORDER</span><b>第九兵团</b></div>
             <div class="menu-actions">
               <button class="btn primary" id="btn-start">开始战役</button>
               <button class="btn ghost" id="btn-settings">设置</button>
@@ -75,7 +82,10 @@ export class Menu {
           <span><b>Shift</b> 冲刺</span>
           <span><b>C</b> 蹲下</span>
         </div>
-        <div>v0.1 · 原型构建中</div>
+        <div class="menu-foot-right">
+          <span class="slogan">誓死保卫 · 解放全美利坚</span>
+          <span>v0.1 · 原型构建中</span>
+        </div>
       </footer>
 
       <div class="settings-panel" id="settings-panel">
@@ -125,6 +135,7 @@ export class Menu {
       <div class="end-inner">
         <div class="end-k" id="end-k">MISSION COMPLETE</div>
         <h2 id="end-title">胜 利</h2>
+        <div class="seal end-seal" id="end-seal" aria-hidden="true">凯旋</div>
         <p id="end-sub"></p>
         <div class="end-stats" id="end-stats"></div>
         <div class="end-actions">
@@ -145,7 +156,7 @@ export class Menu {
           <div class="m-name">${c.name}</div>
           <div class="m-meta">${c.date} · ${c.location.split('·').pop().trim()}</div>
         </span>
-        <span class="m-tag">可部署</span>
+        <span class="m-tag">可出击</span>
       </button>`).join('');
     this.list.querySelectorAll('.mission').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -280,6 +291,7 @@ export class Menu {
     this.endEl.querySelector('#end-k').textContent = win ? 'MISSION COMPLETE' : 'MISSION FAILED';
     this.endEl.querySelector('#end-title').textContent = win ? '胜 利' : '战 败';
     this.endEl.querySelector('#end-title').classList.toggle('lost', !win);
+    this.endEl.querySelector('#end-seal').textContent = win ? '凯旋' : '再战';
     this.endEl.querySelector('#end-sub').textContent = win
       ? '远征军的旗帜已经插上阵地。太平洋舰队正在驶入港口。'
       : '美军重新夺回了阵地。集结部队，再次进攻。';
