@@ -33,7 +33,7 @@ export class Level {
   }
 
   /* ------------------------------------------------------------- terrain */
-  addTerrain({ size = 600, segments = 120, height = () => 0, color = null, material = null }) {
+  addTerrain({ size = 600, segments = 120, height = () => 0, color = null, material = null, texture = 'rubble', tile = 9 }) {
     this.heightFn = height;
     const geo = new THREE.PlaneGeometry(size, size, segments, segments);
     geo.rotateX(-Math.PI / 2);
@@ -51,7 +51,8 @@ export class Level {
     }
     if (colors) geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.computeVertexNormals();
-    const map = this.mats.textures.rubble.clone();
+    const src = this.mats.textures[texture] || this.mats.textures.rubble;
+    const map = src.clone();
     map.needsUpdate = true;
     const mat = material || new THREE.MeshStandardMaterial({
       map, vertexColors: !!colors, roughness: 0.97, metalness: 0,
@@ -59,7 +60,7 @@ export class Level {
     });
     if (mat.map) {
       mat.map.wrapS = mat.map.wrapT = THREE.RepeatWrapping;
-      mat.map.repeat.set(size / 20, size / 20);
+      mat.map.repeat.set(size / tile, size / tile);
     }
     const mesh = new THREE.Mesh(geo, mat);
     mesh.receiveShadow = true;
@@ -213,10 +214,10 @@ export class Level {
     }
     // Rubble at the base.
     const pile = new THREE.Mesh(
-      new THREE.DodecahedronGeometry(Math.min(w, d) * 0.28, 0),
+      new THREE.DodecahedronGeometry(Math.min(w, d) * 0.09, 0),
       this.mats.get('brick'),
     );
-    pile.position.set(x + (this.rand() - 0.5) * w * 0.8, gy + 0.5, z + d / 2 + 0.4);
+    pile.position.set(x + (this.rand() - 0.5) * w * 0.8, gy + 0.25, z + d / 2 + 0.6);
     pile.rotation.set(this.rand(), this.rand() * 6, this.rand());
     pile.castShadow = pile.receiveShadow = true;
     this.scene.add(pile);
@@ -437,6 +438,7 @@ export class Level {
     const def = {
       id, name, position: new THREE.Vector3(x, gy, z), radius, owner,
       progress: owner === -1 ? 0 : 100, contested: false, attacker: -1,
+      captureT: 0, capturingTeam: -1,
     };
     this.capturePoints.push(def);
 
@@ -449,20 +451,12 @@ export class Level {
     ring.position.set(x, gy + 0.06, z);
     this.scene.add(ring);
 
-    const beamMat = new THREE.MeshBasicMaterial({
-      color: owner === -1 ? 0xddd6c2 : TEAM_COLORS[owner], transparent: true, opacity: 0.06,
-      side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending,
-    });
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.86, radius * 0.92, 26, 40, 1, true), beamMat);
-    beam.position.set(x, gy + 13, z);
-    this.scene.add(beam);
-
     const marker = new THREE.Group();
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, height, 8), this.mats.get('metal'));
     pole.position.y = height / 2;
     marker.add(pole);
     const flagMat = new THREE.MeshStandardMaterial({
-      map: flagTexture(owner === 1 ? 1 : 0), roughness: 0.9, side: THREE.DoubleSide,
+      map: flagTexture(owner === 1 ? 1 : owner === 0 ? 0 : 2), roughness: 0.9, side: THREE.DoubleSide,
     });
     const flagGeo = new THREE.PlaneGeometry(2.4, 1.5, 10, 1);
     flagGeo.translate(1.2, 0, 0);
@@ -475,14 +469,20 @@ export class Level {
 
     def.ring = ring;
     def.ringMat = ringMat;
-    def.beam = beam;
-    def.beamMat = beamMat;
     def.flag = flag;
     def.flagMat = flagMat;
     def.marker = marker;
     def.baseGeo = flagGeo.clone();
     this.animated.push({ type: 'flag', mesh: flag, base: flagGeo.clone(), phase: this.rand() * 6.28 });
     return def;
+  }
+
+  refreshPoint(cp) {
+    if (!cp) return;
+    const team = cp.owner;
+    cp.ringMat.color.setHex(team === -1 ? 0xccc6b4 : team === 0 ? 0xd23a2b : 0x3f6fa8);
+    cp.flagMat.map = flagTexture(team === 1 ? 1 : team === 0 ? 0 : 2);
+    cp.flagMat.needsUpdate = true;
   }
 
   /* --------------------------------------------------------------- spawn */
@@ -556,9 +556,6 @@ export class Level {
         pos.needsUpdate = true;
         a.mesh.geometry.computeVertexNormals();
       }
-    }
-    for (const cp of this.capturePoints) {
-      cp.beamMat.opacity = 0.045 + Math.sin(t * 2 + cp.position.x) * 0.015;
     }
   }
 }

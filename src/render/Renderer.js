@@ -21,22 +21,25 @@ uniform vec3 uSunColor;
 uniform vec3 uCloud;
 uniform float uCloudiness;
 
-float hash(vec2 p) {
-  p = fract(p * vec2(123.34, 456.21));
-  p += dot(p, p + 45.32);
-  return fract(p.x * p.y);
+float hash3(vec3 p) {
+  p = fract(p * 0.3183099 + vec3(0.11, 0.17, 0.23));
+  p *= 17.0;
+  return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
 }
-float noise(vec2 p) {
-  vec2 i = floor(p), f = fract(p);
+float noise3(vec3 x) {
+  vec3 i = floor(x), f = fract(x);
   f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(hash(i), hash(i + vec2(1,0)), f.x),
-             mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), f.x), f.y);
+  return mix(
+    mix(mix(hash3(i + vec3(0,0,0)), hash3(i + vec3(1,0,0)), f.x),
+        mix(hash3(i + vec3(0,1,0)), hash3(i + vec3(1,1,0)), f.x), f.y),
+    mix(mix(hash3(i + vec3(0,0,1)), hash3(i + vec3(1,0,1)), f.x),
+        mix(hash3(i + vec3(0,1,1)), hash3(i + vec3(1,1,1)), f.x), f.y), f.z);
 }
-float fbm(vec2 p) {
+float fbm3(vec3 p) {
   float v = 0.0, a = 0.5;
-  for (int i = 0; i < 5; i++) {
-    v += a * noise(p);
-    p = p * 2.03 + vec2(13.1, 7.7);
+  for (int i = 0; i < 4; i++) {
+    v += a * noise3(p);
+    p = p * 2.03 + vec3(9.1, 5.7, 3.3);
     a *= 0.5;
   }
   return v;
@@ -44,31 +47,28 @@ float fbm(vec2 p) {
 
 void main() {
   vec3 dir = normalize(vDir);
-  float h = clamp(dir.y, -1.0, 1.0);
-  vec3 col = mix(uHorizon, uTop, pow(max(h, 0.0), 0.42));
-  col = mix(col, uGround, smoothstep(0.0, -0.16, h));
+  float h = dir.y;
+  vec3 col = mix(uHorizon, uTop, pow(clamp(h, 0.0, 1.0), 0.52));
 
-  float sd = max(dot(dir, uSun), 0.0);
-  col += uSunColor * pow(sd, 320.0) * 1.4;
-  col += uSunColor * pow(sd, 9.0) * 0.22;
-  col += uSunColor * pow(sd, 2.0) * 0.05;
+  float sd = max(dot(dir, normalize(uSun)), 0.0);
+  col += uSunColor * pow(sd, 420.0) * 1.8;
+  col += uSunColor * pow(sd, 14.0) * 0.16;
+  col += uSunColor * pow(sd, 3.0) * 0.045;
 
-  // Layered storm clouds projected onto a dome.
-  if (h > 0.005) {
-    vec2 uv = dir.xz / (h + 0.16);
-    float t = uTime * 0.0035;
-    float n1 = fbm(uv * 0.85 + vec2(t, t * 0.6));
-    float n2 = fbm(uv * 1.9 - vec2(t * 1.4, t));
-    float cover = mix(0.42, 0.72, uCloudiness);
-    float c = smoothstep(cover, cover + 0.28, n1 * 0.68 + n2 * 0.42);
-    c *= smoothstep(0.0, 0.16, h);
-    vec3 cloudCol = mix(uCloud * 0.62, uCloud * 1.22, smoothstep(0.2, 0.9, n2));
-    cloudCol += uSunColor * pow(sd, 6.0) * 0.20;
-    col = mix(col, cloudCol, c * 0.92);
+  if (h > 0.002) {
+    float t = uTime * 0.0022;
+    vec3 q = dir * 3.4 + vec3(t * 1.2, t * 0.2, t * 0.7);
+    float n1 = fbm3(q);
+    float n2 = fbm3(q * 2.15 + vec3(4.0, t * 0.8, 1.0));
+    float c = smoothstep(0.46, 0.74, n1 * 0.72 + n2 * 0.38);
+    c *= smoothstep(0.0, 0.14, h);
+    vec3 cc = mix(uCloud * 0.62, uCloud * 1.2, smoothstep(0.2, 0.8, n2));
+    cc += uSunColor * pow(sd, 10.0) * 0.14;
+    col = mix(col, cc, c * (0.5 + 0.38 * uCloudiness));
   }
 
-  // Haze near horizon.
-  col = mix(col, uHorizon * 1.06, smoothstep(0.14, -0.02, h) * 0.7);
+  col = mix(col, uHorizon * 1.06, smoothstep(0.12, -0.02, h) * 0.8);
+  col = mix(col, uGround, smoothstep(0.0, -0.18, h));
   gl_FragColor = vec4(col, 1.0);
 }`;
 
@@ -108,9 +108,9 @@ export class Renderer {
     this.sun.shadow.normalBias = 0.035;
     this.scene.add(this.sun, this.sun.target);
 
-    this.hemi = new THREE.HemisphereLight(0xa8b0b8, 0x5a4a38, 1.35);
+    this.hemi = new THREE.HemisphereLight(0xb6c2cc, 0x5f5342, 1.55);
     this.scene.add(this.hemi);
-    this.fill = new THREE.AmbientLight(0x6b7280, 0.25);
+    this.fill = new THREE.AmbientLight(0x7b8490, 0.32);
     this.scene.add(this.fill);
     this._createEnvironment();
 
@@ -179,7 +179,7 @@ export class Renderer {
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     const rt = pmrem.fromEquirectangular(tex);
     this.scene.environment = rt.texture;
-    this.scene.environmentIntensity = 0.5;
+    this.scene.environmentIntensity = 0.62;
     this.viewScene.environment = rt.texture;
     this.viewScene.environmentIntensity = 0.85;
     tex.dispose();

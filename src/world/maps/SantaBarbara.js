@@ -25,7 +25,7 @@ export function buildSantaBarbara(L) {
     return y;
   };
   L.addTerrain({
-    size: 640, segments: 128, height,
+    size: 640, segments: 128, height, texture: 'sand', tile: 7,
     color: (x, z, y, c) => {
       if (y < 1.2) c.setHex(0xcdb78c).lerp(new THREE.Color(0x9c8663), Math.random() * 0.35);
       else if (y < 1.6) c.setHex(0xb9a67e).lerp(new THREE.Color(0x8d7a58), Math.random() * 0.3);
@@ -94,16 +94,16 @@ export function buildSantaBarbara(L) {
 
   /* ------------------------------------------------------------- the town */
   const buildings = [
-    { x: 14, z: -24, w: 15, d: 13, h: 10, sign: 'HOTEL', damage: 0.35, floors: 3, balcony: true },
+    { x: 14, z: -24, w: 15, d: 13, h: 10, sign: 'HOTEL', damage: 0.35, floors: 3, balcony: true, material: 'stuccoCream' },
     { x: 32, z: -25, w: 13, d: 12, h: 8, sign: 'CAFE', damage: 0.2 },
     { x: 48, z: -24, w: 12, d: 13, h: 11, sign: 'BANK', damage: 0.1, material: 'brick' },
     { x: 64, z: -25, w: 14, d: 12, h: 9, sign: 'PHARMACY', damage: 0.5 },
-    { x: 82, z: -24, w: 12, d: 13, h: 8, sign: 'STORE', damage: 0.3 },
-    { x: 14, z: 28, w: 13, d: 14, h: 9, sign: 'MISSION INN', damage: 0.4, floors: 3, balcony: true },
+    { x: 82, z: -24, w: 12, d: 13, h: 8, sign: 'STORE', damage: 0.3, material: 'stuccoPink' },
+    { x: 14, z: 28, w: 13, d: 14, h: 9, sign: 'MISSION INN', damage: 0.4, floors: 3, balcony: true, material: 'stuccoOchre' },
     { x: 31, z: 29, w: 12, d: 12, h: 8, sign: 'BAR', damage: 0.15 },
-    { x: 47, z: 28, w: 13, d: 13, h: 12, sign: 'GARAGE', damage: 0.55, flatRoof: true },
+    { x: 47, z: 28, w: 13, d: 13, h: 12, sign: 'GARAGE', damage: 0.55, flatRoof: true, material: 'stuccoGrey' },
     { x: 64, z: 29, w: 14, d: 12, h: 9, sign: 'MARKET', damage: 0.25 },
-    { x: 82, z: 28, w: 12, d: 13, h: 10, sign: 'TELEGRAPH', damage: 0.45 },
+    { x: 82, z: 28, w: 12, d: 13, h: 10, sign: 'TELEGRAPH', damage: 0.45, material: 'stuccoCream' },
     { x: 18, z: -56, w: 16, d: 14, h: 9, sign: 'FIRE STATION', damage: 0.3, flatRoof: true },
     { x: 40, z: -57, w: 14, d: 13, h: 8, damage: 0.65 },
     { x: 60, z: -56, w: 13, d: 14, h: 10, sign: 'HARDWARE', damage: 0.2 },

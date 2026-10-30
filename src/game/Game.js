@@ -114,6 +114,7 @@ export class Game {
       this.player.spawn(new THREE.Vector3(px, py, pz), this.player.yaw);
     }
     if (q.has('nohud')) this.hud.show(false);
+    if (q.has('test')) { this.input.locked = true; }
     if (q.has('nowater') && this.level.water) this.level.water.visible = false;
     if (q.has('nobots')) {
       for (const b of this.bots) { b.dispose(); }
@@ -125,6 +126,23 @@ export class Game {
       d.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:9999;color:#0f0;background:rgba(0,0,0,.75);font:11px monospace;padding:6px;white-space:pre;pointer-events:none';
       document.body.appendChild(d);
       this.debugEl = d;
+      this._debugHandler = (e) => {
+        const d = e.detail || {};
+        if (d.cmd === 'fire' && this.weapon?.canFire) this.weapon.fire();
+        if (d.cmd === 'reload') this.weapon?.startReload();
+        if (d.cmd === 'look' && this.player) {
+          this.player.yaw = d.yaw ?? this.player.yaw;
+          this.player.pitch = d.pitch ?? this.player.pitch;
+        }
+        if (d.cmd === 'teleport' && this.player) {
+          const y = this.level.groundHeight(d.x, d.z) + 0.2;
+          this.player.spawn(new THREE.Vector3(d.x, y, d.z), d.yaw ?? this.player.yaw);
+        }
+        if (d.cmd === 'weaken') {
+          for (const b of this.bots) if (b.team === 1) b.damage(95, this.player, { weapon: 'type38' });
+        }
+      };
+      addEventListener('bf:debug', this._debugHandler);
     }
     if (q.has('nofx')) {
       for (const f of this.level.fires) { f.sprite.visible = false; f.light.visible = false; }
@@ -150,8 +168,8 @@ export class Game {
       const n = cfg[team];
       for (let i = 0; i < n; i++) {
         const s = spawns[i % spawns.length];
-        const offX = ((i % 3) - 1) * 1.3;
-        const offZ = Math.floor(i / spawns.length) * 1.4;
+        const offX = ((i % 5) - 2) * 1.9;
+        const offZ = Math.floor(i / 5) * 2.1;
         const pos = s.position.clone().add(new THREE.Vector3(offX, 0, offZ));
         const bot = new Bot(this, team, pos, s.yaw);
         this.bots.push(bot);
@@ -356,6 +374,7 @@ export class Game {
     if (!this.started || this.paused || !this.player) return;
     if (this.match?.state === 'ended') return;
 
+    this.physics.step(dt);
     const cmd = this.input.cmd();
     const look = this.input.takeMouseDelta();
 
@@ -409,8 +428,10 @@ export class Game {
         `pos ${p.position.x.toFixed(1)} ${p.position.y.toFixed(2)} ${p.position.z.toFixed(1)}`,
         `ground ${gh.toFixed(2)} ray ${ray ? ray.point.y.toFixed(2) : 'MISS'} grounded ${p.grounded}`,
         `alive ${p.alive} hp ${p.health.toFixed(0)} bots ${this.bots.length}`,
+        `ammo ${this.weapon?.ammo}/${this.weapon?.reserve} cycle ${this.weapon?.cycleT.toFixed(2)} reload ${this.weapon?.reloading}`,
         `colliders ${this.physics.world.colliders.len()} bodies ${this.physics.world.bodies.len()}`,
         `terrain ${this.level.terrainMesh ? this.level.terrainMesh.visible : 'none'}`,
+        `points ${this.level.capturePoints.map((c) => c.id + ':' + (c.owner === -1 ? 'N' : c.owner) + ':' + c.captureT.toFixed(0)).join(' ')}`,
       ].join('\n');
     }
     this.audio.setVolume(this.settings.volume);
@@ -435,6 +456,7 @@ export class Game {
   }
 
   teardown() {
+    if (this._debugHandler) { removeEventListener('bf:debug', this._debugHandler); this._debugHandler = null; }
     this.input?.unlock();
     for (const b of this.bots) b.dispose?.();
     this.bots = [];

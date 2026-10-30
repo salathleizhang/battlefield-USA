@@ -48,6 +48,7 @@ export class Match {
           cp.owner = team;
           cp.captureT = 0;
           cp.capturingTeam = -1;
+          this.game.level.refreshPoint(cp);
           this.onCapture(cp, team);
         }
       } else if (!contested && team === cp.owner) {
@@ -79,6 +80,8 @@ export class Match {
     this.game.audio.capture();
     this.game.player?.addTrauma(0.08);
     this.game.assignObjectives?.();
+    const next = this.points.find((p) => p.owner !== 0);
+    this.game.hud?.setObjective(next ? `夺取 ${next.id} 点 · ${next.name}` : '守住全部据点，等待美军兵力耗尽');
   }
 
   onKill(victim, killer) {

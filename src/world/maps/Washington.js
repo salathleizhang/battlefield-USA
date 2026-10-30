@@ -41,9 +41,8 @@ export function buildWashington(L) {
     }
   }
   L.solidBox(0, bridgeY, 162, 12, 0.4, 52, 0, { surface: 'wood' });
-  for (const dir of [-1, 1]) {
-    L.sandbags(0, 162 + dir * 28, Math.PI / 2, 7, { base: bridgeY });
-  }
+  L.sandbags(0, 140, Math.PI / 2, 7, { base: bridgeY });
+  L.sandbags(8, 146, Math.PI / 2, 5, { base: bridgeY });
   L.landingCraft(-30, 150, 1.57, { base: 0.3 });
   L.landingCraft(34, 155, 1.5, { base: 0.3 });
 
@@ -205,9 +204,9 @@ export function buildWashington(L) {
   L.addCapturePoint({ id: 'B', name: '林肯纪念堂', x: 0, z: 96, radius: 16, owner: -1, base: ly + 2, height: 8 });
   L.addCapturePoint({ id: 'C', name: '国会大厦', x: 0, z: -150, radius: 18, owner: 1, base: cy + 1.2, height: 9 });
 
-  L.setPlayerSpawn(0, 190, 0);
-  L.addSpawn(0, -20, 186, 0);
-  L.addSpawn(0, 20, 184, 0);
+  L.setPlayerSpawn(0, 178, 0, { base: bridgeY + 0.2 });
+  L.addSpawn(0, -20, 168, 0, { base: bridgeY + 0.2 });
+  L.addSpawn(0, 20, 166, 0, { base: bridgeY + 0.2 });
   L.addSpawn(0, 0, 160, 0, { base: bridgeY });
   L.addSpawn(0, -30, 130, 0);
   L.addSpawn(1, 60, -70, Math.PI);

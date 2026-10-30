@@ -157,15 +157,16 @@ export function buildGoldenGate(L) {
   L.addCapturePoint({ id: 'B', name: '中跨', x: 0, z: 0, radius: 15, owner: -1, base: deckY + 0.7, height: 9 });
   L.addCapturePoint({ id: 'C', name: '南塔 · 旧金山', x: 0, z: 140, radius: 15, owner: 1, base: deckY + 0.7, height: 9 });
 
-  L.setPlayerSpawn(0, -230, Math.PI);
-  L.addSpawn(0, 0, -228, Math.PI);
-  L.addSpawn(0, -6, -205, Math.PI);
-  L.addSpawn(0, 6, -195, Math.PI);
-  L.addSpawn(0, 0, -160, Math.PI);
-  L.addSpawn(1, 0, 228, 0);
-  L.addSpawn(1, -6, 205, 0);
-  L.addSpawn(1, 6, 190, 0);
-  L.addSpawn(1, 0, 160, 0);
+  const SPAWN_Y = deckY + 0.7;
+  L.setPlayerSpawn(0, -230, Math.PI, { base: SPAWN_Y });
+  L.addSpawn(0, 0, -228, Math.PI, { base: SPAWN_Y });
+  L.addSpawn(0, -6, -205, Math.PI, { base: SPAWN_Y });
+  L.addSpawn(0, 6, -195, Math.PI, { base: SPAWN_Y });
+  L.addSpawn(0, 0, -160, Math.PI, { base: SPAWN_Y });
+  L.addSpawn(1, 0, 228, 0, { base: SPAWN_Y });
+  L.addSpawn(1, -6, 205, 0, { base: SPAWN_Y });
+  L.addSpawn(1, 6, 190, 0, { base: SPAWN_Y });
+  L.addSpawn(1, 0, 160, 0, { base: SPAWN_Y });
   L.addRoute([new THREE.Vector3(0, deckY, -140), new THREE.Vector3(-7, deckY, -70), new THREE.Vector3(0, deckY, 0)]);
   L.addRoute([new THREE.Vector3(-7, deckY, 20), new THREE.Vector3(7, deckY, 80), new THREE.Vector3(0, deckY, 140)]);
 }

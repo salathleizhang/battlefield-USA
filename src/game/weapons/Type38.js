@@ -107,23 +107,37 @@ export function buildType38(mats) {
   bayonet.add(ring);
   g.add(bayonet);
 
-  // Hands (coarse but readable gloves).
+  // Hands + forearms (slim tapered limbs read better than blocks).
   const skin = new THREE.MeshStandardMaterial({ color: 0xa9835f, roughness: 0.9 });
   const sleeve = new THREE.MeshStandardMaterial({ color: 0x6a6f62, roughness: 0.95 });
-  const rightHand = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.07, 0.11), skin);
-  rightHand.position.set(0.015, -0.055, 0.10);
+  const limb = (a, b, r0, r1, mat) => {
+    const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b);
+    const dir = vb.clone().sub(va);
+    const len = dir.length();
+    const geo = new THREE.CylinderGeometry(r1, r0, len, 7);
+    geo.translate(0, len / 2, 0);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(va);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+    return mesh;
+  };
+
+  const rightHand = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.062, 0.10), skin);
+  rightHand.position.set(0.012, -0.052, 0.105);
   g.add(rightHand);
-  const rightSleeve = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.085, 0.30), sleeve);
-  rightSleeve.position.set(0.12, -0.10, 0.26);
-  rightSleeve.rotation.set(0.2, -0.3, 0.25);
-  g.add(rightSleeve);
-  const leftHand = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.075, 0.10), skin);
-  leftHand.position.set(-0.005, -0.045, -0.42);
+  g.add(limb([0.12, -0.28, 0.12], [0.035, -0.09, 0.12], 0.05, 0.038, sleeve));
+  const rightFingers = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.022, 0.075), skin);
+  rightFingers.position.set(0.012, -0.075, 0.10);
+  g.add(rightFingers);
+
+  const leftHand = new THREE.Mesh(new THREE.BoxGeometry(0.058, 0.05, 0.095), skin);
+  leftHand.position.set(-0.004, -0.04, -0.42);
+  leftHand.rotation.x = -0.2;
   g.add(leftHand);
-  const leftSleeve = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.085, 0.34), sleeve);
-  leftSleeve.position.set(-0.18, -0.13, -0.33);
-  leftSleeve.rotation.set(-0.1, 0.45, -0.35);
-  g.add(leftSleeve);
+  g.add(limb([-0.16, -0.27, -0.20], [-0.02, -0.075, -0.39], 0.052, 0.036, sleeve));
+  const leftFingers = new THREE.Mesh(new THREE.BoxGeometry(0.062, 0.022, 0.075), skin);
+  leftFingers.position.set(-0.004, -0.062, -0.43);
+  g.add(leftFingers);
 
   // Muzzle flash sprite + light.
   const flashTex = makeFlashTexture();

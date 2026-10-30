@@ -154,10 +154,10 @@ export function buildMississippi(L) {
   L.addCapturePoint({ id: 'B', name: '棉花田堤坝', x: 45, z: -78, radius: 17, owner: -1, base: height(45, -78), height: 6 });
   L.addCapturePoint({ id: 'C', name: '巴吞鲁日港', x: px, z: pz, radius: 18, owner: 1, base: py + 1.0, height: 8 });
 
-  L.setPlayerSpawn(0, 90, 0);
-  L.addSpawn(0, 0, 88, 0);
-  L.addSpawn(0, -8, 90, 0);
-  L.addSpawn(0, 8, 86, 0);
+  L.setPlayerSpawn(18, 104, 0);
+  L.addSpawn(0, -14, 100, 0);
+  L.addSpawn(0, 0, 96, 0);
+  L.addSpawn(0, 12, 112, 0);
   L.addSpawn(0, 0, 74, 0, { base: bridgeY });
   L.addSpawn(1, -70, -90, Math.PI);
   L.addSpawn(1, 60, -100, Math.PI);

@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { buildType38 } from './Type38.js';
 import { clamp, damp, rand } from '../../core/MathUtil.js';
 
-const HIP = new THREE.Vector3(0.205, -0.185, -0.46);
-const ADS = new THREE.Vector3(0, -0.072, -0.34);
+const HIP = new THREE.Vector3(0.185, -0.20, -0.44);
+const ADS = new THREE.Vector3(0, -0.072, -0.31);
 
 /** First-person rifle presentation: sway, bob, ADS, bolt cycling, reload, bayonet lunge. */
 export class ViewModel {
@@ -17,7 +17,7 @@ export class ViewModel {
     this.gun.position.copy(HIP);
     this.gun.rotation.set(0.015, 0.04, 0);
     this.rig.add(this.gun);
-    this.gun.scale.setScalar(0.86);
+    this.gun.scale.setScalar(0.72);
     this.bolt = this.gun.userData.bolt;
     this.bayonet = this.gun.userData.bayonet;
     this.flash = this.gun.userData.flash;

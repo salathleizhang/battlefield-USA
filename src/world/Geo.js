@@ -133,7 +133,11 @@ export function flagTexture(team) {
   const c = document.createElement('canvas');
   c.width = 256; c.height = 160;
   const ctx = c.getContext('2d');
-  if (team === 0) {
+  if (team === 2) {
+    ctx.fillStyle = '#d9d2bf'; ctx.fillRect(0, 0, 256, 160);
+    ctx.strokeStyle = '#8a826e'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(78, 80); ctx.lineTo(178, 80); ctx.stroke();
+  } else if (team === 0) {
     ctx.fillStyle = '#b3271d'; ctx.fillRect(0, 0, 256, 160);
     // Five-pointed star (八路军臂章风格简化旗).
     ctx.fillStyle = '#e8c44a';

@@ -145,6 +145,23 @@ function sandTexture() {
   });
 }
 
+function grassTexture() {
+  return canvasTex(512, 512, (ctx, w, h) => {
+    noiseFill(ctx, w, h, '#6f7448', 34);
+    for (let i = 0; i < 9000; i++) {
+      const g = 70 + Math.random() * 70;
+      ctx.strokeStyle = `rgba(${Math.floor(g * 0.8)},${Math.floor(g)},${Math.floor(g * 0.5)},${0.15 + Math.random() * 0.3})`;
+      ctx.lineWidth = 1;
+      const x = Math.random() * w, y = Math.random() * h;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (Math.random() - 0.5) * 3, y - 3 - Math.random() * 5); ctx.stroke();
+    }
+    for (let i = 0; i < 300; i++) {
+      ctx.fillStyle = `rgba(120,100,60,${Math.random() * 0.25})`;
+      ctx.fillRect(Math.random() * w, Math.random() * h, 2, 2);
+    }
+  });
+}
+
 function plasterTexture(base = '#c8bda4') {
   return canvasTex(512, 512, (ctx, w, h) => {
     noiseFill(ctx, w, h, base, 16);
@@ -207,6 +224,7 @@ export class Materials {
     this.textures.sand = sandTexture();
     this.textures.plaster = plasterTexture();
     this.textures.plasterWhite = plasterTexture('#cfc8b8');
+    this.textures.grass = grassTexture();
     onProgress?.(1, '材质');
     this._build();
   }
@@ -232,6 +250,11 @@ export class Materials {
     const m = this.mats;
     m.stucco = this._std(t.wall_stucco, { color: 0xffffff, roughness: 0.95 });
     m.stuccoWhite = this._std(t.wall_stucco, { color: 0xd8d2c4, roughness: 0.95 });
+    m.stuccoCream = this._std(t.wall_stucco, { color: 0xe6cfa2, roughness: 0.95 });
+    m.stuccoOchre = this._std(t.wall_stucco, { color: 0xd8b07c, roughness: 0.95 });
+    m.stuccoPink = this._std(t.wall_stucco, { color: 0xd9b09a, roughness: 0.95 });
+    m.stuccoGrey = this._std(t.wall_stucco, { color: 0xa8a696, roughness: 0.95 });
+    m.grass = this._std(t.grass, { roughness: 0.98, bump: false });
     m.plaster = this._std(t.plaster, { roughness: 0.95 });
     m.plasterWhite = this._std(t.plasterWhite, { roughness: 0.93 });
     m.brick = this._std(t.brick, { roughness: 0.95 });
