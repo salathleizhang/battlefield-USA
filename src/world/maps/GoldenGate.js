@@ -225,6 +225,11 @@ export function buildGoldenGate(L) {
   L.wreck(3, 14, 1.2, { base: DECK, kind: 'truck' });
   L.wreck(-3, -44, 0.3, { base: DECK, kind: 'car' });
 
+  // Rainwater standing on the deck: mirror puddles between the lane lines.
+  for (let z = -500; z <= 500; z += 29) {
+    L.puddle((L.rand() - 0.5) * 9, z, { y: DECK + 0.02, r: 1.1 + L.rand() * 2.3, stretch: 0.35 + L.rand() * 0.45 });
+  }
+
   const cache = (x, z, rot = 0) => {
     L.prop('crate', x, z, rot, { base: DECK });
     L.prop('ammo', x + 0.5, z + 0.6, rot, { base: DECK, y: 0.32 });

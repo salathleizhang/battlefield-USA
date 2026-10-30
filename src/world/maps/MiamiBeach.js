@@ -210,12 +210,12 @@ export function buildMiamiBeach(L) {
   hotels.forEach((h, i) => addDecoHotel({ ...h, awning: i }));
 
   // Fires on the hotel row.
-  L.fire(-1.2, height(HOTEL_X, -92) + 9, -92, 2.0);
-  L.smokeColumn(-1.5, height(HOTEL_X, -92) + 11, -92, 1.7);
-  L.fire(-1.2, height(HOTEL_X, 68) + 7, 68, 1.5);
-  L.smokeColumn(-1.5, height(HOTEL_X, 68) + 9, 68, 1.6);
-  L.fire(-1.2, height(HOTEL_X, 4) + 6, 4, 1.2);
-  L.smokeColumn(-1.5, height(HOTEL_X, 4) + 8, 4, 1.3);
+  L.fire(0.55, height(HOTEL_X, -92) + 9, -92, 2.0);
+  L.smokeColumn(0.4, height(HOTEL_X, -92) + 11, -92, 1.7);
+  L.fire(0.55, height(HOTEL_X, 68) + 7, 68, 1.5);
+  L.smokeColumn(0.4, height(HOTEL_X, 68) + 9, 68, 1.6);
+  L.fire(0.55, height(HOTEL_X, 4) + 6, 4, 1.2);
+  L.smokeColumn(0.4, height(HOTEL_X, 4) + 8, 4, 1.3);
 
   // Collins Avenue second row (background depth).
   const second = [
@@ -244,6 +244,17 @@ export function buildMiamiBeach(L) {
   // Cross streets down to the bay.
   for (const z of [-140, -44, 52, 148]) {
     L.batch.box(78, 0.1, 10, -21, 2.07, z, M.asphalt, { uv: 0.55 });
+  }
+  // Standing rainwater: mirror puddles along Ocean Drive and under the awnings.
+  for (let z = -172; z <= 178; z += 13) {
+    const x = 8 + (L.rand() - 0.5) * 5.6;
+    L.puddle(x, z, { y: 2.125, r: 1.1 + L.rand() * 2.4, stretch: 0.4 + L.rand() * 0.5 });
+    if (L.rand() < 0.55) {
+      L.puddle(15.5 + (L.rand() - 0.5) * 1.8, z + 4, { y: 2.2, r: 0.7 + L.rand() * 1.3, stretch: 0.45 + L.rand() * 0.4 });
+    }
+    if (L.rand() < 0.35) {
+      L.puddle(8 + (L.rand() - 0.5) * 74, -140 + (L.rand() - 0.5) * 2, { y: 2.105, r: 1.6 + L.rand() * 2.2, stretch: 0.35 + L.rand() * 0.4 });
+    }
   }
 
   /* ------------------------------------------------------- Ocean Drive life */

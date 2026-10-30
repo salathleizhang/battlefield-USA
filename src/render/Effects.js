@@ -26,6 +26,7 @@ export class Effects {
     this.particles = [];
     this.tracers = [];
     this.flashes = [];
+    this.flipbooks = [];
     this.tex = {
       spark: radialTexture('rgba(255,250,220,1)', 'rgba(255,170,60,0.7)'),
       dust: radialTexture('rgba(190,170,135,0.85)', 'rgba(150,132,100,0.35)'),
@@ -123,6 +124,23 @@ export class Effects {
 
   explosion(pos, scale = 1) {
     this.game.audio.explosion(this.game.player ? this.game.player.position.distanceTo(pos) : 0);
+    // Photoreal fireball flipbook (Unity Labs Explosion01, CC0) when available.
+    const atlas = this.game.materials?.vfx?.explosion;
+    if (atlas) {
+      const map = atlas.clone();
+      map.needsUpdate = true;
+      map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
+      map.repeat.set(1 / 5, 1 / 5);
+      map.offset.set(0, 0.8);
+      const mat = new THREE.SpriteMaterial({
+        map, color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 1,
+      });
+      const blob = new THREE.Sprite(mat);
+      blob.position.copy(pos);
+      blob.scale.setScalar(7 * scale);
+      this.scene.add(blob);
+      this.flipbooks.push({ sprite: blob, map, life: 1.35, max: 1.35, size: 7 * scale });
+    }
     // Core flash.
     const core = new THREE.Mesh(
       new THREE.SphereGeometry(1.2 * scale, 12, 8),
@@ -223,14 +241,33 @@ export class Effects {
         this.flashes.splice(i, 1);
       }
     }
+    for (let i = this.flipbooks.length - 1; i >= 0; i--) {
+      const b = this.flipbooks[i];
+      b.life -= dt;
+      const t = 1 - b.life / b.max;
+      // 5x5 atlas, 25 frames: top-left to bottom-right.
+      const frame = Math.min(24, Math.floor(t * 25));
+      const col = frame % 5, row = (frame / 5) | 0;
+      b.map.offset.set(col / 5, 1 - (row + 1) / 5);
+      b.sprite.scale.setScalar(b.size * (0.55 + t * 0.8));
+      b.sprite.material.opacity = t < 0.7 ? 1 : Math.max(0, 1 - (t - 0.7) / 0.3);
+      if (b.life <= 0) {
+        this.scene.remove(b.sprite);
+        b.map.dispose();
+        b.sprite.material.dispose();
+        this.flipbooks.splice(i, 1);
+      }
+    }
   }
 
   clear() {
     for (const p of this.particles) { this.scene.remove(p.sprite); p.sprite.material?.dispose(); }
     for (const t of this.tracers) { this.scene.remove(t.mesh); t.mesh.material.dispose(); }
     for (const f of this.flashes) { this.scene.remove(f.sprite); f.sprite.material?.dispose(); }
+    for (const b of this.flipbooks) { this.scene.remove(b.sprite); b.map.dispose(); b.sprite.material.dispose(); }
     this.particles.length = 0;
     this.tracers.length = 0;
     this.flashes.length = 0;
+    this.flipbooks.length = 0;
   }
 }

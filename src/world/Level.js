@@ -25,6 +25,9 @@ export class Level {
     this.animated = [];
     this.fires = [];
     this.smokes = [];
+    this.fireSites = [];
+    this.smokeSites = [];
+    this.puddles = [];
     this.rand = mulberry32(19470419);
     this.heightFn = () => 0;
     this.bounds = { minX: -400, maxX: 400, minZ: -400, maxZ: 400 };
@@ -441,32 +444,23 @@ export class Level {
     return flag;
   }
 
+  /**
+   * Register a burning point. The Ambience layer turns this into flame cards, a smoke plume,
+   * embers and a flickering point light (only the nearest few fires get a real light).
+   */
   fire(x, y, z, scale = 1) {
-    const mat = new THREE.SpriteMaterial({
-      map: this._fireTexture(), color: 0xffb066, transparent: true,
-      blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.9,
-    });
-    const s = new THREE.Sprite(mat);
-    s.position.set(x, y, z);
-    s.scale.setScalar(scale * 2.2);
-    this.scene.add(s);
-    const light = new THREE.PointLight(0xff7a30, 3.2 * scale, 16 * scale, 1.8);
-    light.position.set(x, y + 0.6, z);
-    this.scene.add(light);
-    this.fires.push({ sprite: s, light, base: y, scale, t: this.rand() * 10 });
-    return s;
+    const site = { pos: new THREE.Vector3(x, y, z), scale };
+    this.fireSites.push(site);
+    this.fires.push(site);
+    return site;
   }
 
+  /** Register a smoke source (burning wreck, skyline column, burning building). */
   smokeColumn(x, y, z, scale = 1) {
-    const mat = new THREE.SpriteMaterial({
-      map: this._smokeTexture(), color: 0x2c2a26, transparent: true, opacity: 0.42,
-      depthWrite: false,
-    });
-    const s = new THREE.Sprite(mat);
-    s.position.set(x, y, z);
-    s.scale.setScalar(scale * 10);
-    this.scene.add(s);
-    this.smokes.push({ sprite: s, base: y, scale, t: this.rand() * 10 });
+    const site = { pos: new THREE.Vector3(x, y, z), scale };
+    this.smokeSites.push(site);
+    this.smokes.push(site);
+    return site;
   }
 
   _fireTexture() {
@@ -500,6 +494,24 @@ export class Level {
     ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128);
     this._smokeTex = new THREE.CanvasTexture(c);
     return this._smokeTex;
+  }
+
+  /**
+   * Standing water: a flat, low-roughness mirror patch with a gentle normal ripple. Sits a few
+   * centimetres above the surface (`y` defaults to local ground height) and renders over the road.
+   */
+  puddle(x, z, { y = null, r = 2, stretch = 0.55, rot = null } = {}) {
+    const gy = y ?? this.groundHeight(x, z) + 0.035;
+    const geo = new THREE.CircleGeometry(r, 26);
+    const mesh = new THREE.Mesh(geo, this.mats.get('puddle'));
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.rotation.z = rot ?? this.rand() * Math.PI * 2;
+    mesh.scale.y = stretch;
+    mesh.position.set(x, gy, z);
+    mesh.renderOrder = 2;
+    this.scene.add(mesh);
+    this.puddles.push(mesh);
+    return mesh;
   }
 
   crater(x, z, radius = 3, y = null) {
@@ -637,9 +649,16 @@ export class Level {
     this.game.audio.setAmbience(this.campaign.env.ambience);
     this.mats.setWetness(this.campaign.env.wetness ?? 0.85);
     this.mats.setRain(this.campaign.env.rain ?? 0);
+    const env = this.campaign.env;
+    const sky = this.mats.constructor.unify.uSkyReflect.value;
+    sky.set(env.skyHorizon ?? 0xc9d0ce).lerp(new THREE.Color(env.skyTop ?? 0x8e9ea5), 0.12).multiplyScalar(1.05);
   }
 
   update(dt, t) {
+    if (this.puddles.length) {
+      const n = this.mats.get('puddle').normalMap;
+      if (n) { n.offset.x += dt * 0.003; n.offset.y += dt * 0.0015; }
+    }
     if (this.waterMat?.map) {
       this.waterMat.map.offset.x += dt * 0.006;
       this.waterMat.map.offset.y += dt * 0.0035;
@@ -647,19 +666,6 @@ export class Level {
         this.waterMat.normalMap.offset.x = Math.sin(t * 0.05) * 0.02 + t * 0.002;
         this.waterMat.normalMap.offset.y = t * 0.0016;
       }
-    }
-    for (const f of this.fires) {
-      f.t += dt;
-      const flick = 0.78 + Math.sin(f.t * 17) * 0.12 + Math.sin(f.t * 9.3) * 0.1;
-      f.sprite.scale.setScalar(f.scale * 2.2 * flick);
-      f.light.intensity = 3.2 * f.scale * flick;
-      f.sprite.position.y = f.base + Math.sin(f.t * 3) * 0.12;
-    }
-    for (const s of this.smokes) {
-      s.t += dt;
-      s.sprite.position.y = s.base + ((s.t * 1.6) % 18);
-      s.sprite.scale.setScalar(s.scale * (9 + ((s.t * 1.6) % 18) * 1.4));
-      s.sprite.material.opacity = 0.4 * (1 - ((s.t * 1.6) % 18) / 18);
     }
     for (const a of this.animated) {
       if (a.type === 'foam') {

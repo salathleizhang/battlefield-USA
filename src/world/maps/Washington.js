@@ -92,6 +92,13 @@ export function buildWashington(L) {
   L.batch.box(0.6, 4, 0.6, mx, my + 95, mz, L.mats.get('metal'));
   L.solidBox(mx, my + 48, mz, 7, 92, 7, 0, { surface: 'concrete' });
 
+  // Puddles along the Mall walkways (the reflecting pool is separate).
+  for (let z = -110; z <= 110; z += 15) {
+    const x = (L.rand() - 0.5) * 100;
+    if (Math.abs(x) < 18 && z > -10 && z < 66) continue; // reflecting pool
+    L.puddle(x, z, { y: groundY + 0.12, r: 0.9 + L.rand() * 1.8, stretch: 0.4 + L.rand() * 0.4 });
+  }
+
   /* ------------------------------------------------------------ Reflecting pool */
   const poolY = groundY + 0.55;
   L.batch.box(30, 0.7, 74, 0, poolY - 0.2, 28, L.mats.get('plaster'), { uv: 0.3 });

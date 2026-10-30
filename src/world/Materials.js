@@ -297,6 +297,36 @@ function foamTexture() {
   });
 }
 
+function puddleMaskTexture() {
+  const S = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(S, S);
+  const blobs = [];
+  for (let i = 0; i < 7; i++) {
+    const a = Math.random() * Math.PI * 2, r = Math.random() * 0.28;
+    blobs.push([0.5 + Math.cos(a) * r, 0.5 + Math.sin(a) * r, 0.16 + Math.random() * 0.2]);
+  }
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const u = x / (S - 1), v = y / (S - 1);
+    let m = 0;
+    for (const [bx, by, br] of blobs) {
+      const d = Math.hypot(u - bx, v - by) / br;
+      m = Math.max(m, 1 - d * d);
+    }
+    const edge = Math.min(1, Math.min(u, 1 - u) * 12) * Math.min(1, Math.min(v, 1 - v) * 12);
+    const a = Math.max(0, Math.min(1, m * 1.5 * edge));
+    const i = (y * S + x) * 4;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+    img.data[i + 3] = Math.round(a * 255);
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.NoColorSpace;
+  return t;
+}
+
 function grassTexture() {
   return canvasTex(512, 512, (ctx, w, h) => {
     noiseFill(ctx, w, h, '#6f7448', 34);
@@ -415,7 +445,7 @@ const UNIFY_VERT = /* glsl */`
 }`;
 const UNIFY_FRAG_PARS = /* glsl */`
 varying vec3 vUWP; varying vec3 vUWN;
-uniform sampler2D uNoise; uniform float uWet; uniform float uRain; uniform float uTime;
+uniform sampler2D uNoise; uniform float uWet; uniform float uRain; uniform float uTime; uniform vec3 uSkyReflect;
 uniform float uUnifyMode; // 0 full, 1 lite, 2 off
 uniform vec4 uUni; uniform vec4 uUni2;
 float uHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -465,22 +495,27 @@ if (uUnifyMode < 1.5) {
   wet *= mix(0.3, 1.0, smoothstep(0.3, 0.72, g));            // damp vs drying patches
   float pud = 0.0;
   if (uUni.z > 0.0 && up > 0.5 && uUnifyMode < 0.5) {
-    float pf = texture2D(uNoise, P.xz * 0.0105 + 0.13).b * 0.75 + n1.r * 0.25 - P.y * 1.5;
-    float rim = smoothstep(0.46, 0.55, pf);
-    pud = smoothstep(0.55, 0.585, pf) * up * uUni.z * uWet;
+    float pf = texture2D(uNoise, P.xz * 0.1 + 0.13).b * 0.75 + n1.r * 0.25;
+    float rim = smoothstep(0.55, 0.62, pf);
+    pud = smoothstep(0.60, 0.622, pf) * smoothstep(0.62, 0.85, up) * uUni.z * uWet;
     wet = max(wet, rim * up * uUni.z * uWet);
   }
   float porous = 1.0 - metalnessFactor * 0.7;
   diffuseColor.rgb *= mix(1.0, 0.58, wet * porous);
   roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.38 + 0.06, wet);
   if (pud > 0.0) {
-    diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.45, pud);
-    roughnessFactor = mix(roughnessFactor, 0.025, pud);
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.018, 0.026, 0.03), pud * 0.9);
+    roughnessFactor = mix(roughnessFactor, 0.018, pud);
     metalnessFactor = mix(metalnessFactor, 0.0, pud);
     vec3 nUp = vec3(0.0, 1.0, 0.0);
     if (uRain > 0.0) { vec2 rp = uRipple(P.xz, uTime) * uRain * 0.35; nUp = normalize(vec3(rp.x, 1.0, rp.y)); }
     vec3 vUp = normalize((viewMatrix * vec4(nUp, 0.0)).xyz);
     normal = normalize(mix(normal, vUp, pud * 0.97));
+    // Cheat the sky's specular back into the puddle: at grazing angles a mirror puddle reads as bright
+    // water even when the IBL is darker than the visible sky.
+    vec3 Vw = normalize(cameraPosition - vUWP);
+    float fres = pow(1.0 - clamp(dot(N, Vw), 0.0, 1.0), 4.0);
+    totalEmissiveRadiance += uSkyReflect * pud * (0.14 + 0.6 * fres);
   }
   roughnessFactor = clamp(roughnessFactor, 0.02, 1.0);
 }`;
@@ -498,6 +533,7 @@ export class Materials {
     uWet: { value: 0.85 },
     uRain: { value: 0 },
     uTime: { value: 0 },
+    uSkyReflect: { value: new THREE.Color(0x9fb6c9) },
   };
 
   constructor(renderer) {
@@ -508,7 +544,38 @@ export class Materials {
     this.maxAniso = renderer.renderer.capabilities.getMaxAnisotropy();
     this.pbr = new PBR(renderer);
     this._unified = new WeakSet();
+    this.vfx = {};
     if (!Materials.unify.uNoise.value) Materials.unify.uNoise.value = unifyNoiseTex(512, 7);
+  }
+
+  /** CC0 flipbooks (Unity Labs): wispy smoke, flames and explosions. */
+  async _loadVfx(onProgress) {
+    const files = {
+      smoke: 'wispysmoke02_8x8.webp',
+      flame: 'flame03_16x4.webp',
+      explosion: 'explosion01_5x5.webp',
+    };
+    const entries = Object.entries(files);
+    let done = 0;
+    await Promise.all(entries.map(([key, file]) => new Promise((resolve) => {
+      this.loader.load(
+        `/assets/vfx/${file}`,
+        (t) => {
+          t.colorSpace = THREE.SRGBColorSpace;
+          t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+          t.anisotropy = Math.min(4, this.maxAniso);
+          this.vfx[key] = t;
+          onProgress?.(++done / entries.length);
+          resolve();
+        },
+        undefined,
+        () => {
+          console.warn('[vfx] missing flipbook', file);
+          onProgress?.(++done / entries.length);
+          resolve();
+        },
+      );
+    })));
   }
 
   /* ------------------------------------------------------------------ unify */
@@ -523,6 +590,7 @@ export class Materials {
     const p = typeof preset === 'string' ? Materials.PRESETS[preset] ?? Materials.PRESETS.prop : preset;
     if (mat.transparent && !p.alphaOK) return;
     this._unified.add(mat);
+    mat.userData.unify = p;
     if (mat.normalMap && mat.normalScale) {
       const s = THREE.MathUtils.clamp(Math.abs(mat.normalScale.x), 0.6, 2.0);
       mat.normalScale.set(s * Math.sign(mat.normalScale.x || 1), s * Math.sign(mat.normalScale.y || 1));
@@ -549,8 +617,8 @@ export class Materials {
   static PRESETS = {
     level: { grime: 0.42, wet: 0.9, puddle: 0, rmin: 0.4, sat: 0.9, contact: 1, streaks: 1 },
     ground: { grime: 0.5, wet: 1, puddle: 1, rmin: 0.34, sat: 0.9, contact: 1, streaks: 0 },
-    sand: { grime: 0.24, wet: 1, puddle: 0.3, rmin: 0.5, sat: 0.94, contact: 1, streaks: 0 },
-    wall: { grime: 0.44, wet: 0.8, puddle: 0, rmin: 0.45, sat: 0.9, contact: 1, streaks: 1 },
+    sand: { grime: 0.24, wet: 0.85, puddle: 0.04, rmin: 0.5, sat: 0.94, contact: 1, streaks: 0 },
+    wall: { grime: 0.3, wet: 0.55, puddle: 0, rmin: 0.45, sat: 0.9, contact: 0.55, streaks: 0.8 },
     metal: { grime: 0.32, wet: 0.65, puddle: 0, rmin: 0.3, sat: 0.88, contact: 1, streaks: 0.4 },
     cloth: { grime: 0.26, wet: 0.55, puddle: 0, rmin: 0.55, sat: 0.85, contact: 1, streaks: 0 },
     wood: { grime: 0.38, wet: 0.85, puddle: 0, rmin: 0.5, sat: 0.88, contact: 1, streaks: 0.6 },
@@ -598,6 +666,7 @@ export class Materials {
   async load(onProgress) {
     // PBR sets first: they carry the look of every surface in the game.
     await this.pbr.load((p, label) => onProgress?.(p * 0.72, label));
+    await this._loadVfx((p) => onProgress?.(0.72 + p * 0.04, '战场特效'));
 
     // Legacy hand-authored maps remain as a fallback when the PBR library is
     // unavailable, and for effects that have no PBR equivalent (crater, foam).
@@ -758,6 +827,24 @@ export class Materials {
     m.fire = new THREE.MeshBasicMaterial({ color: 0xff7a22, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
     m.smoke = new THREE.MeshBasicMaterial({ color: 0x2a2926, transparent: true, opacity: 0.5, depthWrite: false });
     m.decalHole = new THREE.MeshBasicMaterial({ color: 0x151310, transparent: true, opacity: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+
+    // Authored water puddles: a thin mirror sheet laid over low spots in roads, plazas and decks.
+    // The shader mask above makes the ground look wet; these guarantee readable standing water,
+    // including the sky/fire reflections that sell it.
+    m.puddle = new THREE.MeshStandardMaterial({
+      color: 0x101b20,
+      roughness: 0.035,
+      metalness: 0.0,
+      envMapIntensity: 2.2,
+      alphaMap: puddleMaskTexture(),
+      transparent: true,
+      opacity: 0.72,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -3,
+    });
+    m.puddle.userData.noUnify = true;
 
     // One shared response for every surface (weathering + wetness + puddles).
     this._unifyAll();

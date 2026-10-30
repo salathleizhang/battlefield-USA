@@ -149,6 +149,7 @@ export class Game {
 
     this.effects = new Effects(this);
     this.atmosphere = new Atmosphere(this);
+    this.ambience = new Ambience(this);
     this.player = new Player(this);
     this.player.recoilScale = this.settings.recoil ?? 1;
     const spawn = this.level.playerSpawn || { position: new THREE.Vector3(0, 2, 0), yaw: 0 };
@@ -219,10 +220,7 @@ export class Game {
       };
       addEventListener('bf:debug', this._debugHandler);
     }
-    if (q.has('nofx')) {
-      for (const f of this.level.fires) { f.sprite.visible = false; f.light.visible = false; }
-      for (const s of this.level.smokes) s.sprite.visible = false;
-    }
+    if (q.has('nofx')) this.ambience?.setEnabled(false);
 
     this.started = true;
     this.paused = false;
@@ -503,6 +501,7 @@ export class Game {
     this.materials.update(dt);
     this.level.update(dt, this.time);
     this.atmosphere.update(dt);
+    this.ambience?.update(dt);
     this.effects.update(dt);
     if (!frozen) {
       this.match.update(dt);

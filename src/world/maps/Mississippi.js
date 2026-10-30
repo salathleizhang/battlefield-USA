@@ -33,6 +33,13 @@ export function buildMississippi(L) {
   L.addWater({ y: 0, size: 1600, color: 0x8b7c5c, opacity: 0.98, rough: 0.3 });
   L.worldGround = 2.2;
 
+  // Mud puddles on the levee and road approaches.
+  for (let i = 0; i < 18; i++) {
+    const x = -60 + L.rand() * 140;
+    const z = -110 + L.rand() * 210;
+    L.puddle(x, z, { y: height(x, z) + 0.04, r: 0.8 + L.rand() * 2.0, stretch: 0.35 + L.rand() * 0.45 });
+  }
+
   /* --------------------------------------------------------- pontoon bridge */
   const bridgeY = 2.8;
   const zStart = -72, zEnd = 72;
