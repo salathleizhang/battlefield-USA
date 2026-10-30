@@ -5,9 +5,9 @@ const SETTINGS_KEY = 'bf-la-settings-v1';
 export function loadSettings() {
   try {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
-    return { sens: 1, volume: 0.7, master: 0.7, ...s };
+    return { sens: 1, volume: 0.7, master: 0.7, recoil: 1, ...s };
   } catch {
-    return { sens: 1, volume: 0.7, master: 0.7 };
+    return { sens: 1, volume: 0.7, master: 0.7, recoil: 1 };
   }
 }
 
@@ -195,6 +195,7 @@ export class Menu {
 
     const bind = (id, key, fmt) => {
       const input = this.settingsEl.querySelector(id);
+      if (this.settings[key] == null) this.settings[key] = 1;
       input.value = this.settings[key];
       const out = this.settingsEl.querySelector(id.replace('set-', 'val-'));
       out.textContent = fmt(this.settings[key]);
