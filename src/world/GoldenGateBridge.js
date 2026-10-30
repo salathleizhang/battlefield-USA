@@ -17,29 +17,29 @@ import { clamp, lerp } from '../core/MathUtil.js';
 
 export const GG_DEFAULTS = {
   deckY: 33.5,          // roadway elevation (real 67 m)
-  deckWidth: 22,
-  roadWidth: 18,
-  walkWidth: 2,
+  deckWidth: 13.8,
+  roadWidth: 10,
+  walkWidth: 1.9,
   length: 1080,         // deck end to end, including the approaches
   towerZ: 320,          // main span 640 m (real 1280 m)
   anchorZ: 486,
   towerTop: 113.5,      // real 227 m
   pierTop: 9,
-  legX: 13.2,
-  legBaseW: 6.6,
-  legTopW: 4.6,
-  legBaseD: 8.8,
-  legTopD: 5.6,
-  cableX: 13.2,
+  legX: 7.45,
+  legBaseW: 4.6,
+  legTopW: 3.2,
+  legBaseD: 8.0,
+  legTopD: 5.2,
+  cableX: 7.45,
   cableMidY: 35.9,
   cableTopY: 114.7,
   anchorY: 38.5,
   panel: 4.0,
-  trussX: 10.95,
+  trussX: 6.6,
   trussTop: -1.0,       // offsets from deckY
   trussBottom: -4.6,
-  railX: 10.85,
-  lampX: 10.2,
+  railX: 6.65,
+  lampX: 6.15,
 };
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -102,12 +102,12 @@ function buildDeck(L, P, M) {
       L.batch.box(0.14, 0.02, len, x, top + 0.006, z, mat, { uv: 1.2 });
     }
   };
-  for (const x of [-6, -3, 3, 6]) dash(x, M.white);
+  for (const x of [-P.roadWidth / 4, P.roadWidth / 4]) dash(x, M.white);
   // Solid edge lines and centre pair.
-  for (const x of [-9 + 0.22, 9 - 0.22]) {
+  for (const x of [-P.roadWidth / 2 + 0.22, P.roadWidth / 2 - 0.22]) {
     L.batch.box(0.14, 0.02, length - 4, x, top + 0.006, 0, M.white, { uv: 1.2 });
   }
-  for (const x of [-0.18, 0.18]) {
+  for (const x of [-0.15, 0.15]) {
     L.batch.box(0.12, 0.02, length - 4, x, top + 0.006, 0, M.yellow, { uv: 1.2 });
   }
 
@@ -120,7 +120,7 @@ function buildDeck(L, P, M) {
   // Finger joints / drain scuppers along the curb line.
   for (let z = -half + 12; z < half; z += 24) {
     for (const s of [-1, 1]) {
-      L.batch.box(0.3, 0.1, 0.5, s * 9.05, deckY + 0.1, z, M.dark, { uv: 1 });
+      L.batch.box(0.3, 0.1, 0.5, s * (P.roadWidth / 2 + 0.03), deckY + 0.1, z, M.dark, { uv: 1 });
     }
   }
 }
@@ -247,92 +247,118 @@ function buildTower(L, P, M, z) {
   const legW = (y) => lerp(P.legBaseW, P.legTopW, frac(y));
   const legD = (y) => lerp(P.legBaseD, P.legTopD, frac(y));
 
-  /* Concrete pier, with the stepped cap that carries the steel legs. */
-  L.batch.box(36, y0, 15, 0, y0 / 2, z, M.concrete, { uv: 0.12 });
-  L.batch.box(38, 1.1, 17, 0, y0 - 0.4, z, M.concrete, { uv: 0.25 });
-  L.solidBox(0, y0 / 2, z, 36, y0, 15, 0, { surface: 'concrete' });
+  /* Concrete pier and its stepped cap. */
+  L.batch.box(24, y0, 12, 0, y0 / 2, z, M.concrete, { uv: 0.12 });
+  L.batch.box(26, 1.1, 14, 0, y0 - 0.4, z, M.concrete, { uv: 0.25 });
+  L.solidBox(0, y0 / 2, z, 24, y0, 12, 0, { surface: 'concrete' });
 
-  /* Two cellular steel legs, stepped and fluted. */
+  /* X-bracing between the legs below the roadway (visible from the water). */
+  const bx = P.legX - 0.55;
+  strut(L, -bx, y0 + 0.6, z, bx, P.deckY - 2.6, z, 0.75, M.orange, 0.3);
+  strut(L, bx, y0 + 0.6, z, -bx, P.deckY - 2.6, z, 0.75, M.orange, 0.3);
+
+  /* Two cellular legs: stepped, and covered in closely spaced vertical
+   * fluting — the detail that actually makes a Golden Gate tower read as
+   * itself rather than as a generic suspension bridge. */
   for (const s of [-1, 1]) {
     const lx = s * P.legX;
     for (let i = 0; i < segs; i++) {
       const ya = y0 + i * segH;
       const yb = ya + segH;
-      const w = legW((ya + yb) / 2);
-      const d = legD((ya + yb) / 2);
       const cy = (ya + yb) / 2;
+      const w = legW(cy);
+      const d = legD(cy);
 
-      L.batch.box(w, segH, d, lx, cy, z, M.orange, { uv: 0.14 });
+      L.batch.box(w, segH, d, lx, cy, z, M.orange, { uv: 0.12 });
 
-      // Vertical fluting on all four faces: the vertical emphasis that makes
-      // the tower read as Art Deco rather than as a plain box.
-      for (const f of [-1, 0, 1]) {
-        L.batch.box(0.5, segH, 0.3, lx + f * w * 0.3, cy, z + d / 2 - 0.05, M.orange, { uv: 0.5 });
-        L.batch.box(0.5, segH, 0.3, lx + f * w * 0.3, cy, z - d / 2 + 0.05, M.orange, { uv: 0.5 });
+      // Front and back faces: six flutes each.
+      for (let k = 0; k < 6; k++) {
+        const fx = ((k + 0.5) / 6 - 0.5) * (w - 0.5);
+        L.batch.box(0.2, segH, 0.2, lx + fx, cy, z + d / 2 + 0.05, M.orange, { uv: 0.7 });
+        L.batch.box(0.2, segH, 0.2, lx + fx, cy, z - d / 2 - 0.05, M.orange, { uv: 0.7 });
       }
-      for (const f of [-1, 1]) {
-        L.batch.box(0.3, segH, 0.5, lx + f * (w / 2 - 0.05), cy, z + f * d * 0.28, M.orange, { uv: 0.5 });
-        L.batch.box(0.3, segH, 0.5, lx + f * (w / 2 - 0.05), cy, z - f * d * 0.28, M.orange, { uv: 0.5 });
+      // Inner and outer faces: eight flutes each.
+      for (let k = 0; k < 8; k++) {
+        const fz = ((k + 0.5) / 8 - 0.5) * (d - 0.5);
+        L.batch.box(0.2, segH, 0.2, lx + w / 2 + 0.05, cy, z + fz, M.orange, { uv: 0.7 });
+        L.batch.box(0.2, segH, 0.2, lx - w / 2 - 0.05, cy, z + fz, M.orange, { uv: 0.7 });
       }
       // Corner pilasters.
       for (const sx of [-1, 1]) {
         for (const sz of [-1, 1]) {
-          L.batch.box(0.6, segH, 0.6, lx + sx * (w / 2 - 0.28), cy, z + sz * (d / 2 - 0.28),
-            M.orange, { uv: 0.6 });
+          L.batch.box(0.52, segH, 0.52, lx + sx * (w / 2 - 0.2), cy, z + sz * (d / 2 - 0.2),
+            M.orange, { uv: 0.7 });
         }
       }
       // Belt course at every setback.
-      L.batch.box(w + 0.5, 0.5, d + 0.5, lx, yb - 0.24, z, M.orange, { uv: 0.2 });
+      L.batch.box(w + 0.45, 0.44, d + 0.45, lx, yb - 0.22, z, M.orange, { uv: 0.2 });
     }
 
-    // The steel leg is solid enough for a single collider.
     L.solidBox(lx, (y0 + y1) / 2, z, P.legBaseW, y1 - y0, P.legBaseD, 0, { surface: 'metal' });
   }
 
-  /* Portal struts above the roadway. The stepped haunches and closely spaced
-   * ribs are what people actually recognise in silhouette. */
-  for (const y of [48, 61, 74, 87, 99, 108]) {
+  /* Four portal struts above the roadway. Each is a frame around a recessed,
+   * ribbed panel with stepped haunches dropping into the legs. */
+  for (const y of [52, 70, 88, 104]) {
     const w = legW(y);
-    const span = 2 * P.legX - w + 1.6;
-    L.batch.box(span, 3.6, 6.1, 0, y, z, M.orange, { uv: 0.12 });
-    L.batch.box(span + 0.6, 0.42, 6.35, 0, y + 1.95, z, M.orange, { uv: 0.2 });
-    for (let i = -5; i <= 5; i++) {
-      const rx = i * (span / 11.5);
-      for (const sz of [-1, 1]) {
-        L.batch.box(0.46, 3.6, 0.3, rx, y, z + sz * 3.05, M.orange, { uv: 0.5 });
+    const span = 2 * P.legX - w + 1.0;
+    const bh = 3.2;
+    const bd = 4.4;
+
+    L.batch.box(span, 0.75, bd, 0, y + bh / 2 - 0.375, z, M.orange, { uv: 0.14 });
+    L.batch.box(span, 0.75, bd, 0, y - bh / 2 + 0.375, z, M.orange, { uv: 0.14 });
+    for (const sx of [-1, 1]) {
+      L.batch.box(0.95, bh, bd, sx * (span / 2 - 0.475), y, z, M.orange, { uv: 0.25 });
+    }
+    for (const sz of [-1, 1]) {
+      const zf = z + sz * (bd / 2 - 0.5);
+      L.batch.box(span - 1.9, bh - 1.5, 0.34, 0, y, zf, M.orange, { uv: 0.4 });
+      for (let k = 0; k < 7; k++) {
+        const rx = ((k + 0.5) / 7 - 0.5) * (span - 2.6);
+        L.batch.box(0.24, bh - 1.5, 0.22, rx, y, zf + sz * 0.22, M.orange, { uv: 0.8 });
       }
     }
-    // Stepped haunches under each end, dropping into the legs.
+    // Stepped haunches under each end.
     for (const s of [-1, 1]) {
-      L.batch.box(3.0, 2.0, 6.3, s * (P.legX - w * 0.34), y - 2.4, z, M.orange, { uv: 0.3 });
-      L.batch.box(1.5, 2.0, 6.3, s * (P.legX - w * 0.5 + 0.4), y - 3.9, z, M.orange, { uv: 0.3 });
+      L.batch.box(2.6, 1.7, bd + 0.4, s * (P.legX - w * 0.32), y - 2.35, z, M.orange, { uv: 0.3 });
+      L.batch.box(1.3, 1.7, bd + 0.4, s * (P.legX - w * 0.5 + 0.35), y - 3.55, z, M.orange, { uv: 0.3 });
     }
   }
-  L.solidBox(0, 48, z, 2 * P.legX, 2.7, 5.8, 0, { surface: 'metal' });
+  L.solidBox(0, 52, z, 2 * P.legX, 3.2, 4.4, 0, { surface: 'metal' });
 
-  /* Cable saddles and the tower-top housing. */
+  /* Tower top: saddle housings, walkway and beacon. */
   for (const s of [-1, 1]) {
     const lx = s * P.legX;
-    L.batch.box(5.8, 4.4, 7.0, lx, y1 - 1.6, z, M.orange, { uv: 0.2 });
-    L.batch.box(6.2, 0.5, 7.4, lx, y1 + 0.4, z, M.orange, { uv: 0.3 });
-    const saddle = new THREE.CylinderGeometry(1.25, 1.25, 2.0, 16);
+    const w = legW(y1);
+    const d = legD(y1);
+    L.batch.box(w + 0.5, 1.5, d + 0.5, lx, y1 - 0.75, z, M.orange, { uv: 0.2 });
+    L.batch.box(4.2, 4.6, 5.2, lx, y1 + 0.9, z, M.orange, { uv: 0.18 });
+    L.batch.box(4.7, 0.5, 5.7, lx, y1 + 3.2, z, M.orange, { uv: 0.3 });
+    const saddle = new THREE.CylinderGeometry(1.05, 1.05, 1.9, 16);
     saddle.rotateZ(Math.PI / 2);
     saddle.translate(lx, P.cableTopY, z);
     L.batch.add(saddle, M.cable);
   }
+  // Thin maintenance walkway linking the legs, with a railing.
+  L.batch.box(2 * P.legX, 0.18, 2.6, 0, y1 + 1.4, z, M.orange, { uv: 0.5 });
+  for (let k = -3; k <= 3; k++) {
+    L.batch.box(0.1, 1.1, 0.1, k * 1.8, y1 + 2.0, z + 1.2, M.orange, { uv: 0.8 });
+    L.batch.box(0.1, 1.1, 0.1, k * 1.8, y1 + 2.0, z - 1.2, M.orange, { uv: 0.8 });
+  }
+  L.batch.box(2 * P.legX, 0.09, 0.09, 0, y1 + 2.5, z + 1.2, M.orange, { uv: 0.8 });
+  L.batch.box(2 * P.legX, 0.09, 0.09, 0, y1 + 2.5, z - 1.2, M.orange, { uv: 0.8 });
 
-  /* Aircraft beacon on the top portal. */
-  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.34, 10, 8), M.beacon);
-  beacon.position.set(0, y1 + 2.2, z);
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), M.beacon);
+  beacon.position.set(0, y1 + 3.4, z);
   L.scene.add(beacon);
 
-  /* South tower fender: the elliptical concrete ring that protects the pier. */
+  /* South tower fender. */
   if (z > 0) {
     const fender = new THREE.Mesh(
-      new THREE.CylinderGeometry(27, 27, 5.5, 48, 1, true),
+      new THREE.CylinderGeometry(20, 20, 5.5, 48, 1, true),
       M.concrete,
     );
-    fender.scale.z = 1.5;
+    fender.scale.z = 1.55;
     fender.position.set(0, 1.6, z);
     fender.receiveShadow = true;
     L.scene.add(fender);
@@ -379,8 +405,8 @@ function buildCables(L, P, M) {
         L.batch.add(rope, ropeMat);
       }
       // Bracket from the deck edge out to the cable plane.
-      L.batch.box(2.5, 0.16, 0.2, (s * (P.trussX + P.cableX)) / 2, P.deckY - 0.35, z,
-        M.orange, { uv: 0.6 });
+      L.batch.box(P.cableX - P.trussX + 0.5, 0.16, 0.2, s * (P.trussX + P.cableX) / 2,
+        P.deckY - 0.35, z, M.orange, { uv: 0.6 });
     }
   }
 
