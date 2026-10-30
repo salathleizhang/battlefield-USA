@@ -161,6 +161,11 @@ html, body {
   transition: opacity 0.9s ease, visibility 0.9s;
 }
 #loading.hide { opacity: 0; visibility: hidden; }
+.load-emblem {
+  width: clamp(84px, 9vw, 118px); height: auto; display: block;
+  margin-bottom: 6px;
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.65)) drop-shadow(0 0 24px rgba(255, 140, 20, 0.18));
+}
 .load-title {
   font-family: var(--brush); font-weight: 400;
   font-size: clamp(48px, 7.4vw, 84px); line-height: 1.05;
@@ -250,16 +255,14 @@ html, body {
   background: linear-gradient(0deg, rgba(6, 8, 6, 0.95), rgba(6, 8, 6, 0));
   pointer-events: none; z-index: 0;
 }
-.brand-lockup { position: relative; z-index: 1; display: flex; align-items: center; gap: 14px; }
-.brand-mark { position: relative; width: 38px; height: 46px; flex: none; }
-.brand-mark i {
-  position: absolute; left: 0; right: 0; height: 10px;
-  background: var(--paper);
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 10px 100%);
+.brand-lockup { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; }
+.brand-logo {
+  width: 66px; height: 66px; flex: none; object-fit: contain; display: block;
+  filter:
+    drop-shadow(0 3px 0 rgba(60, 5, 2, 0.55))
+    drop-shadow(0 8px 20px rgba(0, 0, 0, 0.6))
+    drop-shadow(0 0 18px rgba(255, 140, 20, 0.14));
 }
-.brand-mark i:nth-child(1) { top: 0; }
-.brand-mark i:nth-child(2) { top: 18px; right: 8px; background: var(--gold); }
-.brand-mark i:nth-child(3) { top: 36px; right: 16px; }
 .brand-word {
   font-family: var(--brush); font-weight: 400;
   font-size: clamp(32px, 3.2vw, 46px); line-height: 0.96;

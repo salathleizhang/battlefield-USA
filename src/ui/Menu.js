@@ -36,7 +36,7 @@ export class Menu {
       <div class="menu-bgfx" aria-hidden="true"></div>
       <aside class="menu-side">
         <div class="brand-lockup">
-          <div class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></div>
+          <img class="brand-logo" src="/assets/brand/emblem.png" alt="" aria-hidden="true" />
           <div class="brand-word">解放美利坚<small>BATTLEFIELD · LIBERATE AMERICA</small></div>
         </div>
         <div class="side-sub">战役档案 <em>CAMPAIGN ARCHIVE</em></div>
