@@ -915,7 +915,7 @@ html, body {
 /* death */
 .death-screen {
   position: absolute; inset: 0; display: grid; place-items: center;
-  background: radial-gradient(ellipse at center, rgba(24, 4, 2, 0.55), rgba(4, 5, 4, 0.92));
+  background: radial-gradient(ellipse at center, rgba(34, 4, 2, 0.58), rgba(8, 3, 2, 0.94));
   opacity: 0; visibility: hidden; transition: opacity 0.55s, visibility 0.55s;
 }
 .death-screen.show { opacity: 1; visibility: visible; }
