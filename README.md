@@ -15,7 +15,7 @@
 
 | # | 战役 | 地点 | 核心场景 |
 |---|------|------|----------|
-| 01 | 圣塔芭芭拉登陆战 | 加州 · 圣塔芭芭拉 | 抢滩、栈桥、西班牙风格小镇、山顶要塞 |
+| 01 | 迈阿密海滩登陆战 | 佛罗里达 · 迈阿密海滩 | 大西洋抢滩、鲁姆斯公园、装饰艺术酒店、麦克阿瑟堤道 |
 | 02 | 飞夺金门大桥 | 旧金山 · 金门海峡 | 58 米高桥面、双塔、悬索、浓雾 |
 | 03 | 强渡密西西比河 | 路易斯安那 · 巴吞鲁日 | 浮桥、河堤战壕、棉花田、河港 |
 | 04 | 解放华盛顿 | 华盛顿特区 | 波托马克河、林肯纪念堂、国家广场、国会大厦 |
@@ -53,12 +53,13 @@ npm run build    # 生产构建到 dist/
 - **PBR 材质管线**：所有表面使用完整的 albedo / normal / roughness / metalness / AO 贴图组，配合每关一张 HDRI 环境光（PMREM + ACES 色调映射）。清单在 `public/assets/pbr/manifest.json`，素材来源与授权见 [CREDITS.md](public/assets/pbr/CREDITS.md)。
 - 当前 13 组材质全部来自 **CC0 1.0** 素材库（ambientCG / Poly Haven），可商用、可再分发；桥塔的国际橙涂装在原图基础上做了色相校正。
 - **换成付费正版资产不需要改代码**：把贴图按 `albedo / normal / roughness / metalness / ao` 五个文件名放进 `public/assets/pbr/<材质名>/`，或在 manifest 里新增条目即可。具体命名映射见 CREDITS.md。
-- 建筑、武器、士兵、植被、桥梁、纪念碑等全部为 **程序化建模**，没有复用参考项目的任何美术资源。
+- 建筑、武器、士兵、植被、桥梁、纪念碑等主体仍为 **程序化建模**；战壕沙袋改为参考项目的「压扁球体 + 收口」堆垛方式（4 层错缝、双层垛），不再是方盒贴图。
+- 场景小道具复用参考项目的 **CC0 GLB 模型**：混凝土路障、军用木箱、木条箱、油桶、弹药箱、汽油桶，按实例化批渲染放入四张地图的据点与补给点，授权与来源见 [props/CREDITS.md](public/assets/models/props/CREDITS.md)。
 - UI 版式参考 [Ironline](https://github.com/cktang88/3d-fps)：深色战术面板、切角、金色单强调、左栏战役导航、圆形小地图与紧凑比分区；字体换成自托管的毛笔楷书 **Ma Shan Zheng**（SIL OFL 1.1），按项目实际用字子集化为约 280KB 的 woff2，正文为宋体系统字体栈，数字与英文为等宽字体。字体与授权见 `public/fonts/`，不依赖外部字体 CDN。
 
 ## 参考与致谢
 
-- 代码架构参考了 [cktang88/3d-fps](https://github.com/cktang88/3d-fps)（Ironline）的浏览器 FPS 工程实践，包括 Rapier 角色控制器思路、武器层渲染与征服模式结构；**本项目为从零搭建的独立实现，未复用其美术资产**。
+- 代码架构参考了 [cktang88/3d-fps](https://github.com/cktang88/3d-fps)（Ironline）的浏览器 FPS 工程实践，包括 Rapier 角色控制器思路、武器层渲染与征服模式结构；其中场景道具（`public/assets/models/props/`）直接复用其 **Poly Haven CC0** 模型，沙袋堆垛方式也来自该项目；其余美术仍为本项目自制或程序化生成。
 
 ## 开发进度
 
