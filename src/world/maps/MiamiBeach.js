@@ -408,12 +408,10 @@ export function buildMiamiBeach(L) {
   L.prop('ammo', 46.8, 14.2, 0.2, { base: height(46, 14), y: 0.3 });
 
   // Landing craft on the waterline.
-  L.landingCraft(108, 70, 0.03, { base: 0.2 });
-  L.landingCraft(112, -48, 0, { base: 0.35 });
-  L.landingCraft(116, 52, 0.04, { base: 0.3 });
-  L.landingCraft(120, 84, -0.03, { base: 0.28 });
-  L.landingCraft(110, 100, 0.02, { base: 0.32 });
-  L.landingCraft(124, -72, 0, { base: 0.3 });
+  L.landingCraft(110, 124, 0.03, { base: 0.2 });
+  L.landingCraft(120, -112, 0, { base: 0.35 });
+  L.landingCraft(134, 162, 0.04, { base: 0.3 });
+  L.landingCraft(142, -158, -0.03, { base: 0.28 });
 
   // Supply dumps at the beach strongpoints.
   L.prop('crate', 36, -10, 0.2, { base: height(36, -10) });
