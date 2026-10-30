@@ -62,6 +62,7 @@ npm run build    # 生产构建到 dist/
 ## 参考与致谢
 
 - 代码架构参考了 [cktang88/3d-fps](https://github.com/cktang88/3d-fps)（Ironline）的浏览器 FPS 工程实践，包括 Rapier 角色控制器思路、武器层渲染与征服模式结构；其中场景道具（`public/assets/models/props/`）直接复用其 **Poly Haven CC0** 模型，沙袋堆垛方式也来自该项目；其余美术仍为本项目自制或程序化生成。
+- 迈阿密海滩的**棕榈树系统**移植自 [StarKnightt/ocean-drive](https://github.com/StarKnightt/ocean-drive)（MIT）：包括椰子/王棕/菜棕的程序化树干、叶片图集、椰果与风摆着色器；迈阿密地图按战役地形重新布置了树列。
 
 ## 开发进度
 
