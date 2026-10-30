@@ -271,15 +271,15 @@ function buildTower(L, P, M, z) {
 
       L.batch.box(w, segH, d, lx, cy, z, M.orange, { uv: 0.12 });
 
-      // Front and back faces: six flutes each.
-      for (let k = 0; k < 6; k++) {
-        const fx = ((k + 0.5) / 6 - 0.5) * (w - 0.5);
+      // Front and back faces: eight flutes each.
+      for (let k = 0; k < 8; k++) {
+        const fx = ((k + 0.5) / 8 - 0.5) * (w - 0.5);
         L.batch.box(0.2, segH, 0.2, lx + fx, cy, z + d / 2 + 0.05, M.orange, { uv: 0.7 });
         L.batch.box(0.2, segH, 0.2, lx + fx, cy, z - d / 2 - 0.05, M.orange, { uv: 0.7 });
       }
-      // Inner and outer faces: eight flutes each.
-      for (let k = 0; k < 8; k++) {
-        const fz = ((k + 0.5) / 8 - 0.5) * (d - 0.5);
+      // Inner and outer faces: ten flutes each.
+      for (let k = 0; k < 10; k++) {
+        const fz = ((k + 0.5) / 10 - 0.5) * (d - 0.5);
         L.batch.box(0.2, segH, 0.2, lx + w / 2 + 0.05, cy, z + fz, M.orange, { uv: 0.7 });
         L.batch.box(0.2, segH, 0.2, lx - w / 2 - 0.05, cy, z + fz, M.orange, { uv: 0.7 });
       }
