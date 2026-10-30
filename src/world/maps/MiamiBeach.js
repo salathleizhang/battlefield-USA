@@ -388,19 +388,30 @@ export function buildMiamiBeach(L) {
   L.wreck(52, -48, 0.6, { kind: 'truck' });
   L.wreck(45, 34, -0.4);
   L.wreck(58, 150, 1.2, { kind: 'truck' });
+  L.wreck(46, -16, 0.7, { kind: 'truck' });
   for (let i = 0; i < 18; i++) {
     L.crater(42 + Math.random() * 24, -160 + Math.random() * 320, 1.5 + Math.random() * 1.8);
   }
   for (let i = 0; i < 6; i++) {
     L.crater(20 + Math.random() * 14, -170 + Math.random() * 330, 1.2 + Math.random() * 1.4);
   }
+  // Loose planking and a forward supply bundle around the landing point.
+  L.sandbags(44, 12, 0.06, 9);
+  for (let i = 0; i < 9; i++) {
+    const x = 48 + Math.random() * 15;
+    const z = -14 + Math.random() * 34;
+    L.batch.box(2.6, 0.12, 0.28, x, height(x, z) + 0.08, z, M.wood, { rotY: Math.random() * 6.28, uv: 0.6 });
+  }
+  L.crate(46, 14, 1.0, { base: height(46, 14) });
+  L.prop('ammo', 46.8, 14.2, 0.2, { base: height(46, 14), y: 0.3 });
 
   // Landing craft on the waterline.
-  L.landingCraft(75, -18, 0, { base: 0.35 });
-  L.landingCraft(80, 26, 0.04, { base: 0.3 });
-  L.landingCraft(86, 64, -0.03, { base: 0.28 });
-  L.landingCraft(72, 90, 0.02, { base: 0.32 });
-  L.landingCraft(98, -60, 0, { base: 0.3 });
+  L.landingCraft(82, 34, 0.03, { base: 0.2 });
+  L.landingCraft(88, -18, 0, { base: 0.35 });
+  L.landingCraft(92, 26, 0.04, { base: 0.3 });
+  L.landingCraft(98, 64, -0.03, { base: 0.28 });
+  L.landingCraft(84, 90, 0.02, { base: 0.32 });
+  L.landingCraft(106, -60, 0, { base: 0.3 });
 
   // Supply dumps at the beach strongpoints.
   L.prop('crate', 36, -10, 0.2, { base: height(36, -10) });
