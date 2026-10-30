@@ -13,6 +13,7 @@ export const CAMPAIGNS = [
     objectives: ['抢滩登陆，夺取 A 点「血色沙滩」', '沿海洋大道推进，夺取 B 点「装饰艺术街区」', '攻占 C 点「麦克阿瑟堤道」'],
     weather: '晴 · 晨光 · 海风 5 级',
     art: '/assets/art/miami-beach.jpg',
+    video: '/assets/video/miami-beach-war-loop.mp4',
     accent: '#e0906d',
     env: {
       fogColor: 0xe9d3b8, fogDensity: 0.0011, sunColor: 0xffd0a0, sunIntensity: 3.1,
@@ -60,6 +61,7 @@ export const CAMPAIGNS = [
     objectives: ['强渡河面，夺取 A 点「浮桥」', '攻占 B 点「棉花田堤坝」', '夺取 C 点「巴吞鲁日港」'],
     weather: '闷热 · 雷暴将至 · 河雾',
     art: '/assets/art/mississippi.jpg',
+    video: '/assets/video/mississippi-war-loop.mp4',
     accent: '#8a8f4a',
     env: {
       fog: 0xb3ab90, fogDensity: 0.0026, sun: 0xffd7a8, sunIntensity: 2.25,
@@ -82,6 +84,7 @@ export const CAMPAIGNS = [
     objectives: ['从波托马克河岸登陆', '夺取 B 点「林肯纪念堂」', '攻占 C 点「国会大厦」', '在圆顶升起红旗'],
     weather: '炮火烟霾 · 黄昏 · 逆光',
     art: '/assets/art/washington.jpg',
+    video: '/assets/video/washington-war-loop.mp4',
     accent: '#c9a15a',
     env: {
       fog: 0xae9f8a, fogDensity: 0.0024, sun: 0xffcf94, sunIntensity: 2.5,
