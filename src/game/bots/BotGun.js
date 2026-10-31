@@ -60,8 +60,9 @@ async function buildTemplate(id) {
   muzzleMarker.position.copy(muzzle).sub(grip);
   holder.add(muzzleMarker);
 
-  // Same hand-bone convention as the character library: fingers point down, barrel leaves the palm forward.
-  wrapper.rotation.set(-Math.PI / 2, 0, 0);
+  // Hand-bone convention: fingers point down, so the grip is rotated -90° about X and the barrel
+  // is yawed +90° to leave the palm along the character's forward axis (matches the reference arms).
+  wrapper.rotation.set(-Math.PI / 2, Math.PI / 2, 0);
   wrapper.scale.setScalar(1);
   return { template: wrapper, length: size.z * s };
 }
