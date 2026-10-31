@@ -157,6 +157,25 @@ export class Game {
     }
   }
 
+  /**
+   * Authored vehicle geometry. The M46 Patton hull/turret/gun comes from
+   * Kevin-Liu-01/Claude-of-Tanks (MIT), exported from its procedural TS factory
+   * as a textureless GLB and re-skinned here with this project's paint.
+   */
+  async _loadVehicleAssets() {
+    this.vehicleAssets = {};
+    try {
+      const gltf = await new GLTFLoader().loadAsync('/assets/models/vehicles/m46_patton.glb');
+      gltf.scene.traverse((o) => {
+        if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
+      });
+      this.vehicleAssets.m46 = gltf.scene;
+      console.info('[vehicle] m46 patton asset ready');
+    } catch (e) {
+      console.warn('[vehicle] m46 asset unavailable; procedural fallback', e?.message || e);
+    }
+  }
+
   /* ------------------------------------------------------------- missions */
   startMission(id) {
     const campaign = CAMPAIGN_BY_ID[id];

@@ -78,10 +78,12 @@ export class Tank {
     game.worldGroup.add(this.model.root);
 
     const R = game.physics.R;
-    this.bodyCenterY = this.def.height * 0.4;
+    // One box for the whole silhouette: the turret must be hittable too, or
+    // shells aimed at it pass over the hull collider into the sky.
+    this.bodyCenterY = this.def.height * 0.46;
     this.half = {
       x: this.def.width / 2,
-      y: this.def.height * 0.34,
+      y: this.def.height * 0.46,
       z: this.def.length / 2,
     };
     _q.setFromEuler(new THREE.Euler(0, yaw, 0));
@@ -122,11 +124,13 @@ export class Tank {
 
   /** Camera / crew vantage point (turret roof). */
   crewEye(out = new THREE.Vector3()) {
-    const back = this.def.turret.z * Math.cos(this.turretYaw - this.yaw);
+    // The turret's own seat: rotate its fore/aft offset by the turret, not the
+    // hull, so the commander's view follows the gun.
+    const off = this.def.turret.z;
     out.set(
-      this.position.x + Math.sin(this.yaw) * -back,
+      this.position.x + Math.sin(this.turretYaw) * off,
       this.position.y + this.def.turret.y + 0.55,
-      this.position.z + Math.cos(this.yaw) * -back,
+      this.position.z + Math.cos(this.turretYaw) * off,
     );
     return out;
   }
@@ -270,10 +274,14 @@ export class Tank {
     this.turretYaw = wrapAngle(this.turretYaw + applied);
     this.gunPitch = damp(this.gunPitch, clamp(desiredPitch, -9 * DEG, 19 * DEG), 6, dt);
     this.model.turretPivot.rotation.y = this.turretYaw - this.yaw;
-    this.model.gunPivot.rotation.x = this.gunPitch;
+    this.model.gunPivot.rotation.x = this.gunPitch * (this.model.gunPitchSign ?? 1);
     // Recoil spring: the barrel slides back, then returns.
     this.recoil = damp(this.recoil, 0, 9, dt);
-    this.model.gunPivot.position.z = -this.def.turret.d / 2 - 0.12 + this.recoil;
+    if (this.model.recoilGroup) {
+      this.model.recoilGroup.position.z = this.recoil * (this.model.recoilSign ?? -1);
+    } else {
+      this.model.gunPivot.position.z = -this.def.turret.d / 2 - 0.12 + this.recoil;
+    }
     return Math.abs(applied / Math.max(dt, 1e-4));
   }
 

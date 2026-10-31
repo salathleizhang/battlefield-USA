@@ -19,7 +19,7 @@ export const TANK_DEFS = {
     name: 'M3A3 斯图亚特',
     short: 'M3A3',
     nation: '中国远征军',
-    paint: 0x555b3c,
+    paint: 0x6b7149,
     length: 5.0,
     width: 2.24,
     height: 2.55,
@@ -51,7 +51,7 @@ export const TANK_DEFS = {
     name: 'M4A1 谢尔曼',
     short: 'M4A1',
     nation: '美军',
-    paint: 0x4c5238,
+    paint: 0x626846,
     length: 6.2,
     width: 2.62,
     height: 3.0,
@@ -78,18 +78,58 @@ export const TANK_DEFS = {
     hasHullMg: false,
     engineNote: 0.5,
   },
+  /**
+   * M46 Patton. The hull, turret and gun are the authored procedural vehicle
+   * exported from Kevin-Liu-01/Claude-of-Tanks (MIT): its textureless geometry
+   * is re-skinned with this project's paint and weathering pass at load time.
+   */
+  patton: {
+    id: 'patton',
+    name: 'M46 巴顿',
+    short: 'M46',
+    nation: '美军',
+    asset: 'm46',
+    paint: 0x6a6f4e,
+    length: 7.0,
+    width: 3.51,
+    height: 3.18,
+    hullTop: 1.62,
+    trackWidth: 0.6,
+    mass: 44.3,
+    maxSpeed: 6.8,
+    reverseSpeed: 3.2,
+    accel: 1.7,
+    brake: 5.5,
+    turnRate: 0.62,
+    turretSpeed: 0.55,
+    hp: 1650,
+    crew: 5,
+    armor: { front: 101, side: 76, rear: 50, turret: 127, top: 25, track: 30 },
+    gun: {
+      name: '90mm M3', caliber: '90mm', pen: 170, damage: 330, velocity: 810,
+      reload: 6.2, blast: 4.0, spread: 0.0014, sightFov: 24,
+    },
+    mg: { name: 'M2HB', caliber: '.50', damage: 42, interval: 0.11, ammo: 300 },
+    turret: { w: 2.3, d: 2.9, h: 1.0, y: 1.62, z: 0.34 },
+    barrel: { length: 3.86, radius: 0.09, muzzle: 0.12 },
+    wheels: 6,
+    hasHullMg: false,
+    engineNote: 0.42,
+  },
 };
 
 /* ------------------------------------------------------------------ textures */
 
 const _paintCache = new Map();
 function paintTexture(hex) {
-  if (_paintCache.has(hex)) return _paintCache.get(hex);
+  // The texture carries weathering only and stays near-neutral: the material
+  // colour supplies the paint. Tinting both would square the albedo and turn
+  // every hull into a black silhouette.
+  if (_paintCache.has('neutral')) return _paintCache.get('neutral');
   const c = document.createElement('canvas');
   c.width = c.height = 256;
   const ctx = c.getContext('2d');
-  const col = new THREE.Color(hex);
-  const base = `rgb(${Math.round(col.r * 255)},${Math.round(col.g * 255)},${Math.round(col.b * 255)})`;
+  const base = 'rgb(206,203,188)';
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, 256, 256);
   // Paint mottling: olive drab was never one value after a week in the field.
@@ -129,7 +169,7 @@ function paintTexture(hex) {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.anisotropy = 8;
-  _paintCache.set(hex, tex);
+  _paintCache.set('neutral', tex);
   return tex;
 }
 
@@ -216,6 +256,13 @@ function cyl(rTop, rBot, h, seg, x, y, z, rx = 0, ry = 0, rz = 0) {
 class Bucket {
   constructor() { this.map = new Map(); }
   add(geo, mat) {
+    // Extrude geometries are non-indexed while boxes/cylinders are indexed;
+    // mergeGeometries refuses a mixed bucket, so normalise every part first.
+    if (geo.index) {
+      const flat = geo.toNonIndexed();
+      geo.dispose();
+      geo = flat;
+    }
     if (!this.map.has(mat)) this.map.set(mat, []);
     this.map.get(mat).push(geo);
     return geo;
@@ -240,25 +287,145 @@ class Bucket {
 
 /* ------------------------------------------------------------------ model */
 
-export function buildTank(def, game) {
+/**
+ * Build a tank from an exported authored GLB. The reference export keeps its
+ * control rigs (`rig_hull`, `rig_turret`, `rig_gun`, `rig_recoil`, `rig_muzzle`)
+ * and one merged mesh per paint slot, so the same animation hooks as the
+ * procedural hull work: turret yaw, gun elevation, recoil and muzzle position.
+ */
+function buildFromAsset(def, game, template) {
   const mats = game.materials;
-  const L = def.length, W = def.width;
-  const hullTop = def.hullTop;
   const paint = mats.get('metal').clone();
-  // Drop the inherited unify hook so applyUnify() injects it exactly once.
   paint.onBeforeCompile = () => {};
-  paint.customProgramCacheKey = undefined;
+  paint.customProgramCacheKey = () => 'tankpaint';
   paint.color.setHex(def.paint);
   paint.map = paintTexture(def.paint);
-  paint.roughness = 0.78;
-  paint.metalness = 0.3;
+  paint.roughness = 0.82;
+  paint.metalness = 0.18;
   paint.normalScale?.set(0.6, 0.6);
   paint.name = 'tankPaint';
   mats.applyUnify(paint, 'metal');
 
   const dark = mats.get('metal').clone();
   dark.onBeforeCompile = () => {};
-  dark.customProgramCacheKey = undefined;
+  dark.customProgramCacheKey = () => 'tanksteel';
+  dark.color.setHex(0x33322b);
+  dark.roughness = 0.74;
+  dark.metalness = 0.5;
+  dark.name = 'tankSteel';
+
+  const rubber = mats.get('rubber').clone();
+  rubber.name = 'tankRubber';
+  const glass = mats.get('glass').clone();
+  glass.name = 'tankGlass';
+  const accent = mats.get('canvas').clone();
+  accent.color.setHex(0x6b6042);
+  accent.name = 'tankAccent';
+
+  const slots = {
+    'tank:paint': paint,
+    'tank:dark': dark,
+    'tank:rubber': rubber,
+    'tank:glass': glass,
+    'tank:accent': accent,
+  };
+
+  const root = new THREE.Group();
+  root.name = `tank:${def.id}`;
+  // The reference rig points +Z; this project's tanks point -Z.
+  const base = new THREE.Group();
+  base.name = 'assetBase';
+  base.rotation.y = Math.PI;
+  root.add(base);
+  const body = template.clone(true);
+  body.name = 'assetBody';
+  base.add(body);
+
+  body.traverse((o) => {
+    if (!o.isMesh) return;
+    o.castShadow = true;
+    o.receiveShadow = true;
+    o.frustumCulled = false;
+    const name = Array.isArray(o.material) ? o.material[0]?.name : o.material?.name;
+    const mat = slots[name];
+    if (mat) o.material = mat;
+  });
+
+  const turretPivot = body.getObjectByName('rig_turret') || body;
+  const gunPivot = body.getObjectByName('rig_gun') || turretPivot;
+  const recoilGroup = body.getObjectByName('rig_recoil') || null;
+  const muzzle = body.getObjectByName('rig_muzzle') || gunPivot;
+
+  // Recognition stars, placed in the rig's own frame so they follow the hull
+  // and the turret. The export's hull half-width is 1.755 m.
+  const starMat = new THREE.MeshBasicMaterial({
+    map: starTexture(0), transparent: true, depthWrite: false,
+    polygonOffset: true, polygonOffsetFactor: -2, opacity: 0.92,
+  });
+  const addStar = (parent, w, x, y, z, ry) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w), starMat);
+    m.position.set(x, y, z);
+    m.rotation.y = ry;
+    m.userData.noShadow = true;
+    m.userData.isStar = true;
+    parent.add(m);
+  };
+  if (body.getObjectByName('rig_hull')) {
+    addStar(body.getObjectByName('rig_hull'), 0.6, 1.79, 1.15, 0.4, Math.PI / 2);
+    addStar(body.getObjectByName('rig_hull'), 0.6, -1.79, 1.15, 0.4, -Math.PI / 2);
+  }
+  addStar(turretPivot, 0.48, 0, 0.32, -1.45, Math.PI);
+
+  const model = {
+    def, root, hull: body, turretPivot, gunPivot, recoilGroup, muzzle,
+    gunPitchSign: -1, recoilSign: -1,
+    materials: { paint, dark, rubber, glass, accent },
+    track: null,
+    wheels: null,
+    setTeamStar(team) {
+      starMat.map = starTexture(team);
+      starMat.needsUpdate = true;
+    },
+    animate() { /* the authored running gear is a static merged mesh */ },
+    setWreck() {
+      paint.color.setHex(0x24231e);
+      paint.roughness = 0.96;
+      paint.metalness = 0.18;
+      dark.color.setHex(0x171612);
+      turretPivot.rotation.y += (Math.random() - 0.5) * 0.8;
+      gunPivot.rotation.x = -0.16 * (model.gunPitchSign || 1);
+    },
+    dispose() {
+      root.removeFromParent();
+      for (const m of Object.values(model.materials)) m.dispose?.();
+      starMat.dispose();
+    },
+  };
+  return model;
+}
+
+export function buildTank(def, game) {
+  if (def.asset && game.vehicleAssets?.[def.asset]) {
+    return buildFromAsset(def, game, game.vehicleAssets[def.asset]);
+  }
+  const mats = game.materials;
+  const L = def.length, W = def.width;
+  const hullTop = def.hullTop;
+  const paint = mats.get('metal').clone();
+  // Drop the inherited unify hook so applyUnify() injects it exactly once.
+  paint.onBeforeCompile = () => {};
+  paint.customProgramCacheKey = () => 'tankpaint';
+  paint.color.setHex(def.paint);
+  paint.map = paintTexture(def.paint);
+  paint.roughness = 0.82;
+  paint.metalness = 0.18;
+  paint.normalScale?.set(0.6, 0.6);
+  paint.name = 'tankPaint';
+  mats.applyUnify(paint, 'metal');
+
+  const dark = mats.get('metal').clone();
+  dark.onBeforeCompile = () => {};
+  dark.customProgramCacheKey = () => 'tanksteel';
   dark.color.setHex(0x2a2924);
   dark.roughness = 0.72;
   dark.metalness = 0.55;
@@ -266,7 +433,7 @@ export function buildTank(def, game) {
 
   const trackMat = mats.get('rust').clone();
   trackMat.onBeforeCompile = () => {};
-  trackMat.customProgramCacheKey = undefined;
+  trackMat.customProgramCacheKey = () => 'tanktrack';
   trackMat.color.setHex(0x35322a);
   trackMat.roughness = 0.9;
   trackMat.metalness = 0.35;
