@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Batcher, signTexture, flagTexture } from './Geo.js';
 import { G } from '../core/Physics.js';
 import { mulberry32 } from '../core/MathUtil.js';
@@ -285,14 +286,19 @@ export class Level {
       const wx = x + px * c + pz * s;
       const wz = z - px * s + pz * c;
       const wy = gy + this.rand() * h;
-      // Scorch.
-      const scorch = new THREE.Mesh(
-        new THREE.CircleGeometry(0.9 + this.rand() * 1.4, 9),
-        new THREE.MeshBasicMaterial({ color: 0x15120e, transparent: true, opacity: 0.55, depthWrite: false }),
-      );
+      // Scorch. Collected, not added: a damaged street block produces a hundred
+      // of these one-off transparent meshes, and a hundred draw calls to paint
+      // black discs is exactly the kind of budget a 60 fps target cannot spare.
+      // They are merged into one mesh in finalize().
+      const geo = new THREE.CircleGeometry(0.9 + this.rand() * 1.4, 9);
+      const m4 = new THREE.Matrix4();
+      const scorch = new THREE.Object3D();
       scorch.position.set(wx, wy, wz);
       scorch.lookAt(wx + (wx - x), wy, wz + (wz - z));
-      this.scene.add(scorch);
+      scorch.updateMatrix();
+      m4.copy(scorch.matrix);
+      geo.applyMatrix4(m4);
+      (this._scorch ||= []).push(geo);
     }
     // Rubble at the base.
     const pile = new THREE.Mesh(
@@ -702,7 +708,26 @@ export class Level {
     });
   }
 
+  /** Merge every scorch decal into a single mesh — one draw call for the whole map. */
+  _flushScorch() {
+    const list = this._scorch;
+    if (!list || !list.length) return;
+    this._scorch = null;
+    const merged = mergeGeometries(list, false);
+    for (const g of list) g.dispose();
+    if (!merged) return;
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x15120e, transparent: true, opacity: 0.55, depthWrite: false,
+    });
+    mat.name = 'scorch';
+    const mesh = new THREE.Mesh(merged, mat);
+    mesh.matrixAutoUpdate = false;
+    mesh.renderOrder = 1;
+    this.scene.add(mesh);
+  }
+
   finalize() {
+    this._flushScorch();
     this.game.renderer.setEnvironment(this.campaign.env);
     this.game.audio.setAmbience(this.campaign.env.ambience);
     this.mats.setWetness(this.campaign.env.wetness ?? 0.85);
