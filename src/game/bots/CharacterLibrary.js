@@ -3,6 +3,13 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { clamp, damp } from '../../core/MathUtil.js';
+import { makeRetargeter } from './retarget.js';
+import { weaponAlignQuat } from './IronlineLibrary.js';
+
+const UP = new THREE.Vector3(0, 1, 0);
+const _hq = new THREE.Quaternion();
+const _bodyQ = new THREE.Quaternion();
+const _wq = new THREE.Quaternion();
 
 const BASE = '/assets/models/chars/';
 const TARGET_HEIGHT = 1.83;
@@ -34,18 +41,29 @@ export class CharacterLibrary {
         loader.load(BASE + file, resolve, undefined, reject);
       });
       onProgress?.(0.15, '载入写实士兵');
-      const [china, us, us2, anims, weapons] = await Promise.all([
+      const [china, us, us2, anims, weapons, iron] = await Promise.all([
         load('rifleman_v00.glb'),
         load('marine.glb'),
         load('sapper.glb'),
         load('commando_anims.glb'),
         load('weapons.glb'),
+        // Clip source only: the Bamen body is not used, its fifty Mixamo clips are retargeted onto
+        // the Quaternius rig below. See retarget.js.
+        load('v2/soldier.glb').catch(() => null),
       ]);
       onProgress?.(0.9, '绑定骨骼动画');
       this.templates.china = china.scene;
       this.templates.us = us2.scene;
       this.templates.us2 = us2.scene;
       this.clips = anims.animations;
+      // `?anims=legacy` keeps the original UAL set for a side-by-side check.
+      const useLegacy = new URLSearchParams(location.search).get('anims') === 'legacy';
+      if (iron && !useLegacy) {
+        const retargeted = retargetOnto(china.scene, iron);
+        const merged = new Map(this.clips.map((c) => [c.name, c]));
+        for (const c of retargeted) merged.set(c.name, c);
+        this.clips = [...merged.values()];
+      }
       this.aimClip = upperBodyMask(this.clips.find((c) => c.name === 'aim'));
       const kar = weapons.scene.getObjectByName('kar98k');
       if (kar) this.weapons.kar98k = kar;
@@ -178,6 +196,15 @@ class PbrSoldier {
     });
   }
 
+  /** Point the rifle along the body's forward axis, whatever the wrist is doing. */
+  _orientWeapon() {
+    if (!this.weapon || !this.handR) return;
+    this.handR.getWorldQuaternion(_hq);
+    _bodyQ.setFromAxisAngle(UP, this.group.rotation.y);
+    _wq.copy(_bodyQ).multiply(this.weaponAlign);
+    this.weapon.quaternion.copy(_hq.invert().multiply(_wq));
+  }
+
   _tintAndShadow() {
     this.root.traverse((o) => {
       if (!o.isMesh) return;
@@ -249,8 +276,10 @@ class PbrSoldier {
       const gp = w.worldToLocal(grip.getWorldPosition(new THREE.Vector3()));
       w.position.copy(gp).multiplyScalar(-1);
     }
-    // UAL hand bones point down the fingers; rotate the rifle so the barrel leaves the palm forward.
-    w.rotation.set(-Math.PI / 2, 0, 0);
+    // The clips rotate the wrist differently from the rig the old mount was tuned on, so the barrel
+    // is aimed in world space every frame instead of being pinned to a fixed hand offset.
+    this.weaponAlign = weaponAlignQuat(w);
+    w.rotation.set(0, 0, 0);
     this.handR.add(w);
     this.weapon = w;
     if (muzzle) this.muzzle = muzzle;
@@ -383,6 +412,7 @@ class PbrSoldier {
       this.aimAction.setEffectiveWeight(this.aimW * 0.92);
     }
     this.mixer.update(dt);
+    this._orientWeapon();
 
     this.lodT -= dt;
     if (this.lodT <= 0) {
@@ -480,6 +510,36 @@ function starTexture() {
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
+}
+
+/** Ironline clip name → the name the bot animation state machine drives. */
+const IRONLINE_NAMES = {
+  idle: 'idle',
+  walk: 'walk',
+  run: 'run',
+  sprint: 'sprint',
+  aim_idle: 'aim',
+  shoot: 'rifle_shoot',
+  reload: 'reload',
+  hit: 'hit',
+  death: 'die',
+  downed: 'dead',
+};
+
+/** Retarget the Ironline (Mixamo) clip set onto the Quaternius rig, renaming to our state names. */
+function retargetOnto(dstScene, ironGltf) {
+  const rt = makeRetargeter(ironGltf.scene, dstScene);
+  const out = [];
+  for (const clip of ironGltf.animations) {
+    const name = IRONLINE_NAMES[clip.name];
+    if (!name) continue;
+    const converted = rt.retarget(clip, name);
+    if (converted) out.push(converted);
+  }
+  // The head-hit reaction has no separate clip in the source set; reuse the body flinch.
+  const hit = out.find((c) => c.name === 'hit');
+  if (hit) out.push(new THREE.AnimationClip('hit_head', hit.duration, hit.tracks));
+  return out;
 }
 
 /** Keep only the upper-body tracks of a clip so it can be layered over locomotion. */

@@ -22,27 +22,6 @@ function splitClip(clip, upper) {
   return new THREE.AnimationClip(clip.name + (upper ? '_up' : '_lo'), clip.duration, tracks);
 }
 
-/** Merge skinned sub-meshes that share a skeleton + material into one draw call each. */
-function mergeByMaterial(scene) {
-  const groups = new Map();
-  scene.traverse((o) => {
-    if (o.isSkinnedMesh && !Array.isArray(o.material)) {
-      const key = `${o.material.uuid}|${o.skeleton.bones[0].uuid}|${o.skeleton.bones.length}|${o.parent.uuid}`;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(o);
-    }
-  });
-  for (const list of groups.values()) {
-    if (list.length < 2) continue;
-    const base = list[0];
-    if (!list.every((m) => m.bindMatrix.equals(base.bindMatrix) && m.matrix.equals(base.matrix))) continue;
-    const names = Object.keys(base.geometry.attributes).sort().join();
-    if (!list.every((m) => Object.keys(m.geometry.attributes).sort().join() === names)) continue;
-    // BufferGeometryUtils keeps this cheap; no merging when the primitives differ in layout.
-    if (!THREE.BufferGeometryUtils) continue;
-  }
-}
-
 // ---------------------------------------------------------------------------------------------
 // Materials — ported from Ironline's Character.js. Flat, textureless meshes get their life from an
 // object-space triplanar detail tile (twill weave, macro blotching, scratches), a dust gradient up
@@ -212,7 +191,7 @@ const _wv = new THREE.Vector3();
  * Rotation taking the rifle's own axes (barrel = grip→muzzle, up = model +Y) onto the body frame
  * (barrel +Z, up +Y). Applied in world space each frame so the barrel stays on the aim line.
  */
-function weaponAlignQuat(weapon) {
+export function weaponAlignQuat(weapon) {
   const grip = weapon.getObjectByName('kar98kgrip_r');
   const muzzle = weapon.getObjectByName('kar98kmuzzle');
   if (!grip || !muzzle) return new THREE.Quaternion();
@@ -290,7 +269,6 @@ export class IronlineLibrary {
 
       const scene = soldier.scene;
       scene.updateMatrixWorld(true);
-      mergeByMaterial(scene);
 
       const box = new THREE.Box3().setFromObject(scene);
       const height = Math.max(0.01, box.max.y - box.min.y);

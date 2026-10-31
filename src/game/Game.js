@@ -95,15 +95,15 @@ export class Game {
   }
 
   /**
-   * Bots wear the Ironline Bamen soldier by default: one Mixamo rig, fifty clips, sockets.
-   * `?chars=legacy` keeps the previous Quaternius soldiers; a hard load failure falls back to
-   * them on its own so a bad asset never leaves the battlefield empty.
+   * Bots wear the Quaternius soldiers. `?chars=ironline` swaps in the Bamen body (Mixamo rig,
+   * fifty clips) for comparison; either way a load failure falls back to the Quaternius set so a
+   * bad asset never leaves the battlefield empty.
    */
   async _loadCharacters(onProgress) {
-    const legacy = new URLSearchParams(location.search).get('chars') === 'legacy';
-    if (!legacy) {
-      const ironline = new IronlineLibrary(this);
-      if (await ironline.load(onProgress)) return ironline;
+    const ironline = new URLSearchParams(location.search).get('chars') === 'ironline';
+    if (ironline) {
+      const lib = new IronlineLibrary(this);
+      if (await lib.load(onProgress)) return lib;
       console.warn('Ironline soldier unavailable, falling back to the Quaternius set');
     }
     const lib = new CharacterLibrary(this);
