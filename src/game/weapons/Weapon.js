@@ -13,11 +13,19 @@ export const TYPE38 = {
   velocity: 760,
   cycleTime: 0.78,
   reloadTime: 2.55,
+  // Radians of cone half-angle at the muzzle.
   spreadHip: 0.010,
   spreadAds: 0.0011,
   recoil: 0.030,
   meleeDamage: 130,
   zeroRange: 100,
+  // Hands-on model: aimed spread blooms while the string continues, recovers when it stops.
+  adsTime: 0.22,
+  spreadPerShot: 0.00095,
+  spreadMax: 0.0062,
+  spreadRecovery: 0.010,
+  sprintToFire: 0.24,
+  reloadCommit: 0.8,
 };
 
 export class Weapon {
@@ -29,31 +37,59 @@ export class Weapon {
     this.reserve = this.def.reserve;
     this.cycleT = 0;
     this.reloadT = 0;
+    this.reloadTotal = this.def.reloadTime;
+    this.reloadCommitted = false;
     this.reloading = false;
     this.aiming = false;
+    this.adsT = 0;
+    this.spread = 0;
+    this.shotIndex = 0;
+    this.lastShot = -9;
+    this.sprintLock = 0;
     this.meleeCd = 0;
     this.grenadeCd = 0;
     this.triggerHeld = false;
     this.time = 0;
     this.shotsFired = 0;
-    this.lastFire = 0;
   }
 
   get canFire() {
-    return !this.reloading && this.cycleT <= 0 && this.ammo > 0 && this.player.alive;
+    return !this.reloading && this.cycleT <= 0 && this.ammo > 0 && this.player.alive
+      && this.sprintLock <= 0 && !this.player.sliding && !this.player.mantle;
   }
 
   mobility() { return this.player.aiming ? 0.92 : 0.97; }
 
   update(dt, cmd) {
     this.time += dt;
-    this.aiming = !!cmd.aim && !this.player.sprinting;
+    this.aiming = !!cmd.aim && !this.player.sprinting && !this.player.sliding && !this.player.mantle;
+
+    // Aim-down-sights blend: the sight picture settles over adsTime, not instantly.
+    const wantAds = this.aiming;
+    const adsRate = 1 / Math.max(0.05, this.def.adsTime);
+    this.adsT = clamp(this.adsT + (wantAds ? adsRate : -adsRate * 1.3) * dt, 0, 1);
+
+    // Sprint-to-fire lockout, so sprinting is a real commitment.
+    if (this.player.sprinting) this.sprintLock = this.def.sprintToFire;
+    else this.sprintLock = Math.max(0, this.sprintLock - dt);
+
     this.cycleT = Math.max(0, this.cycleT - dt);
     this.reloadT = Math.max(0, this.reloadT - dt);
     this.meleeCd = Math.max(0, this.meleeCd - dt);
     this.grenadeCd = Math.max(0, this.grenadeCd - dt);
 
+    // Bloom only recovers once the string pauses, so tapping resets and spraying walks off.
+    if (this.time - this.lastShot > 0.12) {
+      this.spread = Math.max(0, this.spread - this.def.spreadRecovery * dt);
+    }
+    if (this.time - this.lastShot > 0.35) this.shotIndex = Math.max(0, this.shotIndex - dt * 20);
+
     if (this.reloading) {
+      const p = 1 - this.reloadT / this.reloadTotal;
+      if (!this.reloadCommitted && p >= this.def.reloadCommit) {
+        this.reloadCommitted = true;
+        this._commitAmmo();
+      }
       if (this.reloadT <= 0) this.finishReload();
     }
 
@@ -81,21 +117,33 @@ export class Weapon {
     }
   }
 
+  /** Current cone half-angle (radians) for the next shot. */
+  currentSpread() {
+    const p = this.player;
+    const moving = Math.min(1, Math.hypot(p.velocity.x, p.velocity.z) / 5);
+    const ads = clamp(this.adsT / 0.6, 0, 1);
+    const hip = this.def.spreadHip + this.spread + moving * 0.004;
+    const aimed = this.def.spreadAds + this.spread * 0.45 + moving * 0.0016;
+    let sp = hip + (aimed - hip) * ads;
+    if (p.crouching) sp *= 0.8;
+    if (!p.grounded) sp *= 1.8;
+    return sp;
+  }
+
   fire() {
     const p = this.player;
     this.ammo--;
     this.shotsFired++;
     this.cycleT = this.def.cycleTime;
-    this.lastFire = this.time;
+    this.lastShot = this.time;
 
     const cam = this.game.renderer.camera;
     const dir = new THREE.Vector3();
     cam.getWorldDirection(dir);
-    const spread = this.aiming ? this.def.spreadAds : this.def.spreadHip;
-    const moving = Math.hypot(p.velocity.x, p.velocity.z) > 1 ? 1.6 : 1;
-    dir.x += rand(-spread, spread) * moving;
-    dir.y += rand(-spread, spread) * moving;
-    dir.z += rand(-spread, spread) * moving;
+    const spread = this.currentSpread();
+    dir.x += rand(-spread, spread);
+    dir.y += rand(-spread, spread);
+    dir.z += rand(-spread, spread);
     dir.normalize();
 
     const origin = cam.position.clone().addScaledVector(dir, 0.45);
@@ -109,9 +157,23 @@ export class Weapon {
       headshot: this.def.headshot,
     });
 
+    // Recoil profile: a sharp first shot, a short build-up, then a settle; a slow rightward wander.
+    const idx = Math.floor(this.shotIndex);
+    const shape = idx === 0 ? 1.15 : idx <= 5 ? 1 + 0.05 * idx : 0.72 + 0.43 * Math.exp(-(idx - 5) / 4);
+    let v = this.def.recoil * shape * rand(0.85, 1.15);
+    let h = this.def.recoil * 0.45 * Math.sin(idx * 1.9 + 0.6) + rand(-0.004, 0.004);
+    if (p.crouching) { v *= 0.85; h *= 0.8; }
+    const moveF = Math.min(1.3, Math.hypot(p.velocity.x, p.velocity.z) / 4.7);
+    v *= 1 + 0.15 * moveF;
+    h *= 1 + 0.4 * moveF;
+    if (!p.grounded) { v *= 1.5; h *= 1.5; }
+    p.addRecoil(v, -h);
+    this.shotIndex += 1;
+    this.spread = Math.min(this.def.spreadMax, this.spread + this.def.spreadPerShot);
+
     this.game.audio.shot('type38', { dist: 0 });
+    this.game.alertBots(p.position, 70);
     this.game.viewmodel.onFire();
-    p.addRecoil(this.def.recoil, rand(-0.006, 0.006));
     this.game.effects.muzzleSmoke(origin, dir);
     this.game.hud?.shot();
   }
@@ -119,24 +181,40 @@ export class Weapon {
   startReload() {
     if (this.reloading || this.reserve <= 0) return;
     this.reloading = true;
-    this.reloadT = this.def.reloadTime;
+    this.reloadCommitted = false;
+    this.reloadTotal = this.def.reloadTime;
+    this.reloadT = this.reloadTotal;
     this.game.hud?.setReloading(true);
     // The charger and bolt sounds are cued by the viewmodel timeline.
   }
 
-  finishReload() {
+  _commitAmmo() {
     const need = this.def.magazine - this.ammo;
     const take = Math.min(need, this.reserve);
     this.ammo += take;
     this.reserve -= take;
+  }
+
+  cancelReload() {
+    if (!this.reloading || this.reloadCommitted) return;
     this.reloading = false;
+    this.reloadT = 0;
+    this.game.hud?.setReloading(false);
+  }
+
+  finishReload() {
+    if (!this.reloadCommitted) this._commitAmmo();
+    this.reloading = false;
+    this.reloadT = 0;
+    this.reloadCommitted = false;
     this.game.hud?.setReloading(false);
   }
 
   melee() {
     this.meleeCd = 1.15;
+    this.cancelReload();
     this.game.viewmodel.onMelee();
-    this.game.audio.impact('flesh', 0, 0);
+    this.game.audio.impact('flesh_heavy', 0, 0);
     const cam = this.game.renderer.camera;
     const dir = new THREE.Vector3();
     cam.getWorldDirection(dir);
