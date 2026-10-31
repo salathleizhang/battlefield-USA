@@ -90,12 +90,12 @@ export function buildC96(mats) {
 
   // Hand anchors: right on the grip, left cupping the magazine well.
   const handR = new THREE.Object3D();
-  handR.position.set(0.004, BORE_Y - 0.078, 0.052);
+  handR.position.set(0.004, BORE_Y - 0.115, 0.058);
   handR.rotation.set(-0.35, 0, 0);
   g.add(handR);
 
   const handL = new THREE.Object3D();
-  handL.position.set(-0.010, BORE_Y - 0.052, -0.052);
+  handL.position.set(-0.012, BORE_Y - 0.080, -0.046);
   handL.rotation.set(0.2, 0.25, 0);
   g.add(handL);
 
