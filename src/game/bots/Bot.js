@@ -62,6 +62,9 @@ export class Bot {
     this.difficulty = DIFFICULTY[game.difficulty] || DIFFICULTY.regular;
     this.accuracy = this.difficulty.spread;
     this.reaction = rand(...this.difficulty.react);
+    // Fog is a real visibility limit, not just a filter: a campaign can cap how
+    // far a rifleman picks a target out of the murk.
+    this.sightRange = Math.min(140, game.campaign?.env?.visibility ?? 140);
     this.lastDamageTime = -99;
     this.time = 0;
     this.aiming = false;
@@ -110,7 +113,7 @@ export class Bot {
     const eye = this.eye;
     const target = other.isPlayer ? other.eye : new THREE.Vector3(other.position.x, other.position.y + 1.4, other.position.z);
     const dist = eye.distanceTo(target);
-    if (dist > 140) return false;
+    if (dist > this.sightRange) return false;
     const dir = target.clone().sub(eye).normalize();
     const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     const flat = new THREE.Vector3(dir.x, 0, dir.z).normalize();

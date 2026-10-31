@@ -22,6 +22,7 @@ import { NavGrid } from './bots/NavGrid.js';
 import { HUD } from '../ui/HUD.js';
 import { Atmosphere } from '../render/Atmosphere.js';
 import { Ambience } from '../render/Ambience.js';
+import { Weather } from '../render/Weather.js';
 import { CAMPAIGN_BY_ID } from './campaigns.js';
 import { rand, clamp } from '../core/MathUtil.js';
 
@@ -162,6 +163,9 @@ export class Game {
     });
     this.renderer.fog.density = campaign.env.fogDensity ?? 0.0035;
     this.renderer.applySettings(this.settings);
+    // Weather owns the fog banks/sea layer and the density tide; campaigns
+    // without an `env.weather` simply get nothing back from it.
+    this.weather = new Weather(this, campaign.env);
 
     this.effects = new Effects(this);
     this.atmosphere = new Atmosphere(this);
@@ -617,6 +621,8 @@ export class Game {
       this.respawnT -= dt;
       if (this.respawnT <= 0) this.respawnPlayer();
     }
+    // Runs in both branches so the body hides itself on death.
+    this.playerBody?.update(dt);
 
     const frozen = this.debug?.freeze;
     for (const bot of this.bots) {
@@ -641,6 +647,7 @@ export class Game {
     this.updateGrenades(dt);
     this.materials.update(dt);
     this.level.update(dt, this.time);
+    this.weather?.update(dt, this.time);
     this.atmosphere.update(dt);
     this.ambience?.update(dt);
     this.effects.update(dt);
@@ -708,6 +715,7 @@ export class Game {
     }
     if (this.atmosphere) { this.atmosphere.dispose(); this.atmosphere = null; }
     if (this.ambience) { this.ambience.dispose(); this.ambience = null; }
+    if (this.weather) { this.weather.dispose(); this.weather = null; }
     if (this.effects) { this.effects.clear(); this.effects = null; }
     if (this.hud) {
       this.hud.el.hud.remove();

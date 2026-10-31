@@ -36,16 +36,24 @@ export const CAMPAIGNS = [
       '旧金山湾的雾墙中，金门大桥是北太平洋舰队的最后一道闸门。先锋部队必须在大雾与横风中夺取桥塔，' +
       '剪断炸药引线，让远征军舰队驶入旧金山湾。脚下是六十米深的冰冷海水，桥面上是美军的机枪交叉火网。',
     objectives: ['夺取 A 点「北塔」', '突进桥面，夺取 B 点「中跨」', '攻占 C 点「南塔 · 旧金山」'],
-    weather: '浓雾 · 侧风 · 能见度 120 米',
+    weather: '大雾 · 侧风 · 能见度 120 米',
     art: '/assets/art/golden-gate.jpg',
     video: '/assets/video/golden-gate-war-loop.mp4',
     accent: '#b6493a',
     env: {
-      fog: 0x8f9b99, fogDensity: 0.0015, sun: 0xe9e2d4, sunIntensity: 1.55,
-      skyTop: 0x64767d, skyHorizon: 0x9faaa8, ground: 0x454b46, cloudiness: 0.28, cloudColor: 0x5b6463,
-      sunDir: { x: 0.45, y: 0.52, z: 0.72 },
+      weather: 'fog', fog: 0xb3bcb9, fogDensity: 0.0068, sun: 0xdbe2dc, sunIntensity: 1.0,
+      skyTop: 0x707f84, skyHorizon: 0xb3bcb9, ground: 0x4a514d, cloudiness: 0.8, cloudColor: 0x606a6a,
+      sunDir: { x: 0.42, y: 0.5, z: 0.76 }, sunDisc: 0.3, godRayWeight: 0.08,
+      hemiIntensity: 2.0, hemiColor: 0xc0cac7, hemiGround: 0x59615d,
       ambience: 'bridge', wetness: 1.0,
-      hdri: 'goldenGate', envIntensity: 0.9, hdriRotation: 0.4,
+      hdri: 'goldenGate', envIntensity: 0.78, hdriRotation: 0.4,
+      // Fog also caps bot sight. See Bot.canSee: AI should not fire through a
+      // wall of fog the player cannot see through either.
+      visibility: 120,
+      fogBanks: {
+        count: 46, size: 1.4, opacity: 1, wind: [4.2, 1.2], densitySwing: 0.34,
+        sheets: 3, sheetOpacity: 0.28, sheetColor: 0xdde5e1,
+      },
     },
   },
   {
