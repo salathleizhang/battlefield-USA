@@ -49,8 +49,10 @@ reports read differently.
 
 ## AI 生成人声 / 军号（2026-10）
 
-- `voice/charge-crowd`、`voice/bugle-charge`、`voice/curse-american`、`voice/order-kill-americans`
-  由 **豆包 Seedance 2.5**（`doubao-seedance-2-5-260628`，火山方舟）文生视频并原生生成音频，
-  用 ffmpeg 提取音轨并归一到 -16 LUFS；提示词与任务号见 `voice/README.md`。
+- `voice/charge-crowd`、`voice/bugle-charge`、`voice/curse-american`、`voice/order-kill-americans`、
+  `voice/radio-objective` 由 **豆包 Seedance 2.5**（`doubao-seedance-2-5-260628`，火山方舟）
+  文生视频并原生生成音频，用 ffmpeg 提取音轨并归一到 -16 LUFS；提示词与任务号见 `voice/README.md`。
+  `voice/radio-objective` 另外经过 `tools/radioize.py` 做 300–3000 Hz 窄带、饱和与底噪处理，
+  按野战电台的听感交付。
   其中 `voice/curse-american` 的台词使用 Microsoft Edge TTS（`zh-CN-YunjianNeural`）重录；`voice/bugle-charge` 改用 Bilibili 视频 [BV1KS4y1k7HW](https://www.bilibili.com/video/BV1KS4y1k7HW/)（UP：深夜星空W）的音轨替换，版权归原 UP 主，仅按用户要求在本项目内使用。
   仅限本项目使用，不再以 CC0 名义对外再分发。
