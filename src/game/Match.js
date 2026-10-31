@@ -16,6 +16,8 @@ export class Match {
     this.bleedT = 0;
     this.lastBanner = '';
     this.started = false;
+    this.combat = []; // recent kill sites: spawns keep away from live fights
+    this.spawnUsedAt = new Map();
   }
 
   start() {
@@ -88,6 +90,9 @@ export class Match {
     this.kills[victim.team === 0 ? 1 : 0]++;
     // A death costs one ticket.
     this.tickets[victim.team] = Math.max(0, this.tickets[victim.team] - 1);
+    this.combat.push({ pos: victim.position.clone(), t: this.game.time });
+    if (killer?.position) this.combat.push({ pos: killer.position.clone(), t: this.game.time });
+    this.combat = this.combat.filter((c) => this.game.time - c.t < 12);
   }
 
   end(winner) {
@@ -96,22 +101,47 @@ export class Match {
     this.game.onMatchEnd(winner);
   }
 
+  /**
+   * Spawn safety, Battlefield-style: never directly in an enemy's line of sight,
+   * away from live fire, avoid reusing the point that just killed you, then jitter
+   * so a squad doesn't stack on one metre.
+   */
   getSpawn(team) {
     const owned = this.points.filter((p) => p.owner === team && !p.contested);
     const list = owned.length ? owned : this.points.filter((p) => p.owner === team);
     if (list.length) {
-      // Prefer a point that isn't right on top of enemies.
       let best = null, bestScore = -1e9;
+      const eye = new THREE.Vector3();
       for (const p of list) {
-        let enemyDist = 1e9;
+        let s = rand(0, 6);
+        s += (p.radius || 8) * 0.5;
         for (const a of this.game.combatants()) {
-          if (!a.alive || a.team === team) continue;
-          enemyDist = Math.min(enemyDist, a.position.distanceTo(p.position));
+          if (!a.alive) continue;
+          const d = a.position.distanceTo(p.position);
+          if (a.team === team) {
+            s += d < 20 ? 4 : Math.min(d, 40) * 0.1;
+            continue;
+          }
+          if (d < 12) s -= 140;
+          else if (d < 28) s -= 35;
+          s += Math.min(d, 90) * 0.5;
+          // Visible spawns are the worst: a rifleman can hold the flag from 100 m out.
+          eye.set(p.position.x, p.position.y + 1.6, p.position.z);
+          const head = a.isPlayer
+            ? new THREE.Vector3(a.position.x, a.position.y + a.eyeHeight, a.position.z)
+            : new THREE.Vector3(a.position.x, a.position.y + 1.5, a.position.z);
+          if (d < 110 && this.game.physics.lineOfSight(eye, head)) s -= d < 55 ? 180 : 90;
         }
-        const score = Math.min(enemyDist, 90) + rand(0, 12);
-        if (score > bestScore) { bestScore = score; best = p; }
+        for (const c of this.combat) {
+          const d = c.pos.distanceTo(p.position);
+          if (d < 24) s -= 50 * (1 - (this.game.time - c.t) / 12) * (1 - d / 24);
+        }
+        const used = this.spawnUsedAt.get(p.id) ?? -99;
+        if (this.game.time - used < 6) s -= 40;
+        if (s > bestScore) { bestScore = s; best = p; }
       }
       if (best) {
+        this.spawnUsedAt.set(best.id, this.game.time);
         const angle = rand(0, Math.PI * 2);
         return {
           position: new THREE.Vector3(
