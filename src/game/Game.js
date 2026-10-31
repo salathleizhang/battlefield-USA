@@ -45,6 +45,23 @@ const WEAPON_NAMES = {
   tank_crush: '履带',
 };
 
+/**
+ * The opening beat of every mission, in seconds from deploy.
+ *
+ * The radio order arrives first, over the net and already band-limited (see
+ * tools/radioize.py); the squad leader takes it up, the bugler answers, and the
+ * charge rolls out from there. `radio` lines go through Audio.radio(): they are
+ * in the player's headset, so they play louder than the world and duck it while
+ * they speak. The rest are shouts re-placed around the player by Audio.shout().
+ */
+const INTRO_BEATS = [
+  { at: 0.25, line: 'radio-objective', radio: true, opts: { volume: 2.3 } },
+  { at: 4.65, line: 'order-kill-americans', opts: { volume: 1, near: 3, far: 8, arc: 0.35, reverb: 0.3 } },
+  { at: 5.85, line: 'bugle-charge', opts: { volume: 0.85, near: 9, far: 22, arc: 0.7, reverb: 0.6 } },
+  { at: 8.75, line: 'charge-crowd', opts: { volume: 0.9, near: 3, far: 18, arc: 1.1, crowd: 2, reverb: 0.5 } },
+  { at: 18.25, line: 'curse-american', opts: { volume: 0.9, near: 2, far: 9, arc: 1, reverb: 0.4 } },
+];
+
 export class Game {
   constructor(canvas) {
     this.canvas = canvas;
@@ -580,13 +597,15 @@ export class Game {
   /**
    * Opening charge and squad barks.
    *
-   * The first seconds of a mission play the commander's order, then the bugle,
-   * then the roar of the squad. Later, every fresh forward sprint (Shift + W)
-   * pulls one more shout, with a long cooldown so it never turns into a loop.
+   * The first seconds of a mission follow INTRO_BEATS: the radio order, the
+   * commander echoing it, the bugle, the roar of the squad. Later, every fresh
+   * forward sprint (Shift + W) pulls one more shout, with a long cooldown so it
+   * never turns into a loop.
    *
-   * Every line goes through `audio.shout()`, which re-places the speaker each
-   * time: the level, bearing and distance move, so the squad sounds like men
-   * shouting nearby rather than one recording at a fixed volume.
+   * The shouted lines go through `audio.shout()`, which re-places the speaker
+   * each time: level, bearing and distance move, so the squad sounds like men
+   * shouting nearby rather than one recording at a fixed volume. The radio line
+   * never reaches that path: it is a first-person transmission, not a place.
    */
   updateBattleVoices(dt) {
     const a = this.audio;
@@ -594,26 +613,20 @@ export class Game {
     const intro = this._voiceIntro;
     if (intro) {
       intro.t += dt;
-      if (intro.stage === 0 && intro.t >= 0.7 && a.has('order-kill-americans')) {
-        // The commander is the closest voice: a few metres, near-centred.
-        a.shout('order-kill-americans', { volume: 1, near: 3, far: 8, arc: 0.35, reverb: 0.3 });
-        intro.stage = 1; intro.t = 0;
-      } else if (intro.stage === 1 && intro.t >= 1.2 && a.has('bugle-charge')) {
-        // The bugler stands off to a flank and further out, so the horn is
-        // heard against the voices instead of on top of them.
-        a.shout('bugle-charge', { volume: 0.85, near: 9, far: 22, arc: 0.7, reverb: 0.6 });
-        intro.stage = 2; intro.t = 0;
-      } else if (intro.stage === 2 && intro.t >= 2.8 && a.has('charge-crowd')) {
-        a.shout('charge-crowd', {
-          volume: 0.9, near: 3, far: 18, arc: 1.1, crowd: 2, reverb: 0.5,
-        });
-        intro.stage = 3; intro.t = 0;
-      } else if (intro.stage === 3 && intro.t >= 9.5 && a.has('curse-american')) {
-        a.shout('curse-american', { volume: 0.9, near: 2, far: 9, arc: 1, reverb: 0.4 });
-        intro.stage = 4; intro.t = 0;
-      } else if (intro.stage === 4) {
-        this._voiceIntro = null;
+      while (intro.stage < INTRO_BEATS.length) {
+        const beat = INTRO_BEATS[intro.stage];
+        if (intro.t < beat.at) break;
+        const ready = a.has(beat.line);
+        // Hold the beat until its sample has decoded, but never strand the rest
+        // of the intro if it never arrives.
+        if (!ready && intro.t < beat.at + 6) break;
+        if (ready) {
+          if (beat.radio) a.radio(beat.line, beat.opts);
+          else a.shout(beat.line, beat.opts);
+        }
+        intro.stage++;
       }
+      if (intro.stage >= INTRO_BEATS.length) this._voiceIntro = null;
     }
 
     if (this._voiceCd > 0) this._voiceCd -= dt;
