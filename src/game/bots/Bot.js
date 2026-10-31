@@ -29,6 +29,7 @@ export class Bot {
     this.route = null;
     this.routeIndex = 0;
     this.fireTimer = rand(0.6, 2.2);
+    this.clip = team === 1 ? 8 : 5;
     this.perceptT = rand(0, 0.25);
     this.aimTime = 0;
     this.strafeDir = Math.random() > 0.5 ? 1 : -1;
@@ -43,6 +44,11 @@ export class Bot {
     this.time = 0;
     this.aiming = false;
     this.desired = new THREE.Vector3();
+    // Hearing and suppression: a rifleman reacts to noise and to rounds cracking past.
+    this.suppression = 0;
+    this.heardPos = null;
+    this.heardAt = -99;
+    this.lastSuppressedBy = null;
 
     this.model = (game.characters && game.characters.ready)
       ? game.characters.create(team, variant)
@@ -99,21 +105,48 @@ export class Bot {
     return best;
   }
 
+  /** Footsteps / gunfire give away a position even through cover. */
+  hear(actor, pos) {
+    if (!this.alive || !actor || actor === this || actor.team === this.team) return;
+    if (!pos) return;
+    this.heardPos = pos.clone();
+    this.heardAt = this.time;
+  }
+
+  /** Rounds cracking past: flinch, then tighten up or keep their heads down. */
+  onSuppressed(by, amount = 0.5) {
+    if (!this.alive) return;
+    this.suppression = Math.min(1, this.suppression + amount * 0.25);
+    if (by) {
+      this.lastSuppressedBy = by;
+      this.hear(by, by.position);
+      // A near miss re-acquires the shooter's direction but still needs a look.
+      if (!this.target && this.suppression > 0.45) { this.target = by; this.aimTime = 0; }
+    }
+  }
+
   update(dt) {
     this.time += dt;
     if (!this.alive) { this.deadT += dt; this.model.update(dt, 0, false, false); return; }
+    this.suppression = Math.max(0, this.suppression - dt * 0.4);
 
     this.perceptT -= dt;
     if (this.perceptT <= 0) {
       this.perceptT = 0.22 + Math.random() * 0.16;
       const seen = this.findTarget();
       if (seen) {
-        if (this.target !== seen) this.aimTime = 0;
+        if (this.target !== seen) { this.aimTime = 0; this.reaction = rand(0.22, 0.6); }
         this.target = seen;
         this.targetSeenAt = this.time;
         this.lastSeenPos.copy(seen.position);
       } else if (this.time - this.targetSeenAt > 4) {
         this.target = null;
+      }
+      // Hearing: the player's noise radius reaches this bot.
+      const pl = this.game.player;
+      if (pl?.alive && pl.team !== this.team && pl.noise > 0
+        && this.position.distanceTo(pl.position) < pl.noise) {
+        this.hear(pl, pl.position);
       }
     }
 
@@ -141,14 +174,27 @@ export class Bot {
       else if (dist < 16) moveTarget = this.position.clone().addScaledVector(flat, -3);
       else moveTarget = this.position.clone().addScaledVector(right, this.strafeDir * 3);
       speed = 1.9;
-      if (this.fireTimer <= 0 && dist < 120) {
+      // Reaction time gates the first shot, and incoming fire makes the aim wobble.
+      if (this.fireTimer <= 0 && dist < 120 && this.aimTime >= this.reaction && this.suppression < 0.75) {
         this.fireTimer = rand(1.15, 2.3) / (this.team === 1 ? 1.12 : 1);
+        this.fireTimer *= 1 + this.suppression;
         this.shoot();
       }
     } else {
       this.state = this.objective ? 'advance' : 'patrol';
       this.aiming = false;
-      if (this.objective) {
+      // Something was heard: sweep toward it before going back to the objective.
+      const heard = this.heardPos && this.time - this.heardAt < 6;
+      if (heard) {
+        this.state = 'search';
+        const d = Math.hypot(this.heardPos.x - this.position.x, this.heardPos.z - this.position.z);
+        if (d > 2.5) { moveTarget = this.heardPos; speed = 2.9; }
+        else {
+          const yaw = Math.atan2(-(this.heardPos.x - this.position.x), -(this.heardPos.z - this.position.z));
+          this.yaw = this._turn(this.yaw, yaw, dt, 2.5);
+        }
+      }
+      if (this.objective && !heard) {
         const p = this.objective.position;
         const dist = Math.hypot(p.x - this.position.x, p.z - this.position.z);
         if (dist > 3.5) moveTarget = p;
@@ -249,7 +295,8 @@ export class Bot {
     const dir = to.sub(from).normalize();
     // Accuracy falls with range; bots intentionally imperfect.
     const dist = from.distanceTo(target.position);
-    const spread = 0.008 + dist * 0.00016 + (this.aimTime < this.reaction ? 0.02 : 0);
+    const spread = 0.008 + dist * 0.00016 + (this.aimTime < this.reaction ? 0.02 : 0)
+      + this.suppression * 0.022;
     dir.x += rand(-spread, spread);
     dir.y += rand(-spread * 0.7, spread * 0.8);
     dir.z += rand(-spread, spread);
@@ -262,7 +309,14 @@ export class Bot {
     const cam = this.game.renderer.camera;
     const pan = this._panTo(cam);
     this.model.shoot?.();
-    this.game.audio.shot(this.team === 1 ? 'm1' : 'type38', { dist, pan });
+    // The Garand's en-bloc clip pings when the eighth round leaves the rifle.
+    let empty = false;
+    if (this.team === 1) {
+      this.clip -= 1;
+      empty = this.clip <= 0;
+      if (empty) this.clip = 8;
+    }
+    this.game.audio.shot(this.team === 1 ? 'm1' : 'type38', { dist, pan, empty });
     this.game.effects.botMuzzle(this.model.muzzle, dir);
     this.aiming = true;
   }
@@ -278,9 +332,12 @@ export class Bot {
     this.health -= amount;
     this.lastDamageTime = this.time;
     this.lastAttacker = attacker;
+    this.suppression = Math.min(1, this.suppression + 0.4);
     if (attacker && attacker.alive) {
       this.target = attacker;
       this.targetSeenAt = this.time;
+      this.lastSeenPos.copy(attacker.position);
+      this.aimTime = 0;
     }
     this.game.effects.blood(this.eye, new THREE.Vector3(rand(-0.4, 0.4), 0.2, rand(-0.4, 0.4)));
     if (this.health > 0) this.model.hit?.(!!info.headshot);
