@@ -211,7 +211,7 @@ export class DestructibleWorld {
     // A clone keeps the source's compiled-unify hook; applying unify again would
     // inject the same declarations twice and fail shader compilation.
     mat.onBeforeCompile = () => {};
-    mat.customProgramCacheKey = undefined;
+    mat.customProgramCacheKey = () => 'wallmat';
     mat.map = wallTexture(kind, windowed);
     mat.userData.noUnify = false;
     if (kind === 'wood') mat.color.setHex(0xc9b48d);
@@ -233,9 +233,11 @@ export class DestructibleWorld {
    * can be hidden later without touching the rest of its batch.
    */
   registerProp({ name, entry, collider, size, center, surface }) {
-    if (!DESTRUCTIBLE_PROPS.has(name)) return null;
     const vol = Math.max(0.05, size.x * size.y * size.z);
-    const hp = Math.round(clamp(30 + vol * 26, 35, 420));
+    const destructible = DESTRUCTIBLE_PROPS.has(name);
+    // Every solid prop gets a record: a tank flattens sandbags and crates alike,
+    // even though only the light cover takes bullet damage.
+    const hp = Math.round(clamp((destructible ? 30 : 90) + vol * 26, 35, 420));
     const rec = {
       id: this.nextId++,
       name,
@@ -247,6 +249,7 @@ export class DestructibleWorld {
       hp,
       maxHp: hp,
       alive: true,
+      destructible,
       explosive: EXPLOSIVE[name] || null,
     };
     this.props.push(rec);
@@ -264,6 +267,9 @@ export class DestructibleWorld {
 
   damageProp(rec, amount, point, dir = null, info = {}) {
     if (!rec?.alive) return false;
+    // Sandbags, fences and heavy cover shrug off small arms; a blast still
+    // scatters them, and tracks flatten them regardless.
+    if (!rec.destructible && !info.force) return false;
     rec.hp -= amount;
     if (rec.hp > 0) {
       // A crate that has been shot leaks splinters and dust but stays put.
@@ -326,7 +332,17 @@ export class DestructibleWorld {
     const roof = spec.roof ?? def.roof;
     const yaw = spec.yaw ?? 0;
     const level = this.game.level;
-    const gy = spec.base ?? level.groundHeight(spec.x, spec.z);
+    let gy = spec.base ?? level.groundHeight(spec.x, spec.z);
+    // Map authors place a building by intent; a palm trunk or a parked truck
+    // decides whether that exact footprint is usable. Nudge it to the nearest
+    // clear patch instead of growing a tree through the roof.
+    if (spec.base == null && spec.clear !== false) {
+      const spot = this._clearFootprint(spec.x, spec.z, w, d, gy, yaw);
+      if (spot) {
+        spec = { ...spec, x: spot.x, z: spot.z };
+        gy = spot.y;
+      }
+    }
 
     const bays = Math.max(2, Math.round(w / PANEL_W));
     const sideBays = Math.max(2, Math.round(d / PANEL_W));
@@ -473,6 +489,50 @@ export class DestructibleWorld {
     return st;
   }
 
+  /** Nearest footprint whose ground is walkable and whose volume is empty. */
+  _clearFootprint(x, z, w, d, gy, yaw) {
+    const physics = this.game.physics;
+    const level = this.game.level;
+    const rot = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0));
+    const probe = (px, pz) => {
+      const hit = physics.raycast({ x: px, y: gy + 30, z: pz }, { x: 0, y: -1, z: 0 }, 70, G.WORLD);
+      if (!hit) return null;
+      const y = hit.point.y;
+      if (level?.waterY != null && y < level.waterY + 0.4) return null;
+      // Slope under the four corners: a 7.5 m house on a dune looks like a
+      // seesaw, so require a nearly flat pad.
+      const hs = [];
+      for (const [ox, oz] of [[-w / 2, -d / 2], [w / 2, -d / 2], [-w / 2, d / 2], [w / 2, d / 2]]) {
+        const h = physics.raycast({ x: px + ox, y: y + 3, z: pz + oz }, { x: 0, y: -1, z: 0 }, 8, G.WORLD);
+        hs.push(h ? h.point.y : y);
+      }
+      if (Math.max(...hs) - Math.min(...hs) > 1.1) return null;
+      let blocked = false;
+      physics.world.intersectionsWithShape(
+        { x: px, y: y + 1.4, z: pz }, rot,
+        new physics.R.Cuboid(w / 2, 1.4, d / 2),
+        (col) => {
+          const data = physics.dataOf(col) || {};
+          // Crates and barrels inside a shed are fine; trunks, walls and
+          // vehicles are not.
+          if (!data.prop && !data.vehicle) blocked = true;
+          return true;
+        }, undefined, (0xffff << 16) | G.WORLD,
+      );
+      return blocked ? null : { x: px, z: pz, y };
+    };
+    const direct = probe(x, z);
+    if (direct) return direct;
+    for (const r of [2.5, 4, 6, 8, 10]) {
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        const spot = probe(x + Math.cos(a) * r, z + Math.sin(a) * r);
+        if (spot) return spot;
+      }
+    }
+    return null;
+  }
+
   _wallPanel(st, mesh, index, { lx, ly, lz, rot, size, floor }) {
     const c = Math.cos(st.yaw), s = Math.sin(st.yaw);
     const wx = st.x + lx * c + lz * s;
@@ -556,7 +616,7 @@ export class DestructibleWorld {
     const pos = panel.center.clone();
     const normal = new THREE.Vector3(Math.sin(panel.structure.yaw), 0, Math.cos(panel.structure.yaw));
     if (dir) pos.addScaledVector(dir, -0.2);
-    this.spawnDebris(pos, panel.size, this.wallMaterial(panel.structure.material, false), 3 + (cause > 1 ? 2 : 0), {
+    this.spawnDebris(pos, panel.size, this.wallMaterial(panel.structure.material, false), cause === 0 ? 1 : cause > 1 ? 5 : 3, {
       dir, spread: 1.6, speed: 3.6, surface: panel.structure.material,
     });
     this.game.effects?.impact(pos, normal, panel.structure.material);
@@ -568,7 +628,7 @@ export class DestructibleWorld {
     st.stage = 'collapsed';
     st.alive = false;
     const at = point || new THREE.Vector3(st.x, st.gy + st.h * 0.4, st.z);
-    for (const panel of st.panels) if (panel.alive) this.breakPanel(panel, at, null, 2);
+    for (const panel of st.panels) if (panel.alive) this.breakPanel(panel, at, null, 0);
     for (const part of st.roofParts) {
       if (!part.alive) continue;
       part.alive = false;

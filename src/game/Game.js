@@ -465,7 +465,7 @@ export class Game {
           if (data.prop || data.structure) {
             this.destructibles.bulletHit(data, hit.point, hit.normal, p.damage, dir, p.owner);
             if (p.shell && data.structure) {
-              this.destructibles.damageStructure(data.structure, p.damage * 1.8, hit.point, {
+              this.destructibles.damageStructure(data.structure, p.damage, hit.point, {
                 dir, radius: 2.4 + (p.blast || 2), cause: 'shell',
               });
             }
@@ -715,7 +715,7 @@ export class Game {
       this.damageActor(a, dmg, owner, { weapon: opts.kind || 'grenade', from: pos });
     }
     this.vehicles?.blast(pos, radius, damage, owner, opts.ignore);
-    this.destructibles?.blast(pos, radius * 1.12, damage * 1.9, { attacker: owner });
+    this.destructibles?.blast(pos, radius * 1.02, damage, { attacker: owner });
   }
 
   /** Vehicle destruction: kill feed, score, and a ticket cost heavier than a man. */
