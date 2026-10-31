@@ -59,12 +59,10 @@ async function buildTemplate(id) {
   muzzleMarker.name = 'muzzle';
   muzzleMarker.position.copy(muzzle).sub(grip);
   holder.add(muzzleMarker);
+  const dirGun = muzzle.clone().sub(grip).normalize();
 
-  // Hand-bone convention: fingers point down, so the grip is rotated -90° about X and the barrel
-  // is yawed +90° to leave the palm along the character's forward axis (matches the reference arms).
-  wrapper.rotation.set(-Math.PI / 2, Math.PI / 2, 0);
-  wrapper.scale.setScalar(1);
-  return { template: wrapper, length: size.z * s };
+  wrapper.rotation.set(0, 0, 0);
+  return { template: wrapper, length: size.z * s, dirGun };
 }
 
 /** Load (and cache) one bot gun template. */
@@ -79,19 +77,34 @@ export function loadBotGun(id) {
 }
 
 /**
- * Give a bot the reference gun. Hides the character's own rifle; returns a promise that resolves
- * once the model is in the hand (safe to ignore).
+ * Give a bot the reference gun. Hides the character's own low-poly rifle and returns the mounted
+ * model (or null if the asset is missing).
  */
 export async function equipBotGun(model, id) {
-  if (!model?.handR) return null;
+  if (!model?.group) return null;
   const tpl = await loadBotGun(id);
-  if (!tpl || !model.handR) return null;
+  if (!tpl) return null;
+
+  // The character pack's hand bone frame doesn't line up with the authored FP guns (the old rifle
+  // used a different convention), so the bot gun rides a shoulder pivot in model space and points
+  // along the character's facing. The raised hands from the aim clip sit around it, which reads
+  // correctly at gameplay distance and never depends on hand-bone quirks.
   if (model.weapon) model.weapon.visible = false;
   if (model._botGun) model._botGun.removeFromParent();
   const gun = tpl.template.clone(true);
-  model.handR.add(gun);
+  gun.position.set(0.16, 1.26, 0.10);
+  gun.rotation.set(0, 0, 0);
+  model.group.add(gun);
   model._botGun = gun;
   const muzzle = gun.getObjectByName('muzzle');
   if (muzzle) model.muzzle = muzzle;
   return gun;
+}
+
+/** Keep the bot's rifle pointing along its facing (model -Z), with a little aim pitch. */
+export function updateBotGun(model, pitch = 0) {
+  const gun = model?._botGun;
+  if (!gun) return;
+  const p = Math.max(-0.6, Math.min(0.6, pitch));
+  gun.rotation.x = -p;
 }
