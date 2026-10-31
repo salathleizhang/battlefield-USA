@@ -93,7 +93,8 @@ export async function equipBotGun(model, id) {
   if (model._botGun) model._botGun.removeFromParent();
   const gun = tpl.template.clone(true);
   gun.position.set(0.16, 1.26, 0.10);
-  gun.rotation.set(0, 0, 0);
+  // Model space faces +Z: yaw the extracted gun 180° so its muzzle (-Z) points the same way.
+  gun.rotation.set(0, Math.PI, 0);
   model.group.add(gun);
   model._botGun = gun;
   const muzzle = gun.getObjectByName('muzzle');
