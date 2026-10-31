@@ -175,6 +175,47 @@ export function buildMississippi(L) {
     L.batch.cylinder(3 + Math.random() * 3, 4.5 + Math.random() * 3, 0.2, 12, x, height(x, z) + 0.1, z, L.mats.get('ground'), { uv: 0.5 });
   }
 
+  /* ---------------------------------------- 堤坝工事与滩头营地（Military Pack） */
+  // 北岸堤顶战壕线：沙袋墙对着河面，铁丝网压在水线一侧。
+  for (const [x, z] of [[-44, -80], [-30, -82], [-16, -84], [-2, -85], [12, -84], [26, -82], [40, -80]]) {
+    L.prop('sandbagWall', x, z, 0);
+  }
+  for (const z of [-64, -70]) {
+    for (let x = -60; x <= 60; x += 12) L.prop('barbedWire', x, z, 0, { solid: false });
+  }
+  // B 点棉花田堤坝的加固阵地。
+  L.prop('sandbagCorner', 38, -74, 0);
+  L.prop('sandbagPit', 54, -84, Math.PI);
+  L.prop('guardTower', 30, -96, 0.4);
+  // 南岸出发营地：帐篷、补给、灯柱。
+  L.prop('tentLarge', -46, 118, 0.2);
+  L.prop('tentLarge', -46, 92, -0.2);
+  L.prop('tentCamo', -60, 106, 0.6);
+  L.prop('fuelTank', -32, 124, 0, { scale: 0.7 });
+  L.prop('weaponBox', 30, 108, 0.3);
+  L.prop('weaponChest', 33, 112, -0.6);
+  L.prop('ammoCrate', 26, 112, 0.8);
+  L.prop('pallet', 34, 106, 0.2, { solid: false });
+  L.prop('drumTall', 8, 116, 0);
+  L.prop('drumSmall', 6.6, 118, 0);
+  L.prop('drumSmall', 9.4, 118.4, 0);
+  L.prop('cableSpool', -18, 122, 0.5);
+  L.prop('lampMast', 0, 88, 0);
+  L.prop('locker', -6, 110, 0.1);
+  L.prop('table', 14, 120, 0);
+  L.prop('chair', 16.2, 121.4, 1.2);
+  // 桥头两侧的路障。
+  for (const side of [-1, 1]) {
+    L.prop('concreteBarrier', side * 7.5, 86, 0);
+    L.prop('sandbagLong', side * 9, 80, Math.PI / 2);
+  }
+  L.prop('target', 24, 96, Math.PI);
+  L.prop('signPost', -10, 84, 0);
+  // 河滩石块。
+  for (const [x, z, s] of [[-70, 60, 1], [70, -58, 0.9], [40, 68, 0.7], [-24, -64, 1.1]]) {
+    L.prop(L.rand() > 0.5 ? 'rockMedium' : 'rockSmall', x, z, L.rand() * 6.28, { scale: s, solid: false });
+  }
+
   /* ------------------------------------------------------------- gameplay */
   L.addCapturePoint({ id: 'A', name: '浮桥', x: 0, z: 0, radius: 14, owner: -1, base: bridgeY + 0.2, height: 7 });
   L.addCapturePoint({ id: 'B', name: '棉花田堤坝', x: 45, z: -78, radius: 17, owner: -1, base: height(45, -78), height: 6 });

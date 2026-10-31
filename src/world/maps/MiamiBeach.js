@@ -637,6 +637,58 @@ export function buildMiamiBeach(L) {
   L.warship(820, 120, -0.08, 0.7);
   L.warship(700, 250, 0.3, 0.5);
 
+  /* ------------------------------------------- 美军海滩防御工事（Military Pack） */
+  // 沙袋弧线正面朝海，中央留口子方便进攻方突入。
+  for (let z = -16.4; z <= 16.4; z += 2.05) {
+    L.prop('sandbagWall', 46, z, Math.PI / 2);
+  }
+  // 两翼加厚，形成侧射阵地。
+  for (const side of [-1, 1]) {
+    for (let z = 20; z <= 30; z += 3.2) L.prop('sandbagLong', 47, side * z, Math.PI / 2);
+    L.prop('sandbagPit', 52, side * 22, 0);
+    L.prop('sandbagTower', 52, side * 30, 0);
+  }
+  L.prop('sandbagCorner', 46, -18, 0);
+  L.prop('sandbagCorner', 46, 18, Math.PI);
+  // 铁丝网带：只封两翼，不挡住抢滩主线。
+  for (const side of [-1, 1]) {
+    for (let z = 34; z <= 62; z += 6) {
+      L.prop('barbedWire', 36, side * z, Math.PI / 2 + (L.rand() - 0.5) * 0.6, { solid: false });
+    }
+    for (let z = 44; z <= 58; z += 5) L.prop('barbedWire', 30, side * z, Math.PI / 2, { solid: false });
+    L.prop('guardTower', 30, side * 66, side > 0 ? Math.PI : 0);
+  }
+  // 街区入口的混凝土隔离墩。
+  for (const z of [-12, -6, 6, 12]) L.prop('concreteBarrier', 19, z, Math.PI / 2);
+  L.prop('concreteBarrierShort', 19, -18, Math.PI / 2);
+  L.prop('concreteBarrierShort', 19, 18, Math.PI / 2);
+  // 滩头补给堆。
+  L.prop('ammoCrate', 62, -18, 0.4);
+  L.prop('weaponBox', 64, -21, 1.1);
+  L.prop('drumSmall', 60, -22, 0);
+  L.prop('drumSmall', 60.8, -23.4, 0);
+  L.prop('pallet', 65, -16, 0.2, { solid: false });
+  L.prop('plankPile', 66, 26, -0.5);
+  L.prop('drumTall', 58, 30, 0);
+  L.prop('cableSpool', 62, 34, 0.8);
+  // 内陆营地。
+  L.prop('tentLarge', -18, -46, Math.PI / 2);
+  L.prop('tentLarge', -18, 46, -Math.PI / 2);
+  L.prop('tentCamo', -32, -54, 0.3);
+  L.prop('tentCamo', -32, 54, -0.3);
+  L.prop('locker', -8, -38, 0.2);
+  L.prop('table', -12, -34, 0);
+  L.prop('chair', -14.4, -33.2, 0.9);
+  L.prop('lampMast', -6, -52, 0);
+  // 零散石头与碎块，压住沙滩和草地的过渡。
+  for (const [x, z, s] of [[64, 44, 1], [67, -46, 0.8], [40, 70, 1.2], [24, -70, 0.9], [66, 12, 0.7]]) {
+    L.prop(L.rand() > 0.5 ? 'rockMedium' : 'rockSmall', x, z, L.rand() * 6.28, { scale: s, solid: false });
+  }
+  L.prop('rockBoulder', 20, 62, 1.2, { solid: false });
+  L.prop('rubbleLarge', 42, -44, 0.7, { solid: false });
+  L.prop('signPost', 40, 34, 0);
+  L.prop('signBoard', 40, 34.1, 0, { solid: false });
+
   /* ------------------------------------------------------------------ combat */
   const cpA = L.addCapturePoint({ id: 'A', name: '血色沙滩', x: 50, z: 0, radius: 18, owner: -1 });
   const cpB = L.addCapturePoint({ id: 'B', name: '装饰艺术街区', x: 8, z: 0, radius: 16, owner: -1 });

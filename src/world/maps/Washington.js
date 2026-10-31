@@ -223,6 +223,52 @@ export function buildWashington(L) {
     { x: 200, z: 300, w: 60, h: 24, d: 50 },
   ]);
 
+  /* -------------------------------------- 检查站与街具（Military Pack） */
+  // 桥头 A：公路两侧的沙袋工事，中间留一个只能过人的缺口。
+  for (const side of [-1, 1]) {
+    for (const dz of [0, 3.5, 7, 10.5]) L.prop('sandbagWall', side * 7.2, 112 + dz, Math.PI / 2);
+    L.prop('concreteBarrier', side * 4.2, 106, 0);
+    L.prop('concreteBarrierShort', side * 4.2, 100, 0);
+    L.prop('barbedWire', side * 11, 108, Math.PI / 2, { solid: false });
+    L.prop('guardTower', side * 20, 116, side > 0 ? Math.PI : 0);
+  }
+  L.prop('signPost', 4.5, 140, 0);
+  L.prop('signBoard', 4.5, 140.1, 0, { solid: false });
+  // 国家广场中段：一道带缺口的铁丝网，逼出绕行路线。
+  for (let x = -44; x <= 44; x += 6.5) {
+    if (Math.abs(x) < 12) continue;
+    L.prop('barbedWire', x, -30, Math.PI / 2, { solid: false });
+  }
+  // 广场两侧的街具和补给点。
+  for (const side of [-1, 1]) {
+    for (const z of [70, 40, 10, -20]) L.prop('bench', side * 46, z, side > 0 ? -Math.PI / 2 : Math.PI / 2);
+    L.prop('lampMast', side * 58, 20, 0, { scale: 0.7 });
+    L.prop('dumpster', side * 52, -66, side > 0 ? 0.2 : -0.2);
+  }
+  L.prop('table', 30, -96, 0.3);
+  L.prop('chair', 32.2, -94.6, 1.4);
+  L.prop('chair', 27.8, -94.6, -1.4);
+  L.prop('weaponChest', 34, -102, 0.9);
+  L.prop('ammoCrate', 26, -102, -0.4);
+  L.prop('drumTall', 24, -99, 0);
+  L.prop('drumSmall', 24.6, -101.2, 0);
+  L.prop('pallet', 30, -104, 0.5, { solid: false });
+  L.prop('tentLarge', -34, -112, 0.35);
+  L.prop('tentCamo', -46, -120, -0.5);
+  L.prop('locker', -28, -104, 0.2);
+  L.prop('target', 36, -88, Math.PI);
+  // 国会山一侧的工事。
+  for (const side of [-1, 1]) {
+    for (const dz of [-6, -2, 2, 6]) L.prop('sandbagLong', side * 12, -146 + dz, Math.PI / 2);
+    L.prop('concreteBarrier', side * 7, -132, 0);
+  }
+  // 池边的石块与碎砖。
+  for (const [x, z, s] of [[-20, 92, 1], [22, 88, 0.8], [-26, 8, 1.2], [28, -54, 0.9], [-16, -128, 1]]) {
+    L.prop(L.rand() > 0.5 ? 'rockMedium' : 'rockSmall', x, z, L.rand() * 6.28, { scale: s, solid: false });
+  }
+  L.prop('rubbleLarge', -30, -62, 0.4, { solid: false });
+  L.prop('rubbleSmall', 18, 72, 0.5, { solid: false });
+
   /* ---------------------------------------------------------------- gameplay */
   L.addCapturePoint({ id: 'A', name: '波托马克桥头', x: 0, z: 134, radius: 16, owner: -1, base: height(0, 134), height: 7 });
   L.addCapturePoint({ id: 'B', name: '林肯纪念堂', x: 0, z: 96, radius: 16, owner: -1, base: ly + 2, height: 8 });

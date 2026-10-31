@@ -192,6 +192,32 @@ export function buildGoldenGate(L) {
     });
   }
 
+  /* ------------------------------------------ 桥面工事（Military Pack） */
+  // 两座塔与中跨各摆一道沙袋胸墙，中间留出车道。
+  for (const z of [-P.towerZ - 12, -P.towerZ + 12, -12, 12, P.towerZ - 12, P.towerZ + 12]) {
+    for (const side of [-1, 1]) L.prop('sandbagWall', side * 4.4, z, Math.PI / 2, { base: DECK });
+  }
+  // 桥面边缘的混凝土墩，兼作掩体；放在车道外侧，不挡路。
+  for (const z of [-430, -380, -250, -180, 180, 250, 380, 430]) {
+    for (const side of [-1, 1]) L.prop('concreteBarrierShort', side * 5.6, z, Math.PI / 2, { base: DECK });
+  }
+  // 北端出发阵地：弹药箱、油桶、栈板。
+  L.prop('ammoCrate', 5.2, -470, 0.3, { base: DECK });
+  L.prop('weaponCrate', 5.4, -476, -0.5, { base: DECK });
+  L.prop('drumSmall', -5.2, -468, 0, { base: DECK });
+  L.prop('drumSmall', -5.6, -471, 0, { base: DECK });
+  L.prop('pallet', 5.75, -464, 0.2, { base: DECK, solid: false, scale: 0.7 });
+  // 南塔一侧的美军补给。
+  L.prop('ammoCrate', -5.2, 466, 0.3, { base: DECK });
+  L.prop('fuelTank', 5.4, 452, 0, { base: DECK, scale: 0.4 });
+  L.prop('plankPile', -5.2, 480, 0.4, { base: DECK, scale: 0.5 });
+  // 北引桥的铁丝网：只压在两侧路肩，中间车道留给人冲。
+  for (const side of [-1, 1]) {
+    for (let dz = 0; dz <= 8; dz += 2.6) {
+      L.prop('barbedWire', side * 5.1, -462 + dz, Math.PI / 2, { base: DECK, solid: false });
+    }
+  }
+
   /* ------------------------------------------------------------- gameplay */
   L.addCapturePoint({ id: 'A', name: '北塔', x: 0, z: -P.towerZ, radius: 7, owner: -1, base: DECK, height: 10 });
   L.addCapturePoint({ id: 'B', name: '中跨', x: 0, z: 0, radius: 7, owner: -1, base: DECK, height: 10 });
