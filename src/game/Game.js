@@ -17,6 +17,7 @@ import { ViewModel } from './weapons/ViewModel.js';
 import { loadRifle } from './weapons/RifleModel.js';
 import { Bot } from './bots/Bot.js';
 import { CharacterLibrary } from './bots/CharacterLibrary.js';
+import { IronlineLibrary } from './bots/IronlineLibrary.js';
 import { Match } from './Match.js';
 import { NavGrid } from './bots/NavGrid.js';
 import { HUD } from '../ui/HUD.js';
@@ -84,13 +85,30 @@ export class Game {
     this.physics = await Physics.create();
     this.materials = new Materials(this.renderer);
     await this.materials.load(onProgress);
-    this.characters = new CharacterLibrary(this);
-    await this.characters.load(onProgress);
+    this.characters = await this._loadCharacters(onProgress);
     this.props = new Props();
     await this.props.load((p, label) => onProgress?.(0.9 + p * 0.08, label));
     await this._loadMiamiCar();
+    await this._loadVehicleAssets();
     await this._loadRifle();
     onProgress?.(1, '准备就绪');
+  }
+
+  /**
+   * Bots wear the Ironline Bamen soldier by default: one Mixamo rig, fifty clips, sockets.
+   * `?chars=legacy` keeps the previous Quaternius soldiers; a hard load failure falls back to
+   * them on its own so a bad asset never leaves the battlefield empty.
+   */
+  async _loadCharacters(onProgress) {
+    const legacy = new URLSearchParams(location.search).get('chars') === 'legacy';
+    if (!legacy) {
+      const ironline = new IronlineLibrary(this);
+      if (await ironline.load(onProgress)) return ironline;
+      console.warn('Ironline soldier unavailable, falling back to the Quaternius set');
+    }
+    const lib = new CharacterLibrary(this);
+    await lib.load(onProgress);
+    return lib;
   }
 
   /**
