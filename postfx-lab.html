@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>PostFX lab</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#000}canvas{display:block;width:100vw;height:100vh}</style>
+</head><body><canvas id="c"></canvas>
+<script type="module">
+import * as THREE from 'three';
+import { Renderer } from '/src/render/Renderer.js';
+const R = new Renderer(document.getElementById('c'));
+let seed = 20260312;
+const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+R.setEnvironment({ fogColor: 0xefd9bd, fogDensity: 0.0016, sunColor: 0xffd6a8, sunIntensity: 3.4,
+  sunDir: { x: -0.30, y: 0.26, z: -0.92 }, sunDisc: 1, skyTop: 0x4a7fae, skyHorizon: 0xf6d6b0,
+  cloudiness: 0.12, cloudColor: 0xf0d6b8, groundColor: 0x8a7a64, hemiIntensity: 1.25,
+  hemiColor: 0xbdd9ec, hemiGround: 0xb09470 });
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(900, 900),
+  new THREE.MeshStandardMaterial({ color: 0x6b6252, roughness: 0.92, metalness: 0.02 }));
+ground.rotation.x = -Math.PI / 2; R.scene.add(ground);
+const mat = new THREE.MeshStandardMaterial({ color: 0x4b4038, roughness: 0.75, metalness: 0.05 });
+for (let i = 0; i < 17; i++) {
+  const x = -68 + i * 8.5 + rnd() * 3; if (x > -30 && x < -1) continue;
+  const w = 5 + rnd() * 7, h = 5 + rnd() * 15, d = 6 + rnd() * 6;
+  const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  b.position.set(x, h / 2, -45 - rnd() * 18); b.castShadow = b.receiveShadow = true; R.scene.add(b);
+}
+for (let i = 0; i < 5; i++) {
+  const b = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 1.4),
+    new THREE.MeshStandardMaterial({ color: 0x7a6a52, roughness: 0.8 }));
+  b.position.set(-6 + i * 3, 0.7, -6 - i * 2.5); b.castShadow = b.receiveShadow = true; R.scene.add(b);
+}
+const q = new URLSearchParams(location.search);
+if (q.get('epic') === '0') R.settings.fxEpic = false;
+if (q.get('blood') === '0') R.settings.fxBlood = false;
+R.applyToggles();
+const sun = new THREE.Vector3(-0.30, 0.26, -0.92).normalize();
+R.camera.position.set(0, 2.2, 0);
+R.camera.lookAt(new THREE.Vector3(sun.x * 40, 2.2 + sun.y * 40, sun.z * 40));
+window.__LAB__ = { R, splat(a = 0.8) { R.splatter(a); return 'ok'; } };
+let last = performance.now();
+function frame(now) { const dt = Math.min(0.05, (now - last) / 1000); last = now; R.update(dt); R.render(dt); requestAnimationFrame(frame); }
+requestAnimationFrame(frame);
+window.__LAB_READY__ = true;
+</script></body></html>
