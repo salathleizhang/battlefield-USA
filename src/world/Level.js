@@ -371,12 +371,20 @@ export class Level {
     const gy = base ?? this.groundHeight(x, z);
     const hit = lib.place(name, { x, z, y: gy + y, rot, scale, color });
     if (!hit) return null;
+    const surf = surface || hit.surface;
+    // Crates, barrels, ammo boxes and light cover can be destroyed; the record
+    // is what the projectile path and blast radius look up.
+    const rec = this.game.destructibles?.registerProp({
+      name, entry: hit.entry, collider: null, size: hit.size, center: hit.center, surface: surf,
+    }) || null;
     if (solid) {
       const p = hit.center;
-      this.solidBox(p.x, p.y, p.z, hit.size.x, hit.size.y, hit.size.z, rot, {
-        surface: surface || hit.surface,
+      const col = this.solidBox(p.x, p.y, p.z, hit.size.x, hit.size.y, hit.size.z, rot, {
+        surface: surf, prop: rec,
       });
+      if (rec) this.game.destructibles.attachPropCollider(rec, col);
     }
+    hit.prop = rec;
     return hit;
   }
 

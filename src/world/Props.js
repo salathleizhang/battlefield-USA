@@ -230,11 +230,14 @@ export class Props {
     const quat = new THREE.Quaternion().setFromAxisAngle(UP, rot);
     const matrix = new THREE.Matrix4().compose(pos, quat, new THREE.Vector3(s, s, s));
     if (!this.pending.has(name)) this.pending.set(name, []);
-    this.pending.get(name).push({ matrix, color });
+    // The queue entry is the prop's handle after flush: it carries the instance
+    // mesh + index so the destruction layer can retire one crate out of a batch.
+    const entry = { matrix, color, parts: [], material: null };
+    this.pending.get(name).push(entry);
 
     const size = def.size.clone().multiplyScalar(s);
     const center = def.center.clone().multiplyScalar(s).applyAxisAngle(UP, rot).add(pos);
-    return { size, center, surface: def.surface, baseY: pos.y };
+    return { size, center, surface: def.surface, baseY: pos.y, entry };
   }
 
   /** Build the instanced meshes for everything queued since the last flush. */
@@ -263,7 +266,11 @@ export class Props {
           });
         }
         mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
-        for (let i = 0; i < list.length; i++) mesh.setMatrixAt(i, list[i].matrix);
+        for (let i = 0; i < list.length; i++) {
+          mesh.setMatrixAt(i, list[i].matrix);
+          list[i].parts.push({ mesh, index: i });
+          if (!list[i].material) list[i].material = part.mat;
+        }
         mesh.instanceMatrix.needsUpdate = true;
         if (tinted) {
           // Same geometry, different sap: a per-instance multiply keeps a row of
