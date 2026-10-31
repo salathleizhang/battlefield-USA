@@ -7,3 +7,9 @@ screenshots/
 
 # local tooling environments
 .fontenv/
+
+# sketchfab-cli (third-party, ~66MB clone + downloads)
+tools/sketchfab-cli/
+
+# reference clones (third-party)
+reference/
