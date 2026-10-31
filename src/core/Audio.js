@@ -10,6 +10,10 @@ import * as THREE from 'three';
  */
 const SAMPLE_ROOT = '/assets/audio/';
 
+// Mix headroom: at 100% volume a dense firefight peaks near −1 dBFS, so the
+// clipper only rounds the loudest stacks instead of shaping the whole mix.
+const HEADROOM = 0.7;
+
 const GROUPS = {
   // Battlefield voices: charge shout, bugle, curses and the attack order.
   voice: ['charge-crowd', 'bugle-charge', 'curse-american', 'order-kill-americans'],
@@ -126,17 +130,11 @@ export class Audio {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     const ctx = this.ctx = new AC();
-    const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -14;
-    comp.knee.value = 18;
-    comp.ratio.value = 6;
-    comp.attack.value = 0.003;
-    // Fast enough that rapid fire does not duck the whole bed between shots.
-    comp.release.value = 0.2;
-
-    // Last stage before the speakers: the compressor still lets a 3 ms transient
-    // through, so a close explosion plus overlapping reports can hand the DAC
-    // samples above full scale. A soft knee saturates those instead of clipping.
+    // The only dynamics stage. A DynamicsCompressor used to sit here, but its gain
+    // rode the explosion sub-bass: on a close blast it raised the 3–8 kHz share of
+    // the output from 0.1% to 1.6% (audible crackle), and 200 m away it added
+    // +2 dB, flattening the distance cues the mixer works to build. A soft clipper
+    // cannot pump: it is linear to −2 dBFS and only rounds the last 2 dB.
     const clip = ctx.createWaveShaper();
     clip.curve = softClipCurve();
     clip.oversample = '4x';
@@ -148,12 +146,17 @@ export class Audio {
     this.muffle.Q.value = 0.4;
 
     this.master = ctx.createGain();
-    this.master.gain.value = this.volume;
-    this.master.connect(this.muffle);
-    this.muffle.connect(comp);
-    comp.connect(clip);
+    this.master.gain.value = this.volume * HEADROOM;
+    // Everything below ~35 Hz is inaudible on most speakers but still drives the
+    // cone (and used to modulate the compressor), so cut it once here.
+    this.rumbleFilter = ctx.createBiquadFilter();
+    this.rumbleFilter.type = 'highpass';
+    this.rumbleFilter.frequency.value = 35;
+    this.rumbleFilter.Q.value = 0.707;
+    this.master.connect(this.rumbleFilter);
+    this.rumbleFilter.connect(this.muffle);
+    this.muffle.connect(clip);
     clip.connect(ctx.destination);
-    this.comp = comp;
     this.clipper = clip;
 
     this.sfx = ctx.createGain();
@@ -172,7 +175,7 @@ export class Audio {
     this._loadSamples();
   }
 
-  setVolume(v) { this.volume = v; if (this.master) this.master.gain.value = v; }
+  setVolume(v) { this.volume = v; if (this.master) this.master.gain.value = v * HEADROOM; }
 
   /* ------------------------------------------------------------ sample loading */
 
@@ -321,7 +324,9 @@ export class Audio {
       node.connect(p);
       node = p;
     }
-    const rolloff = 1 / (1 + dist / 38);
+    // One distance law for both the dry path and the reverb send; `_out` used to
+    // hard-code its own copy, which silently ignored changes to rollout().
+    const rolloff = rollout(dist);
     node.connect(this.sfx);
     if (reverb > 0) {
       const rg = this._gain(reverb * (0.55 + rollout(dist) * 0.6));
@@ -544,11 +549,11 @@ export class Audio {
     src.start(t); src.stop(t + 1.4);
     const sub = this.ctx.createOscillator();
     sub.type = 'sine';
-    sub.frequency.setValueAtTime(85, t);
-    sub.frequency.exponentialRampToValueAtTime(28, t + 0.6);
+    sub.frequency.setValueAtTime(70, t);
+    sub.frequency.exponentialRampToValueAtTime(36, t + 0.6);
     const sg = this._gain(0.0001);
     sub.connect(sg); sg.connect(out);
-    this._env(sg.gain, t, 0.004, 0.8, 0.9);
+    this._env(sg.gain, t, 0.004, 0.8, 0.55);
     sub.start(t); sub.stop(t + 1.0);
   }
 
@@ -652,7 +657,7 @@ export class Audio {
   }
 }
 
-function rollout(dist) { return 1 / (1 + dist / 38); }
+function rollout(dist) { return 1 / Math.pow(1 + dist / 30, 1.3); }
 
 /**
  * Output transfer curve: linear to about −2 dBFS, then a tanh knee that lands on
@@ -665,9 +670,11 @@ function softClipCurve(points = 4096) {
   for (let i = 0; i < points; i++) {
     const x = (i / (points - 1)) * 2 - 1;
     const a = Math.abs(x);
+    // tanh(k) with no extra slope term: value and first derivative both match the
+    // linear segment at the knee, so the curve never expands before it compresses.
     const y = a <= knee
       ? a
-      : knee + (top - knee) * (Math.tanh(((a - knee) / (1 - knee)) * 1.6) / Math.tanh(1.6));
+      : knee + (top - knee) * Math.tanh((a - knee) / (top - knee));
     curve[i] = Math.sign(x) * y;
   }
   return curve;
