@@ -1,0 +1,56 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>soldier lab</title>
+<style>html,body{margin:0;height:100%;background:#1d2126;overflow:hidden}canvas{display:block}</style>
+</head><body>
+<script type="module">
+import * as THREE from 'three';
+import { IronlineLibrary } from '/src/game/bots/IronlineLibrary.js';
+
+const r = new THREE.WebGLRenderer({ antialias: true });
+r.setPixelRatio(1); r.setSize(innerWidth, innerHeight);
+r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.1;
+r.shadowMap.enabled = true;
+document.body.appendChild(r.domElement);
+
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0x1d2126);
+sc.add(new THREE.HemisphereLight(0xc3d6ee, 0x3a3630, 1.1));
+const key = new THREE.DirectionalLight(0xfff2df, 2.6); key.position.set(-3, 5, 4); key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024);
+key.shadow.camera.left = -8; key.shadow.camera.right = 8; key.shadow.camera.top = 4; key.shadow.camera.bottom = -1;
+sc.add(key);
+const rim = new THREE.DirectionalLight(0xa9c8ff, 1.5); rim.position.set(4, 3, -4); sc.add(rim);
+const g = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: 0x3b4046, roughness: 0.95 }));
+g.rotation.x = -Math.PI / 2; g.receiveShadow = true; sc.add(g);
+const cam = new THREE.PerspectiveCamera(28, innerWidth / innerHeight, 0.1, 100);
+
+const lib = new IronlineLibrary({});
+await lib.load();
+
+const view = new URLSearchParams(location.search).get('v') || 'side';
+if (view === 'side') { cam.position.set(11, 1.9, 0); cam.lookAt(0, 1.05, 0); }
+else { cam.position.set(0, 1.55, 8.2); cam.lookAt(0, 1.2, 0); }
+
+const poses = view === 'side'
+  ? [{ team: 0, z: -2.4 }, { team: 1, z: 0 }, { team: 0, z: 2.4 }]
+  : [{ team: 0, x: -2.6 }, { team: 1, x: 0 }, { team: 0, x: 2.6 }];
+for (const p of poses) {
+  const s = lib.create(p.team, 0);
+  s.setPosition(p.x || 0, 0, p.z || 0, Math.PI);
+  sc.add(s.group);
+  s.mixer.update(0.5);
+  s._orientWeapon();
+  s.root.updateMatrixWorld(true);
+  const hand = s.root.getObjectByName('mixamorigRightHand');
+  const hq = hand.getWorldQuaternion(new THREE.Quaternion());
+  const finger = new THREE.Vector3(0, 1, 0).applyQuaternion(hq);
+  console.log('fingerDir', finger.toArray().map(v=>v.toFixed(2)).join(','), 'bodyFwd', new THREE.Vector3(0,0,1).toArray().join(','));
+  const gp = s.weapon.getObjectByName('kar98kgrip_r').getWorldPosition(new THREE.Vector3());
+  const mp = s.weapon.getObjectByName('kar98kmuzzle').getWorldPosition(new THREE.Vector3());
+  const hp = s.root.getObjectByName('mixamorigRightHand').getWorldPosition(new THREE.Vector3());
+  console.log('barrel', mp.clone().sub(gp).normalize().toArray().map(v => v.toFixed(2)).join(','),
+    'gripToHand', gp.distanceTo(hp).toFixed(3),
+    'weaponScale', s.weapon.getWorldScale(new THREE.Vector3()).x.toFixed(2));
+}
+
+r.setAnimationLoop(() => r.render(sc, cam));
+</script></body></html>
