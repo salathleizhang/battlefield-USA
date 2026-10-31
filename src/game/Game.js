@@ -672,3 +672,12 @@ export class Game {
     this.started = false;
   }
 }
+
+/** Shortest distance from point p to segment a→b (near-miss tests for fast bullets). */
+function segmentPointDistance(a, b, p) {
+  const abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z;
+  const apx = p.x - a.x, apy = p.y - a.y, apz = p.z - a.z;
+  const len2 = abx * abx + aby * aby + abz * abz;
+  const t = len2 > 1e-8 ? clamp((apx * abx + apy * aby + apz * abz) / len2, 0, 1) : 0;
+  return Math.hypot(apx - abx * t, apy - aby * t, apz - abz * t);
+}
