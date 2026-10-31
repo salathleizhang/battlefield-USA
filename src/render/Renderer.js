@@ -341,6 +341,11 @@ export class Renderer {
    */
   _applyBudget() {
     const tight = (this.renderScale ?? 1) < 0.9;
+    // On a tight budget the cascades refresh every other frame. The sun is
+    // static, so the only thing that can lag is a moving character's shadow by
+    // one displayed frame — invisible at 40+ fps, and it halves a pass that
+    // measured 3 ms at 1512x982.
+    this._shadowEvery = tight ? 2 : 1;
     const f = this.features;
     if (this.aoPass && f?.ao) {
       const mode = tight ? 'Low' : f.ao;
@@ -679,7 +684,8 @@ export class Renderer {
     this.blood.tick(dt);
     this._updateSun();
     r.info.reset();
-    r.shadowMap.needsUpdate = true;
+    const every = this._shadowEvery || 1;
+    r.shadowMap.needsUpdate = every === 1 || (this._frameCount % every === 0);
     this.composer.render(dt);
   }
 }
