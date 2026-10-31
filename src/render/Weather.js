@@ -69,7 +69,7 @@ export class Weather {
         opacity: opacity * (1 - i * 0.2), depthWrite: false, side: THREE.DoubleSide, fog: true,
       });
       const mesh = new THREE.Mesh(this.sheetGeo, mat);
-      mesh.position.set(0, 2.5 + i * 7.5, 0);
+      mesh.position.set(0, 3.5 + i * 8.5, 0);
       mesh.renderOrder = 2;
       this.scene.add(mesh);
       this.sheets.push({

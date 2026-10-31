@@ -779,6 +779,11 @@ export class Level {
     const env = this.campaign.env;
     const sky = this.mats.constructor.unify.uSkyReflect.value;
     sky.set(env.skyHorizon ?? 0xc9d0ce).lerp(new THREE.Color(env.skyTop ?? 0x8e9ea5), 0.12).multiplyScalar(1.05);
+    // Standing water normally mirrors a bright HDRI. Under a heavy fog lid the
+    // sky is diffuse, and leaving the 2.2x reflection in turns every puddle into
+    // a white patch on the deck. Always write it, so switching campaigns restores
+    // the shared material's default.
+    this.mats.get('puddle').envMapIntensity = env.puddleReflection ?? 2.2;
   }
 
   update(dt, t) {
@@ -808,11 +813,6 @@ export class Level {
         }
         pos.needsUpdate = true;
         a.mesh.geometry.computeVertexNormals();
-      } else if (a.type === 'fog') {
-        a.mesh.position.x = a.baseX + Math.sin(t * 0.035 + a.phase) * 16;
-        a.mesh.position.z = a.baseZ + Math.cos(t * 0.021 + a.phase) * 10;
-        a.mesh.position.y = a.baseY + Math.sin(t * 0.06 + a.phase) * 1.2;
-        a.mesh.material.opacity = a.opacity * (0.72 + 0.28 * Math.sin(t * 0.11 + a.phase));
       } else if (a.type === 'fn') {
         a.update(t, dt);
       }

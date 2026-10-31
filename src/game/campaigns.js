@@ -41,18 +41,18 @@ export const CAMPAIGNS = [
     video: '/assets/video/golden-gate-war-loop.mp4',
     accent: '#b6493a',
     env: {
-      weather: 'fog', fog: 0xb3bcb9, fogDensity: 0.0068, sun: 0xdbe2dc, sunIntensity: 1.0,
-      skyTop: 0x707f84, skyHorizon: 0xb3bcb9, ground: 0x4a514d, cloudiness: 0.8, cloudColor: 0x606a6a,
-      sunDir: { x: 0.42, y: 0.5, z: 0.76 }, sunDisc: 0.3, godRayWeight: 0.08,
-      hemiIntensity: 2.0, hemiColor: 0xc0cac7, hemiGround: 0x59615d,
-      ambience: 'bridge', wetness: 1.0,
-      hdri: 'goldenGate', envIntensity: 0.78, hdriRotation: 0.4,
+      weather: 'fog', fog: 0x9fb1b3, fogDensity: 0.0056, sun: 0xdde5e2, sunIntensity: 1.15,
+      skyTop: 0x738489, skyHorizon: 0x9fb1b3, ground: 0x4b524e, cloudiness: 0.7, cloudColor: 0x738285,
+      sunDir: { x: 0.42, y: 0.5, z: 0.76 }, sunDisc: 0.28, godRayWeight: 0.06,
+      hemiIntensity: 1.9, hemiColor: 0xbfcfd0, hemiGround: 0x57615e,
+      ambience: 'bridge', wetness: 1.0, puddleReflection: 1.0,
+      hdri: 'goldenGate', envIntensity: 0.8, hdriRotation: 0.4,
       // Fog also caps bot sight. See Bot.canSee: AI should not fire through a
       // wall of fog the player cannot see through either.
       visibility: 120,
       fogBanks: {
-        count: 46, size: 1.4, opacity: 1, wind: [4.2, 1.2], densitySwing: 0.34,
-        sheets: 3, sheetOpacity: 0.28, sheetColor: 0xdde5e1,
+        count: 46, size: 1.5, opacity: 1.5, wind: [4.2, 1.2], densitySwing: 0.28,
+        sheets: 3, sheetOpacity: 0.32, sheetColor: 0xc9d3cf,
       },
     },
   },
