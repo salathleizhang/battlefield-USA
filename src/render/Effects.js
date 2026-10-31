@@ -38,6 +38,36 @@ export class Effects {
     this.tracerGeo.translate(0, 0.5, 0);
     this.tmp = new THREE.Vector3();
     this.up = new THREE.Vector3(0, 1, 0);
+    /**
+     * Explosion lights are pooled and stay in the scene forever.
+     *
+     * three bakes the number of VISIBLE point lights into every material's
+     * program cache key, so creating one per explosion and removing it 0.3 s
+     * later recompiles every lit material in the scene twice per blast — the
+     * classic multi-hundred-millisecond hitch on the frame the grenade lands.
+     * A fixed pool with intensity driven to zero costs a constant +2 light
+     * slots in the shader and nothing else.
+     */
+    this.boomLights = [];
+    for (let i = 0; i < 2; i++) {
+      const light = new THREE.PointLight(0xffa24a, 0, 60, 2);
+      light.position.set(0, -500, 0);
+      this.scene.add(light);
+      this.boomLights.push({ light, t: 1, dur: 1, peak: 0 });
+    }
+  }
+
+  /** Hand out the pool slot closest to finishing; an overlap simply steals it. */
+  _boomLight(pos, scale) {
+    let best = this.boomLights[0];
+    for (const s of this.boomLights) if (s.t / s.dur > best.t / best.dur) best = s;
+    best.t = 0;
+    best.dur = 0.32;
+    best.peak = 90 * scale;
+    best.light.distance = 60 * scale;
+    best.light.position.copy(pos);
+    best.light.intensity = best.peak;
+    return best;
   }
 
   _sprite(tex, pos, vel, size, life, color, additive = true, gravity = 0) {
@@ -149,10 +179,7 @@ export class Effects {
     core.position.copy(pos);
     this.scene.add(core);
     this.flashes.push({ sprite: core, life: 0.18, max: 0.18, grow: 9 * scale });
-    const light = new THREE.PointLight(0xffa24a, 90 * scale, 60 * scale, 2);
-    light.position.copy(pos);
-    this.scene.add(light);
-    this.flashes.push({ sprite: light, life: 0.32, max: 0.32, light: true });
+    this._boomLight(pos, scale);
     for (let i = 0; i < 26 * scale; i++) {
       const d = new THREE.Vector3(rand(-1, 1), rand(-0.2, 1), rand(-1, 1)).normalize();
       this._sprite(this.tex.spark, pos, d.multiplyScalar(rand(4, 16) * scale), rand(0.1, 0.3), rand(0.4, 1.0), 0xffb050, true, 12);
@@ -224,12 +251,17 @@ export class Effects {
         this.tracers.splice(i, 1);
       }
     }
+    for (const b of this.boomLights) {
+      if (b.t >= b.dur) { if (b.light.intensity !== 0) b.light.intensity = 0; continue; }
+      b.t = Math.min(b.dur, b.t + dt);
+      const k = 1 - b.t / b.dur;
+      b.light.intensity = b.peak * k * k;
+    }
     for (let i = this.flashes.length - 1; i >= 0; i--) {
       const f = this.flashes[i];
       f.life -= dt;
       const t = 1 - f.life / f.max;
-      if (f.light) f.sprite.intensity *= 0.82;
-      else if (f.grow) {
+      if (f.grow) {
         if (f.flat) f.sprite.scale.setScalar(1 + t * f.grow);
         else f.sprite.scale.setScalar(1 + t * f.grow);
         f.sprite.material.opacity = Math.max(0, 0.9 * (1 - t));
