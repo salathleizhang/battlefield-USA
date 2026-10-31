@@ -741,9 +741,9 @@ export function buildMiamiBeach(L) {
   for (const cp of [cpA, cpB, cpC]) cp.marker.rotation.y = Math.PI / 2;
 
   /* 装甲：海滩公路上的远征军斯图亚特，B 点十字路口的两辆谢尔曼。 */
-  L.vehicle('stuart', 44, 24, Math.PI / 2, { team: 0, player: true });
-  L.vehicle('sherman', 4, -34, -Math.PI / 2, { team: 1 });
-  L.vehicle('sherman', -2, 46, -Math.PI / 2, { team: 1 });
+  L.vehicle('patton', 45, 5, Math.PI / 2, { team: 0, player: true });
+  L.vehicle('sherman', 18.7, -14.5, -Math.PI / 2, { team: 1 });
+  L.vehicle('sherman', -140, 0, -Math.PI / 2, { team: 1, base: deckY });
   /* 可破坏建筑：海滨售货棚、装饰艺术街区的两层民居。 */
   L.structure({ type: 'shed', x: 30, z: 58, yaw: -0.3 });
   L.structure({ type: 'house', x: 26, z: -52, yaw: 0.35, material: 'plaster' });
