@@ -7,6 +7,17 @@ const US_NAMES = ['米勒', '卡特', '沃克', '布朗', '戴维斯', '汤普�
 const CN_NAMES = ['铁柱', '二牛', '长胜', '德福', '青山', '大勇', '红军', '志远', '海生', '建国'];
 
 /**
+ * Difficulty presets (reference DIFFICULTY table, retuned for our aim model):
+ * reaction range before the first shot, spread multiplier, and pause between shots.
+ */
+export const DIFFICULTY = {
+  recruit: { label: '新兵', react: [0.55, 0.95], spread: 1.5, fireGap: 1.3 },
+  regular: { label: '常规', react: [0.3, 0.62], spread: 1.0, fireGap: 1.0 },
+  hardened: { label: '老兵', react: [0.22, 0.42], spread: 0.8, fireGap: 0.85 },
+  veteran: { label: '精锐', react: [0.15, 0.3], spread: 0.65, fireGap: 0.72 },
+};
+
+/**
  * Rifleman AI: perception → engage / advance / capture, with cover-ish steering.
  * Bots are capsule colliders tagged as actors so bullets can hit them.
  */
@@ -29,6 +40,16 @@ export class Bot {
     this.route = null;
     this.routeIndex = 0;
     this.fireTimer = rand(0.6, 2.2);
+    this.grenades = 1;
+    this.grenadeCd = rand(8, 16);
+    this.jumpY = 0;
+    this.jumpV = 0;
+    this.jumpCd = 0;
+    // A* route (see NavGrid): waypoints to follow when the target is behind geometry.
+    this.path = null;
+    this.pathIndex = 0;
+    this.pathGoal = null;
+    this.repathT = 0;
     this.clip = team === 1 ? 8 : 5;
     this.perceptT = rand(0, 0.25);
     this.aimTime = 0;
@@ -38,8 +59,9 @@ export class Bot {
     this.deadT = 0;
     this.spawnPos = position.clone();
     this.spawnYaw = yaw;
-    this.accuracy = team === 1 ? 0.75 : 0.68;
-    this.reaction = rand(0.25, 0.7);
+    this.difficulty = DIFFICULTY[game.difficulty] || DIFFICULTY.regular;
+    this.accuracy = this.difficulty.spread;
+    this.reaction = rand(...this.difficulty.react);
     this.lastDamageTime = -99;
     this.time = 0;
     this.aiming = false;
@@ -49,6 +71,9 @@ export class Bot {
     this.heardPos = null;
     this.heardAt = -99;
     this.lastSuppressedBy = null;
+    this.coverPos = null;
+    this.coverHoldUntil = 0;
+    this.coverNextAt = 0;
 
     this.model = (game.characters && game.characters.ready)
       ? game.characters.create(team, variant)
@@ -125,6 +150,31 @@ export class Bot {
     }
   }
 
+  /** A spot nearby where enemy fire can't reach the chest, but a standing peek can shoot back. */
+  findCover() {
+    const threat = this.target?.position;
+    if (!threat) return null;
+    const threatEye = new THREE.Vector3(threat.x, threat.y + 1.5, threat.z);
+    let best = null, bestS = -Infinity;
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2 + rand(-0.2, 0.2);
+      const r = rand(3, 11);
+      const x = this.position.x + Math.cos(a) * r;
+      const z = this.position.z + Math.sin(a) * r;
+      const gh = this.game.physics.raycast({ x, y: this.position.y + 2, z }, { x: 0, y: -1, z: 0 }, 7, G.WORLD);
+      if (!gh) continue;
+      const y = gh.point.y;
+      if (y > this.position.y + 1.5 || y < this.position.y - 3) continue;
+      const chest = new THREE.Vector3(x, y + 1.0, z);
+      if (this.game.physics.lineOfSight(threatEye, chest)) continue; // still exposed
+      const peek = this.game.physics.lineOfSight(threatEye, new THREE.Vector3(x, y + 1.6, z));
+      const dt = chest.distanceTo(threatEye);
+      const s = (peek ? 3 : 0) - r * 0.2 - Math.abs(dt - 18) * 0.1;
+      if (s > bestS) { bestS = s; best = new THREE.Vector3(x, y, z); }
+    }
+    return best;
+  }
+
   update(dt) {
     this.time += dt;
     if (!this.alive) { this.deadT += dt; this.model.update(dt, 0, false, false); return; }
@@ -135,7 +185,7 @@ export class Bot {
       this.perceptT = 0.22 + Math.random() * 0.16;
       const seen = this.findTarget();
       if (seen) {
-        if (this.target !== seen) { this.aimTime = 0; this.reaction = rand(0.22, 0.6); }
+        if (this.target !== seen) { this.aimTime = 0; this.reaction = rand(...this.difficulty.react); }
         this.target = seen;
         this.targetSeenAt = this.time;
         this.lastSeenPos.copy(seen.position);
@@ -151,6 +201,8 @@ export class Bot {
     }
 
     this.fireTimer -= dt;
+    this.grenadeCd = Math.max(0, this.grenadeCd - dt);
+    this.jumpCd = Math.max(0, this.jumpCd - dt);
     this.strafeT -= dt;
     if (this.strafeT <= 0) { this.strafeT = rand(1.2, 3.0); this.strafeDir *= -1; }
 
@@ -167,17 +219,34 @@ export class Bot {
       // Face target.
       const desiredYaw = Math.atan2(-toTarget.x, -toTarget.z);
       this.yaw = this._turn(this.yaw, desiredYaw, dt, 4.5);
-      // Keep distance / strafe.
-      const flat = new THREE.Vector3(toTarget.x, 0, toTarget.z).normalize();
-      const right = new THREE.Vector3(-flat.z, 0, flat.x);
-      if (dist > 55) moveTarget = this.position.clone().addScaledVector(flat, 4);
-      else if (dist < 16) moveTarget = this.position.clone().addScaledVector(flat, -3);
-      else moveTarget = this.position.clone().addScaledVector(right, this.strafeDir * 3);
-      speed = 1.9;
+      // Keep distance / strafe — unless pinned down or hurt, then break line of sight.
+      const hp = this.health / this.maxHealth;
+      const pinned = this.suppression > 0.55 || hp < 0.45 || (this.clip <= 1 && this.team === 1);
+      if (pinned && !this.coverPos && this.time > this.coverNextAt) {
+        this.coverPos = this.findCover();
+        // Failed searches wait a moment too: 14 probe rays are not a per-frame cost.
+        this.coverNextAt = this.time + (this.coverPos ? 2 : 3);
+        this.coverHoldUntil = this.time + 2.5;
+      }
+      if (this.coverPos) {
+        const toCover = this.coverPos.distanceTo(this.position);
+        if (toCover > 1.3) { moveTarget = this.coverPos; speed = 3.2; }
+        else if (!pinned && this.time > this.coverHoldUntil) {
+          this.coverPos = null;
+          this.coverNextAt = this.time + 5;
+        }
+      } else {
+        const flat = new THREE.Vector3(toTarget.x, 0, toTarget.z).normalize();
+        const right = new THREE.Vector3(-flat.z, 0, flat.x);
+        if (dist > 55) moveTarget = this.position.clone().addScaledVector(flat, 4);
+        else if (dist < 16) moveTarget = this.position.clone().addScaledVector(flat, -3);
+        else moveTarget = this.position.clone().addScaledVector(right, this.strafeDir * 3);
+        speed = 1.9;
+      }
       // Reaction time gates the first shot, and incoming fire makes the aim wobble.
       if (this.fireTimer <= 0 && dist < 120 && this.aimTime >= this.reaction && this.suppression < 0.75) {
         this.fireTimer = rand(1.15, 2.3) / (this.team === 1 ? 1.12 : 1);
-        this.fireTimer *= 1 + this.suppression;
+        this.fireTimer *= this.difficulty.fireGap * (1 + this.suppression);
         this.shoot();
       }
     } else {
@@ -212,12 +281,22 @@ export class Bot {
         const desiredYaw = Math.atan2(-(p.x - this.position.x), -(p.z - this.position.z));
         this.yaw = this._turn(this.yaw, desiredYaw, dt, 3);
       }
+      // Lob a grenade at where an enemy just disappeared.
+      const sinceSeen = this.time - this.targetSeenAt;
+      const dSeen = this.lastSeenPos.distanceTo(this.position);
+      if (this.grenades > 0 && this.grenadeCd <= 0
+        && sinceSeen < 3.5 && dSeen > 8 && dSeen < 28) {
+        this.grenades--;
+        this.grenadeCd = 25;
+        this.game.throwBotGrenade(this, this.eye, this.lastSeenPos.clone());
+      }
     }
 
     // Movement + simple obstacle avoidance.
     let moved = 0;
     if (moveTarget) {
-      const dir = moveTarget.clone().sub(this.position);
+      const navTarget = this._navTarget(moveTarget, dt);
+      const dir = navTarget.clone().sub(this.position);
       dir.y = 0;
       if (dir.lengthSq() > 0.01) {
         dir.normalize();
@@ -240,18 +319,39 @@ export class Bot {
           const desiredYaw = Math.atan2(-dir.x, -dir.z);
           this.yaw = this._turn(this.yaw, desiredYaw, dt, 6);
         }
+        // Hop low obstacles (sandbag rows, crates) instead of grinding against them.
+        if (this.jumpY <= 0 && this.jumpCd <= 0) {
+          const knee = this.game.physics.raycast(
+            { x: this.position.x, y: this.position.y + 0.35, z: this.position.z }, dir, 0.9, G.WORLD,
+          );
+          const chest = this.game.physics.raycast(
+            { x: this.position.x, y: this.position.y + 1.25, z: this.position.z }, dir, 0.9, G.WORLD,
+          );
+          if (knee && (!chest || chest.distance > knee.distance + 0.25)) {
+            this.jumpV = 4.4;
+            this.jumpY = 0.02;
+            this.jumpCd = 1.4;
+          }
+        }
         this.stuckT += dt;
         if (this.stuckT > 2.5) { this.strafeDir *= -1; this.stuckT = 0; }
       }
     }
 
-    // Ground clamp via raycast.
+    // Jump arc, then ground clamp via raycast.
+    if (this.jumpY > 0 || this.jumpV > 0) {
+      this.jumpV -= 16 * dt;
+      this.jumpY += this.jumpV * dt;
+      if (this.jumpY <= 0) { this.jumpY = 0; this.jumpV = 0; }
+    }
     const ground = this.game.physics.raycast(
       { x: this.position.x, y: this.position.y + 2.2, z: this.position.z },
       { x: 0, y: -1, z: 0 }, 8, G.WORLD,
     );
-    if (ground) this.position.y = damp(this.position.y, ground.point.y, 16, dt);
-    else this.position.y -= 9 * dt;
+    if (ground) {
+      if (this.jumpY > 0) this.position.y = ground.point.y + this.jumpY;
+      else this.position.y = damp(this.position.y, ground.point.y, 16, dt);
+    } else this.position.y -= 9 * dt;
 
     // Keep inside map bounds.
     const b = this.game.level.bounds;
@@ -263,6 +363,31 @@ export class Bot {
     this.model.update(dt, moved, this.aiming, true);
 
     if (this.position.y < -8) this.die(null);
+  }
+
+  /**
+   * Steering point for this frame: the goal itself when a straight walk works,
+   * otherwise the next waypoint of an A* route (recomputed about once a second).
+   */
+  _navTarget(goal, dt) {
+    const nav = this.game.nav;
+    this.repathT -= dt;
+    if (!nav || this.position.distanceTo(goal) < 10) {
+      this.path = null;
+      this.pathGoal = null;
+      return goal;
+    }
+    if (this.pathGoal && this.pathGoal.distanceTo(goal) > 5) this.path = null;
+    if ((!this.path || !this.path.length) && this.repathT <= 0) {
+      this.path = nav.findPath(this.position, goal);
+      this.pathIndex = 0;
+      this.pathGoal = goal.clone();
+      this.repathT = 1 + Math.random() * 0.7;
+    }
+    if (!this.path || !this.path.length) return goal;
+    while (this.pathIndex < this.path.length
+      && this.position.distanceTo(this.path[this.pathIndex]) < 1.0) this.pathIndex++;
+    return this.path[this.pathIndex] || goal;
   }
 
   _turn(a, b, dt, speed) {
@@ -295,8 +420,8 @@ export class Bot {
     const dir = to.sub(from).normalize();
     // Accuracy falls with range; bots intentionally imperfect.
     const dist = from.distanceTo(target.position);
-    const spread = 0.008 + dist * 0.00016 + (this.aimTime < this.reaction ? 0.02 : 0)
-      + this.suppression * 0.022;
+    const spread = (0.008 + dist * 0.00016 + (this.aimTime < this.reaction ? 0.02 : 0)
+      + this.suppression * 0.022) * this.accuracy;
     dir.x += rand(-spread, spread);
     dir.y += rand(-spread * 0.7, spread * 0.8);
     dir.z += rand(-spread, spread);
@@ -364,6 +489,21 @@ export class Bot {
     this.target = null;
     this.aiming = false;
     this.fireTimer = rand(0.8, 2);
+    this.grenades = 1;
+    this.grenadeCd = rand(8, 16);
+    this.jumpY = 0;
+    this.jumpV = 0;
+    this.jumpCd = 0;
+    this.path = null;
+    this.pathIndex = 0;
+    this.pathGoal = null;
+    this.repathT = 0;
+    this.suppression = 0;
+    this.heardPos = null;
+    this.heardAt = -99;
+    this.coverPos = null;
+    this.coverHoldUntil = 0;
+    this.coverNextAt = 0;
     if (this.model.reset) {
       this.model.reset();
     } else {

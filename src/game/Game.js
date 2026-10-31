@@ -17,6 +17,7 @@ import { loadRifle } from './weapons/RifleModel.js';
 import { Bot } from './bots/Bot.js';
 import { CharacterLibrary } from './bots/CharacterLibrary.js';
 import { Match } from './Match.js';
+import { NavGrid } from './bots/NavGrid.js';
 import { HUD } from '../ui/HUD.js';
 import { Atmosphere } from '../render/Atmosphere.js';
 import { Ambience } from '../render/Ambience.js';
@@ -128,6 +129,8 @@ export class Game {
     const q = new URLSearchParams(location.search);
     this.teardown();
     this.campaign = campaign;
+    // ?difficulty=recruit|regular|hardened|veteran (bots fall back to regular on anything else).
+    this.difficulty = (q.get('difficulty') || 'regular').toLowerCase();
     this.stats = { kills: 0, deaths: 0 };
     this.respawnT = 0;
     this.lastKiller = null;
@@ -143,6 +146,13 @@ export class Game {
     this.level.build();
     // Every world material goes through the shared weathering / wetness / puddle pass.
     this.level.applyUnify();
+    // Walkable grid for bot pathfinding, baked from the level colliders just built.
+    try {
+      this.nav = new NavGrid(this.level, this.physics).build();
+    } catch (e) {
+      console.warn('[nav] grid build failed; bots fall back to steering', e);
+      this.nav = null;
+    }
     this.renderer.setEnvironment(campaign.env);
     this.renderer.setHDRI(this.materials.pbr.hdri(campaign.env.hdri), {
       intensity: campaign.env.envIntensity ?? 0.95,
