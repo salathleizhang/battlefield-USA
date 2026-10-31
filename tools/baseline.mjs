@@ -101,7 +101,10 @@ const report = { url: URL_, size: `${W}x${H}`, frames: FRAMES, shots: [], errors
 for (const shot of SHOTS) {
   const t0 = Date.now();
   try {
-    const res = await withPage(`${URL_}?capture=1&seed=7`, async ({ evaluate, logs, send }) => {
+    const target = new URL(URL_);
+    target.searchParams.set('capture', '1');
+    target.searchParams.set('seed', '7');
+    const res = await withPage(target.toString(), async ({ evaluate, logs, send }) => {
       let ready = false;
       for (let i = 0; i < 180; i++) {
         if (await evaluate('window.__READY__ === true')) { ready = true; break; }
