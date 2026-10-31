@@ -52,6 +52,9 @@ export class Game {
     this.worldGroup = new THREE.Group();
     this.assignT = 0;
     this.miamiCar = null;
+    this._voiceIntro = null;
+    this._voiceCd = 0;
+    this._wasSprinting = false;
   }
 
   async init(onProgress) {
@@ -228,6 +231,9 @@ export class Game {
     this.time = 0;
     this.audio.ensure();
     this.audio.setVolume(this.settings.volume);
+    this._voiceIntro = { stage: 0, t: 0 };
+    this._voiceCd = 5;
+    this._wasSprinting = false;
     this.input.lock();
     this.canvas.focus?.();
     this.onMissionStart?.(campaign);
@@ -364,9 +370,60 @@ export class Game {
     this.weapon.reloading = false;
     this.weapon.cycleT = 0;
     this.weapon.reloadT = 0;
+    this.weapon.reloadCommitted = false;
+    this.weapon.spread = 0;
+    this.weapon.shotIndex = 0;
+    this.weapon.sprintLock = 0;
+    this.weapon.adsT = 0;
     this.hud?.setReloading(false);
     this.viewmodel?.setEnabled(true);
     this.grenades = Math.max(this.grenades, 2);
+  }
+
+  /**
+   * Opening charge and squad barks.
+   *
+   * The first seconds of a mission play the commander's order, then the bugle,
+   * then the roar of the squad. Later, every fresh forward sprint (Shift + W)
+   * pulls one more shout, with a long cooldown so it never turns into a loop.
+   */
+  updateBattleVoices(dt) {
+    const a = this.audio;
+    if (!a?.ready) return;
+    const intro = this._voiceIntro;
+    if (intro) {
+      intro.t += dt;
+      if (intro.stage === 0 && intro.t >= 0.7 && a.has('order-kill-americans')) {
+        a.voice('order-kill-americans', { volume: 0.95, reverb: 0.3 });
+        intro.stage = 1; intro.t = 0;
+      } else if (intro.stage === 1 && intro.t >= 1.2 && a.has('bugle-charge')) {
+        a.voice('bugle-charge', { volume: 0.62, reverb: 0.55 });
+        intro.stage = 2; intro.t = 0;
+      } else if (intro.stage === 2 && intro.t >= 2.8 && a.has('charge-crowd')) {
+        a.voice('charge-crowd', { volume: 0.8, reverb: 0.5, spread: 0.45 });
+        intro.stage = 3; intro.t = 0;
+      } else if (intro.stage === 3 && intro.t >= 9.5 && a.has('curse-american')) {
+        a.voice('curse-american', { volume: 0.8, reverb: 0.4, pan: -0.15 });
+        intro.stage = 4; intro.t = 0;
+      } else if (intro.stage === 4) {
+        this._voiceIntro = null;
+      }
+    }
+
+    if (this._voiceCd > 0) this._voiceCd -= dt;
+    const p = this.player;
+    const charging = !!(p?.alive && p.sprinting && !p.aiming);
+    if (charging && !this._wasSprinting && this._voiceCd <= 0) {
+      this._voiceCd = 12 + Math.random() * 7;
+      if (Math.random() < 0.32 && a.has('curse-american')) {
+        a.voice('curse-american', {
+          volume: 0.85, reverb: 0.35, pan: (Math.random() * 2 - 1) * 0.2,
+        });
+      } else if (a.has('charge-crowd')) {
+        a.voice('charge-crowd', { volume: 0.72, reverb: 0.45, spread: 0.5 });
+      }
+    }
+    this._wasSprinting = charging;
   }
 
   throwGrenade(owner) {
@@ -496,6 +553,7 @@ export class Game {
       bot.update(dt);
     }
 
+    this.updateBattleVoices(dt);
     this.updateProjectiles(dt);
     this.updateGrenades(dt);
     this.materials.update(dt);

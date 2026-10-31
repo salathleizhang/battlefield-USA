@@ -181,7 +181,7 @@ export class HUD {
     this.el.hitmarker.classList.add('show');
     if (kill) this.el.hitmarker.classList.add('kill');
     this.hitT = 0.16;
-    this.game.audio.hitmark();
+    this.game.audio.hitmark(kill);
   }
 
   damage(attacker) {

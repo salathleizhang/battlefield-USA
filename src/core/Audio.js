@@ -11,10 +11,19 @@ import * as THREE from 'three';
 const SAMPLE_ROOT = '/assets/audio/';
 
 const GROUPS = {
+  // Battlefield voices: charge shout, bugle, curses and the attack order.
+  voice: ['charge-crowd', 'bugle-charge', 'curse-american', 'order-kill-americans'],
   guns: [
+    // Recorded Type 38 Arisaka and M1 Garand reports (CC0, see CREDITS.md).
+    'type38_player_near_000', 'type38_player_near_001',
+    'type38_world_000', 'type38_world_001',
+    'type38_enemy_distant_000', 'type38_enemy_distant_001',
+    'm1_player_near_000', 'm1_world_000',
+    'm1_enemy_distant_000', 'm1_enemy_distant_001',
+    'm1_clip_ping_000',
+    // Kept as a fallback if the period recordings above fail to load.
     'awm_player_near', 'awm_world', 'awm_enemy_distant',
     'm24_player_near', 'm24_world', 'm24_enemy_distant',
-    'm1911_player_near', 'm1911_world',
   ],
   foley: [
     'bolt_back', 'bolt_fwd', 'rifle_boltdrop', 'rifle_rack', 'rifle_dry',
@@ -27,6 +36,16 @@ const GROUPS = {
     'footstep_carpet_000', 'footstep_carpet_001', 'footstep_carpet_002',
   ],
   impacts: [
+    // Bullet-specific impacts recorded for each material.
+    'impact_bullet_concrete_000', 'impact_bullet_concrete_001', 'impact_bullet_concrete_002',
+    'impact_bullet_metal_000', 'impact_bullet_metal_001', 'impact_bullet_metal_002',
+    'impact_bullet_wood_000', 'impact_bullet_wood_001',
+    'impact_bullet_glass_000', 'impact_bullet_glass_001',
+    'impact_bullet_dirt_000', 'impact_bullet_dirt_001',
+    'impact_bullet_water_000', 'impact_bullet_water_001',
+    'impact_flesh_000', 'impact_flesh_001', 'impact_flesh_002', 'impact_flesh_003',
+    'impact_flesh_heavy_000', 'impact_flesh_heavy_001',
+    'bullet_whiz_000', 'bullet_whiz_001',
     'impact_generic_light_000', 'impact_generic_light_001', 'impact_generic_light_002', 'impact_generic_light_003', 'impact_generic_light_004',
     'impact_metal_light_000', 'impact_metal_light_001', 'impact_metal_light_002', 'impact_metal_light_003', 'impact_metal_light_004',
     'impact_metal_medium_000', 'impact_metal_medium_001', 'impact_metal_medium_002', 'impact_metal_medium_003',
@@ -40,20 +59,39 @@ const GROUPS = {
     'explosionCrunch_000', 'explosionCrunch_001', 'explosionCrunch_002', 'explosionCrunch_003',
     'lowFrequency_explosion_000', 'lowFrequency_explosion_001',
   ],
-  ui: ['click_001', 'select_001', 'select_002', 'tick_001', 'tick_002', 'confirmation_001'],
+  ui: [
+    'click_001', 'select_001', 'select_002', 'tick_001', 'tick_002', 'confirmation_001',
+    'hitmarker_000', 'hitmarker_001',
+  ],
 };
 
 const GROUP_DIR = {
-  guns: 'guns/', foley: 'foley/', steps: 'steps/',
+  voice: 'voice/', guns: 'guns/', foley: 'foley/', steps: 'steps/',
   impacts: 'impacts/', explosion: 'explosion/', ui: 'ui/',
 };
 
+const GUN_PROFILES = {
+  type38: { clip: 'type38', fallback: 'awm', pitch: 0.98, volume: 0.9 },
+  m1: { clip: 'm1', fallback: 'm24', pitch: 1.0, volume: 0.85 },
+};
+
 const IMPACT_GROUPS = {
+  metal: 'impact_bullet_metal', steel: 'impact_bullet_metal', car: 'impact_bullet_metal',
+  wood: 'impact_bullet_wood', plank: 'impact_bullet_wood',
+  concrete: 'impact_bullet_concrete', stucco: 'impact_bullet_concrete',
+  stone: 'impact_bullet_concrete', rubble: 'impact_bullet_concrete',
+  glass: 'impact_bullet_glass', dirt: 'impact_bullet_dirt', sand: 'impact_bullet_dirt',
+  water: 'impact_bullet_water', flesh: 'impact_flesh', flesh_heavy: 'impact_flesh_heavy',
+};
+
+// Kenney material hits, used only when a bullet recording is unavailable.
+const IMPACT_FALLBACK = {
   metal: 'impact_metal_medium', steel: 'impact_metal_light', car: 'impact_metal_light',
   wood: 'impact_plank_medium', plank: 'impact_plank_medium',
-  concrete: 'impact_plate_light', stone: 'impact_plate_light', rubble: 'impact_mining',
+  concrete: 'impact_plate_light', stucco: 'impact_plate_light',
+  stone: 'impact_plate_light', rubble: 'impact_mining',
   glass: 'impact_glass_light', dirt: 'impact_generic_light', sand: 'impact_generic_light',
-  flesh: 'impact_generic_light',
+  water: 'impact_generic_light', flesh: 'impact_generic_light', flesh_heavy: 'impact_generic_light',
 };
 
 const STEP_GROUPS = {
@@ -284,9 +322,22 @@ export class Audio {
 
   has(name) { return !!this.buffers.get(name)?.length; }
 
+  /**
+   * Voice line: a recorded shout with a little stereo width, used for the
+   * opening charge and for squad barks while the player sprints forward.
+   */
+  voice(name, { dist = 0, pan = 0, volume = 1, reverb = 0.4, when = 0, spread = 0 } = {}) {
+    if (!this.ready || !this.has(name)) return null;
+    if (spread > 0) {
+      this.play(name, { dist, pan: pan - spread, volume: volume * 0.72, reverb, when, pitchVar: 0.01 });
+      return this.play(name, { dist, pan: pan + spread, volume: volume * 0.72, reverb, when: when + 0.015, pitchVar: 0.01 });
+    }
+    return this.play(name, { dist, pan, volume, reverb, when, pitchVar: 0.01 });
+  }
+
   /* ------------------------------------------------------------ weapons */
 
-  shot(kind = 'type38', { dist = 0, pan = 0, suppressed = false, pos = null } = {}) {
+  shot(kind = 'type38', { dist = 0, pan = 0, suppressed = false, pos = null, empty = false } = {}) {
     if (!this.ready) return;
     if (pos) {
       const rel = pos.clone().sub(this.listener.pos);
@@ -295,18 +346,19 @@ export class Audio {
     }
     const t = this.ctx.currentTime;
     const near = dist < 4;
-    const base = kind === 'm1' ? 'm24' : 'awm';
+    const profile = GUN_PROFILES[kind] || GUN_PROFILES.type38;
+    const base = this.has(`${profile.clip}_player_near`) ? profile.clip : profile.fallback;
     const clip = near ? `${base}_player_near` : dist > 55 ? `${base}_enemy_distant` : `${base}_world`;
-    const sampleVol = near ? 0.9 : dist > 55 ? 0.62 : 0.8;
+    const sampleVol = (near ? 1 : dist > 55 ? 0.7 : 0.9) * profile.volume;
     if (this.has(clip)) {
       this.play(clip, {
         dist, pan, volume: sampleVol * (suppressed ? 0.35 : 1),
-        pitch: kind === 'm1' ? 1.04 : 0.97, pitchVar: 0.035,
+        pitch: profile.pitch, pitchVar: 0.035,
         reverb: suppressed ? 0.12 : 0.6,
       });
     }
     // Layer: sharp transient + low punch, quieter for distant reports.
-    const synth = near ? 0.55 : 0.32;
+    const synth = near ? 0.35 : 0.2;
     const out = this._out(dist, pan, { reverb: suppressed ? 0.1 : 0.5 });
     const sharp = kind === 'type38' || kind === 'm1';
     const src = this._srcNoise();
@@ -339,10 +391,16 @@ export class Audio {
       tail.start(t); tail.stop(t + 0.8);
     }
     // Semiautomatic Garand: the en-bloc clip ping when the clip empties.
-    if (kind === 'm1' && Math.random() < 0.35) this._ping(t + 0.12);
+    if (kind === 'm1' && empty) this._ping(t + 0.10);
   }
 
   _ping(t) {
+    const when = Math.max(0, t - this.ctx.currentTime);
+    if (this.has('m1_clip_ping')) {
+      return void this.play('m1_clip_ping', {
+        volume: 0.65, reverb: 0.35, when, pitchVar: 0.05,
+      });
+    }
     for (const [f, a] of [[2600, 0.05], [4100, 0.03], [5300, 0.02]]) {
       const o = this.ctx.createOscillator();
       o.type = 'sine';
@@ -416,10 +474,12 @@ export class Audio {
   impact(surface = 'dirt', dist = 0, pan = 0) {
     if (!this.ready) return;
     const group = IMPACT_GROUPS[surface] || 'impact_generic_light';
-    if (this.has(group) && surface !== 'flesh') {
-      return void this.play(group, {
-        dist, pan, volume: surface === 'metal' ? 0.7 : 0.55,
-        pitch: surface === 'dirt' || surface === 'sand' ? 0.8 : 1,
+    const pick = this.has(group) ? group : (IMPACT_FALLBACK[surface] || 'impact_generic_light');
+    if (this.has(pick)) {
+      const volume = surface === 'metal' ? 0.8 : surface === 'flesh' ? 0.8 : surface === 'flesh_heavy' ? 0.9 : 0.72;
+      return void this.play(pick, {
+        dist, pan, volume,
+        pitch: surface === 'dirt' || surface === 'sand' || surface === 'flesh' || surface === 'flesh_heavy' ? 0.88 : 1,
         reverb: 0.18, pitchVar: 0.09,
       });
     }
@@ -466,6 +526,11 @@ export class Audio {
 
   whiz(pan = 0) {
     if (!this.ready) return;
+    if (this.has('bullet_whiz')) {
+      return void this.play('bullet_whiz', {
+        pan, volume: 0.5, pitch: 0.9 + Math.random() * 0.2, pitchVar: 0.12, reverb: 0.05,
+      });
+    }
     const t = this.ctx.currentTime;
     const src = this._srcNoise();
     const bp = this.ctx.createBiquadFilter();
@@ -478,8 +543,15 @@ export class Audio {
     src.start(t); src.stop(t + 0.25);
   }
 
-  hitmark() {
+  hitmark(kill = false) {
     if (!this.ready) return;
+    if (this.has('hitmarker')) {
+      return void this.play('hitmarker', {
+        volume: kill ? 0.75 : 0.55,
+        pitch: kill ? 1.24 : 1,
+        reverb: 0, pitchVar: 0.01,
+      });
+    }
     if (this.has('tick_001')) return void this.play('tick_001', { volume: 0.5, pitch: 1.6, reverb: 0, pitchVar: 0 });
     const t = this.ctx.currentTime;
     const o = this.ctx.createOscillator();
