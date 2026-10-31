@@ -299,8 +299,8 @@ export function buildWashington(L) {
   L.addCapturePoint({ id: 'C', name: '国会大厦', x: 0, z: -150, radius: 18, owner: 1, base: cy + 1.2, height: 9 });
 
   /* 装甲：波托马克桥头的斯图亚特，国会山前的谢尔曼。 */
-  L.vehicle('stuart', 31.9, 162.5, 0, { team: 0, player: true });
-  L.vehicle('sherman', -12.8, -97.8, Math.PI, { team: 1 });
+  L.vehicle('patton', 31.9, 162.5, 0, { team: 0, player: true });
+  L.vehicle('patton', -12.8, -97.8, Math.PI, { team: 1 });
   L.structure({ type: 'brickhouse', x: 34, z: 40, yaw: 0.25, material: 'brick' });
   L.structure({ type: 'house', x: -34, z: 6, yaw: -0.4, material: 'plaster' });
   L.structure({ type: 'shed', x: 26, z: -86, yaw: 0.6 });

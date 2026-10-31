@@ -6,6 +6,7 @@ import { clamp, damp, rand } from '../core/MathUtil.js';
 
 const DEG = Math.PI / 180;
 const DOWN = new THREE.Vector3(0, -1, 0);
+const UP = new THREE.Vector3(0, 1, 0);
 const _v = new THREE.Vector3();
 const _w = new THREE.Vector3();
 const _q = new THREE.Quaternion();
@@ -80,10 +81,10 @@ export class Tank {
     const R = game.physics.R;
     // One box for the whole silhouette: the turret must be hittable too, or
     // shells aimed at it pass over the hull collider into the sky.
-    this.bodyCenterY = this.def.height * 0.46;
+    this.bodyCenterY = this.def.height * 0.5;
     this.half = {
       x: this.def.width / 2,
-      y: this.def.height * 0.46,
+      y: this.def.height * 0.5,
       z: this.def.length / 2,
     };
     _q.setFromEuler(new THREE.Euler(0, yaw, 0));
@@ -341,6 +342,11 @@ export class Tank {
    */
   hitShell({ point, dir, pen, damage, caliber = 75, range = 0 }, attacker = null) {
     if (!this.alive) return { hit: false };
+    // No friendly fire on armour: a squad's own shell does not gut its wingman.
+    if (attacker && attacker !== this && attacker.team === this.team) {
+      this._spark(point, attacker);
+      return { zone: 'friendly', penetrated: false };
+    }
     const local = this.toLocal(point, new THREE.Vector3());
     const def = this.def;
     let zone = 'side';
@@ -361,7 +367,10 @@ export class Tank {
       zone = 'side';
       normal.set(Math.sign(local.x) || 1, 0, 0);
     }
-    // Incoming direction is `dir`; the impact angle is measured against the plate.
+    // The zone normals above are in hull space; the shell's direction is world
+    // space. Rotating the plate by the hull (or turret) yaw is what makes a
+    // shot at a tank facing you land on its front plate instead of its side.
+    normal.applyAxisAngle(UP, zone === 'turret' ? this.turretYaw : this.yaw);
     const cosA = clamp(-dir.dot(normal), 0, 1);
     const angle = Math.acos(cosA);
     const armor = def.armor[zone] || def.armor.side;
@@ -378,6 +387,7 @@ export class Tank {
       // Non-penetration still rings the crew and can break a track.
       const stun = clamp(penEff / Math.max(1, effective), 0, 1) * damage * 0.12;
       this.hp -= stun;
+      this._damageFx();
       this._spark(point, attacker);
       this.game.audio?.impact('metal', 0, 0);
       this._report({ zone, angle, effective, penetrated: false, ricochet: false, damage: stun }, attacker);
@@ -399,6 +409,7 @@ export class Tank {
     }
     this.hp -= dmg;
     this._internalFx(point, dmg);
+    this._damageFx();
     this.game.audio?.impact('metal', 0, 0);
     this._report({ zone, angle, effective, penetrated: true, ricochet: false, damage: dmg }, attacker);
     if (this.hp <= 0) this.destroy(attacker);
@@ -420,6 +431,20 @@ export class Tank {
     this.game.renderer?.addLight?.(point, 0xffb060, 2.2, 0.08);
     if (attacker === this.game.player) {
       this.game.hud?.armorResult?.('未击穿', false);
+    }
+  }
+
+  /** Smoke once badly hurt, fire once it is about to brew up. */
+  _damageFx() {
+    const ratio = this.hp / this.maxHp;
+    if (!this._smokeFx && ratio < 0.55) {
+      this._smokeFx = true;
+      this.game.level?.smokeColumn(this.position.x, this.position.y + 2.0, this.position.z, 1.0);
+    }
+    if (!this._fireFx && ratio < 0.28) {
+      this._fireFx = true;
+      this.game.level?.fire(this.position.x, this.position.y + 1.5, this.position.z, 0.9);
+      this.game.level?.smokeColumn(this.position.x, this.position.y + 2.2, this.position.z, 1.5);
     }
   }
 
@@ -468,6 +493,8 @@ export class Tank {
     this.game.audio?.explosion(this.game.player ? this.game.player.position.distanceTo(pos) : 0);
     this.game.level?.fire(this.position.x, this.position.y + 1.2, this.position.z, 1.5);
     this.game.level?.smokeColumn(this.position.x, this.position.y + 1.4, this.position.z, 2.0);
+    // The brew-up is a real explosion: nearby infantry and armour take it.
+    this.game.explode?.(pos, this, { radius: 5.5, damage: 110, scale: 2.0, kind: 'explosion' });
     this.game.onVehicleKilled?.(this, killer);
     if (this.game.playerVehicle === this) {
       this.game.leaveVehicle?.(true);
@@ -553,7 +580,6 @@ export class Tank {
       this.mgAmmo--;
       this._fireMG(player);
     }
-    if (cmd.jumpPressed) this.game.leaveVehicle?.(false);
     this._wreckFx(dt);
   }
 

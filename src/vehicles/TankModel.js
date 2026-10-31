@@ -19,7 +19,7 @@ export const TANK_DEFS = {
     name: 'M3A3 斯图亚特',
     short: 'M3A3',
     nation: '中国远征军',
-    paint: 0x6b7149,
+    paint: 0x8b9066,
     length: 5.0,
     width: 2.24,
     height: 2.55,
@@ -51,7 +51,7 @@ export const TANK_DEFS = {
     name: 'M4A1 谢尔曼',
     short: 'M4A1',
     nation: '美军',
-    paint: 0x626846,
+    paint: 0x868c62,
     length: 6.2,
     width: 2.62,
     height: 3.0,
@@ -89,19 +89,19 @@ export const TANK_DEFS = {
     short: 'M46',
     nation: '美军',
     asset: 'm46',
-    paint: 0x6a6f4e,
+    paint: 0x8a9068,
     length: 7.0,
     width: 3.51,
     height: 3.18,
     hullTop: 1.62,
     trackWidth: 0.6,
     mass: 44.3,
-    maxSpeed: 6.8,
-    reverseSpeed: 3.2,
-    accel: 1.7,
+    maxSpeed: 10.5,
+    reverseSpeed: 4.5,
+    accel: 2.4,
     brake: 5.5,
     turnRate: 0.62,
-    turretSpeed: 0.55,
+    turretSpeed: 0.8,
     hp: 1650,
     crew: 5,
     armor: { front: 101, side: 76, rear: 50, turret: 127, top: 25, track: 30 },
@@ -301,7 +301,7 @@ function buildFromAsset(def, game, template) {
   paint.color.setHex(def.paint);
   paint.map = paintTexture(def.paint);
   paint.roughness = 0.82;
-  paint.metalness = 0.18;
+  paint.metalness = 0.12;
   paint.normalScale?.set(0.6, 0.6);
   paint.name = 'tankPaint';
   mats.applyUnify(paint, 'metal');
@@ -390,7 +390,7 @@ function buildFromAsset(def, game, template) {
     setWreck() {
       paint.color.setHex(0x24231e);
       paint.roughness = 0.96;
-      paint.metalness = 0.18;
+      paint.metalness = 0.12;
       dark.color.setHex(0x171612);
       turretPivot.rotation.y += (Math.random() - 0.5) * 0.8;
       gunPivot.rotation.x = -0.16 * (model.gunPitchSign || 1);
@@ -418,7 +418,7 @@ export function buildTank(def, game) {
   paint.color.setHex(def.paint);
   paint.map = paintTexture(def.paint);
   paint.roughness = 0.82;
-  paint.metalness = 0.18;
+  paint.metalness = 0.12;
   paint.normalScale?.set(0.6, 0.6);
   paint.name = 'tankPaint';
   mats.applyUnify(paint, 'metal');

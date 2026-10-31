@@ -238,6 +238,7 @@ export class Vehicles {
       const dmg = power * falloff * 0.35;
       if (dmg < 3) continue;
       t.hp -= dmg;
+      t._damageFx?.();
       if (d > 2.2) t.modules.tracks = Math.max(0.5, t.modules.tracks - falloff * 0.12);
       if (t.game.playerVehicle === t) t.game.hud?.toast('车体受到爆炸冲击');
       if (t.hp <= 0) t.destroy(owner);
