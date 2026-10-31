@@ -165,7 +165,8 @@ export class Game {
   async _loadVehicleAssets() {
     this.vehicleAssets = {};
     try {
-      const gltf = await new GLTFLoader().loadAsync('/assets/models/vehicles/m46_patton.glb');
+      const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
+        .loadAsync('/assets/models/vehicles/m46_patton.glb');
       gltf.scene.traverse((o) => {
         if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
       });
