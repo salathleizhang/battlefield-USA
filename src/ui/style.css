@@ -1198,3 +1198,7 @@ html, body {
 .armor-hit.show { opacity: 1; }
 .armor-hit.good { color: #ffd77a; }
 .armor-hit.bad { color: #cf7b62; }
+
+/* Tank gunner sight: the infantry crosshair would be redundant under a 24-degree optic. */
+.hud.driving.tankzoom .crosshair { opacity: 0.12 !important; }
+.hud.driving.tankzoom .armor-hit { top: calc(50% + 92px); }

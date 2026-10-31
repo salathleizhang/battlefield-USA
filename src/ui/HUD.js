@@ -181,6 +181,7 @@ export class HUD {
   showVehicle(tank) {
     this.vehicle = tank;
     this.el.hud.classList.toggle('driving', !!tank);
+    if (!tank) this.el.hud.classList.remove('tankzoom');
     if (tank) this.el.vehName.textContent = tank.def.name;
     this.el.vehPrompt.classList.remove('show');
   }
@@ -211,6 +212,7 @@ export class HUD {
     this.el.vehMod.textContent = mods.length ? mods.join(' · ') : '机动正常 · 炮塔正常';
     this.el.vehMod.classList.toggle('hurt', mods.length > 0);
     this.el.vehicle.classList.toggle('zoom', !!s.zoom);
+    this.el.hud.classList.toggle('tankzoom', !!s.zoom);
   }
 
   /** Penetration feedback: floats under the reticle for a moment. */
@@ -617,6 +619,30 @@ export class HUD {
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(cp.id, x, z + 0.5);
     }
+    // Armour: hull-shaped marks so a tank can be found before it is close
+    // enough for the boarding prompt.
+    for (const tank of this.game.vehicles?.tanks || []) {
+      if (!tank.alive) continue;
+      const d = Math.hypot(tank.position.x - p.position.x, tank.position.z - p.position.z);
+      if (d > 220) continue;
+      const x = X(tank.position.x), z = Z(tank.position.z);
+      ctx.save();
+      ctx.translate(x, z);
+      ctx.rotate(-tank.yaw);
+      ctx.fillStyle = tank.team === 0 ? 'rgba(226,80,60,0.95)' : 'rgba(110,160,220,0.95)';
+      ctx.strokeStyle = 'rgba(20,12,8,0.9)';
+      ctx.lineWidth = 1;
+      ctx.fillRect(-2.6, -4.2, 5.2, 8.4);
+      ctx.strokeRect(-2.6, -4.2, 5.2, 8.4);
+      // Turret direction.
+      ctx.strokeStyle = 'rgba(255,235,190,0.9)';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.sin(tank.turretYaw - tank.yaw) * 7, -Math.cos(tank.turretYaw - tank.yaw) * 7);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Combatants.
     const seen = new Set();
     for (const a of this.game.combatants()) {
