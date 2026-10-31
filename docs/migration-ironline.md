@@ -14,6 +14,8 @@
 | `Ballistics.js` | 子弹重力下坠、按距离衰减、近失弹线段判定、压制值传播 | `Game.updateProjectiles` |
 | `weapons/Weapon.js` | 散布膨胀与恢复、开镜过渡、冲刺出枪锁、装填 80% 提交、装填取消、逐发后坐轨迹、多武器状态机 | `src/game/weapons/Weapon.js` |
 | `weapons/WeaponDefs.js` | 数据驱动武器表、槽位与配装（`?loadout=`）、半自动/栓动/全自动开火模式 | `src/game/weapons/WeaponDefs.js` |
+| `weapons/FPRig.js` + `models/fp/*.glb` | 参考项目的作者级第一人称武器 rig（枪 + 手套手臂）、hip/ADS 解算 | `src/game/weapons/FpRig.js`、`public/assets/models/fp/` |
+| `weapons/ReloadChoreo.js` | 换弹枪身关键帧（战术/空仓、步枪/手枪）、弹匣与拉机柄节点动画 | `src/game/weapons/ReloadChoreo.js` |
 | `PlayerBody.js` | 第一人称身体、按世界高度逐片元裁掉胸口以上、完整影子、死亡/蹲伏隐藏 | `src/game/PlayerBody.js` |
 | `bots/Bot.js` | 脚步声/枪声听觉、压制影响精度与射速、反应时间门控、掩体选择（胸线遮蔽+可探头）、对失去视野目标投弹、低矮障碍起跳、四档难度 | `src/game/bots/Bot.js` |
 | `bots/Navigation.js` | **替代实现**：可行走网格（射线+净空+洪泛连通域）与 A*，不引入 recast wasm | `src/game/bots/NavGrid.js` |
@@ -24,7 +26,7 @@
 | 模块 | 原因 |
 | --- | --- |
 | UI（`ui/HUD.js`、`ui/Menu.js`、`hud.css`） | 需求明确排除；本仓库已有赤红搪瓷风格 UI |
-| 配件 / 深度配装（瞄具、枪口、下挂） | 首套多武器已落地（步枪 + 手枪），配件系统尚未做 |
+| 配件 / 深度配装（瞄具、枪口、下挂） | 多武器已改为直接使用参考项目的 FP rig 与武器表；瞄具/枪口/下挂与换弹编排仍需引入 `optics.glb` 与动画模板（许可需复核） |
 | Recast / Detour 导航 | 引入 `@recast-navigation` wasm 依赖；自研网格已覆盖四张图 |
 | `render/` 性能系统（Adaptive、Fsr、GpuTimer、Lod、Occlusion、Pvs、ShadowCache、LightPool、UploadRing、Benchmark） | 与本仓库渲染管线差异大，且当前 `Renderer.js` 正在被并行修改 |
 | `bots/Character.js` 的程序化姿态细节 | 本仓库用 UAL 片段 + `aim` 遮罩层，方向不同 |
