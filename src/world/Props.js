@@ -251,6 +251,17 @@ export class Props {
         mesh.name = `prop:${name}`;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
+        // Alpha-card foliage still has to cast a dappled shadow. The default
+        // transparent-material depth pass would draw the whole card, so give the
+        // leaves a shadow material that samples the same alpha map.
+        if (part.mat.transparent && part.mat.map) {
+          mesh.customDepthMaterial = new THREE.MeshDepthMaterial({
+            depthPacking: THREE.RGBADepthPacking,
+            map: part.mat.map,
+            alphaTest: 0.45,
+            side: THREE.DoubleSide,
+          });
+        }
         mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
         for (let i = 0; i < list.length; i++) mesh.setMatrixAt(i, list[i].matrix);
         mesh.instanceMatrix.needsUpdate = true;
