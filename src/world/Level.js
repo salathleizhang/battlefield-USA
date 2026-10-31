@@ -124,6 +124,21 @@ export class Level {
     return mesh;
   }
 
+  /* ------------------------------------------------- vehicles & destruction */
+  /** Queue a tank spawn. `player: true` marks the hull the player can board. */
+  vehicle(kind, x, z, yaw = 0, opts = {}) {
+    return this.game.vehicles?.add(kind, x, z, yaw, opts) ?? null;
+  }
+
+  /**
+   * Place a destructible building. It is not part of the static batch: each
+   * wall bay is its own instanced panel with its own collider, so a shell can
+   * open a hole and a collapse can take the box apart.
+   */
+  structure(spec = {}) {
+    return this.game.destructibles?.addStructure(spec) ?? null;
+  }
+
   /* ----------------------------------------------------------- colliders */
   solidBox(x, y, z, w, h, d, rotY = 0, data = {}) {
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rotY, 0));
