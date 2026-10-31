@@ -65,7 +65,7 @@ const ATLAS_MATERIAL = {
   stones: { roughness: 0.97, metalness: 0 },
   garbage: { roughness: 0.88, metalness: 0.03 },
   trash1: { roughness: 0.66, metalness: 0.42 },
-  toilet1: { roughness: 0.7, metalness: 0.15 },
+  toilet: { roughness: 0.7, metalness: 0.15 },
   building_office: { roughness: 0.85, metalness: 0.05 },
   warnings: { roughness: 0.7, metalness: 0.3, side: THREE.DoubleSide },
   weapon_box1: { roughness: 0.76, metalness: 0.16 },
