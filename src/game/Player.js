@@ -4,6 +4,7 @@ import {
   clamp, damp, DEG, Spring, rand, smoothstep, easeOutCubic,
 } from '../core/MathUtil.js';
 import { AimRecoil } from './AimRecoil.js';
+import { sampleCurve, CAM_CURVES } from './CamCurves.js';
 
 export const MOVE = {
   walk: 4.7,
@@ -100,6 +101,11 @@ export class Player {
     this.noise = 0;
     this.mantle = null;
     this.moveIntent = new THREE.Vector2();
+    // Baked head-motion layers (landing, slide, mantle) added on top of the true view.
+    this.landCurve = null;
+    this.slideT = -1;
+    this.slideExitT = -1;
+    this.curve = [0, 0, 0, 0, 0, 0];
 
     const hh = (MOVE.standHeight - 2 * MOVE.radius) / 2;
     const { collider, kcc } = this.physics.makeCharacter(MOVE.radius, hh, 5);
@@ -130,6 +136,10 @@ export class Player {
     this.slideCooldown = 0;
     this.stepOffset = 0;
     this.landDip = 0;
+    this.landCurve = null;
+    this.slideT = -1;
+    this.slideExitT = -1;
+    this.curve.fill(0);
     this.height = MOVE.standHeight;
     this.eyeHeight = MOVE.eyeStand;
     this.collider.setHalfHeight((MOVE.standHeight - 2 * MOVE.radius) / 2);
@@ -339,7 +349,69 @@ export class Player {
     this.kickPitch.update(dt);
     this.kickYaw.update(dt);
     this.trauma = Math.max(0, this.trauma - dt * 1.4);
+    this._updateCurves(dt);
     this.syncCamera(dt);
+  }
+
+  /**
+   * Baked head curves for the moves that carry weight (landing, slide, mantle).
+   * Scaled well below the source amplitude so they read as momentum, not nausea.
+   */
+  _updateCurves(dt) {
+    const c = this.curve.fill(0);
+    const k = this.game.settings?.reduceMotion ? 0.35 : 1;
+    const add = (v, pos, rot, w = 1) => {
+      c[0] += v[0] * pos * w; c[1] += v[1] * pos * w; c[2] += v[2] * pos * w;
+      c[3] += v[3] * rot * w; c[4] += v[4] * rot * 0.5 * w; c[5] += v[5] * rot * w;
+    };
+    // Mantle / vault: pull-up arc that looks at the ledge.
+    if (this.mantle) add(sampleCurve('ClimbUp_1m', Math.min(1, this.mantle.t)), 0.3 * k, 0.17 * k);
+
+    // Slide: Start → Loop, then Exit as the player stands back up.
+    if (this.sliding) {
+      if (this.slideT < 0) {
+        this.slideT = 0;
+        this.slideSide = this.moveIntent.x >= 0 ? 1 : -1;
+      }
+      this.slideT += dt;
+      this.slideExitT = -1;
+    } else if (this.slideT >= 0) {
+      this.slideT = -1;
+      this.slideExitT = 0;
+    }
+    const ss = CAM_CURVES.Slide_Start;
+    const slidePose = (w) => {
+      const st = sampleCurve('Slide_Start', Math.min(1, Math.max(this.slideT, 0) / ss.dur), { detrend: false });
+      const v = [st[0], 0, st[2], st[3], st[4] * this.slideSide, st[5] * this.slideSide];
+      if (this.slideT > ss.dur) {
+        const lp = sampleCurve('Slide_Loop', (this.slideT - ss.dur) / CAM_CURVES.Slide_Loop.dur, { detrend: false, loop: true });
+        for (let j = 0; j < 6; j++) v[j] += lp[j];
+      }
+      add(v, 0.1 * k, 0.14 * k, w);
+    };
+    if (this.slideT >= 0) slidePose(1);
+    if (this.slideExitT >= 0) {
+      this.slideExitT += dt;
+      const ue = this.slideExitT / CAM_CURVES.Slide_Exit.dur;
+      if (ue >= 1) this.slideExitT = -1;
+      else {
+        // Ease the held pose out while the exit curve plays (detrended, so it ends neutral).
+        const hold = 1 - ue * ue * (3 - 2 * ue);
+        const save = this.slideT;
+        this.slideT = 99; slidePose(hold); this.slideT = save;
+        const ex = sampleCurve('Slide_Exit', ue);
+        add([ex[0], 0, ex[2], ex[3], ex[4] * this.slideSide, ex[5] * this.slideSide], 0.08 * k, 0.1 * k);
+      }
+    }
+
+    // Landing absorb: knees take it, the head dips and nods, then recovers.
+    if (this.landCurve) {
+      const L = this.landCurve;
+      L.t += dt;
+      const u = L.t / CAM_CURVES.NinjaJump_Land.dur;
+      if (u >= 1 || this.mantle || this.sliding) this.landCurve = null;
+      else add(sampleCurve('NinjaJump_Land', u), 0.22 * L.amp * k, 0.28 * L.amp * k);
+    }
   }
 
   _accelerate(vh, wishDir, wishSpeed, accel, dt, capSpeed = wishSpeed) {
@@ -442,7 +514,9 @@ export class Player {
     if (this.grounded) {
       if (!this.wasGrounded) {
         const fall = -this.velocity.y;
-        this.landDip = Math.min(this.landDip, -Math.min(fall * 0.03, 0.3));
+        this.landDip = Math.min(this.landDip, -Math.min(fall * 0.02, 0.12));
+        // Baked landing absorb; a hop is quiet, a two-storey drop is not.
+        if (fall > 2.5) this.landCurve = { t: 0, amp: clamp((fall - 2.5) / 7, 0.18, 1) };
         this.addTrauma(Math.min(0.35, fall * 0.02));
         if (fall > 3) this.game.audio?.step(this.surface);
         if (fall > 11) this.damage(Math.round((fall - 11) * 9), null, { weapon: 'fall' });
@@ -647,11 +721,14 @@ export class Player {
 
     // Lean moves the eye sideways and drops it a little so the tilt reads as weight.
     const leanShift = this.lean * MOVE.leanOffset;
+    // Baked head curves ride on top in view space (yaw only, so a nod never swings the eye sideways).
+    const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+    const cv = this.curve;
     const eye = new THREE.Vector3(
-      this.position.x + right.x * (bobX + leanShift),
+      this.position.x + right.x * (bobX + leanShift + cv[0]) - fwd.x * cv[2],
       this.position.y + this.eyeHeight + bobY - Math.abs(this.lean) * 0.08
-        + this.stepOffset + this.landDip,
-      this.position.z + right.z * (bobX + leanShift),
+        + this.stepOffset + this.landDip + cv[1],
+      this.position.z + right.z * (bobX + leanShift + cv[0]) - fwd.z * cv[2],
     );
     if (snap) cam.position.copy(eye); else cam.position.lerp(eye, 1 - Math.exp(-28 * dt));
 
@@ -659,9 +736,9 @@ export class Player {
     if (this.tacSprint) targetFov += 4;
     cam.fov = snap ? targetFov : damp(cam.fov, targetFov, 10, dt);
     cam.rotation.set(
-      this.pitch + this.kickPitch.x + sy,
-      this.yaw + this.kickYaw.x + sx,
-      roll,
+      this.pitch + this.kickPitch.x + sy + cv[3],
+      this.yaw + this.kickYaw.x + sx + cv[4],
+      roll + cv[5],
     );
     cam.updateProjectionMatrix();
     this.game.renderer.sun.target.position.copy(this.position);
@@ -673,7 +750,10 @@ export class Player {
     this.lastDamage = this.time;
     this.addTrauma(0.35);
     this.game.audio.hurt();
-    this.game.hud?.damage(attacker, info);
+    // The post stack already knew how to bruise the screen (chromatic split,
+    // vignette, desaturation); nothing fed it until now.
+    this.game.renderer?.setDamage(clamp(amount / 90, 0.12, 0.45));
+    this.game.hud?.damage(attacker, info, amount);
     if (this.health <= 0) this.die(attacker, info.weapon || 'rifle');
   }
 
