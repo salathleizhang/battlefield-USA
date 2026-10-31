@@ -517,6 +517,40 @@ if (uUnifyMode < 1.5) {
     float fres = pow(1.0 - clamp(dot(N, Vw), 0.0, 1.0), 4.0);
     totalEmissiveRadiance += uSkyReflect * pud * (0.14 + 0.6 * fres);
   }
+  // 4. Ground detail, sampled in WORLD space so it cannot repeat with the map.
+  //    The albedo map tiles every ~3 m; without something at other frequencies
+  //    the sand reads as one photograph stretched over the beach. These three
+  //    octaves sit at 23 m / 5.9 m / 0.6 m and are deliberately low-contrast.
+  if (uUni2.w > 0.5) {
+    float dune = texture2D(uNoise, P.xz * 0.043 + 0.31).r;
+    float patchy = texture2D(uNoise, P.xz * 0.17 + 0.77).g;
+    float grain = texture2D(uNoise, P.xz * 1.63).b;
+    diffuseColor.rgb *= 1.0 + (dune - 0.5) * 0.20 + (patchy - 0.5) * 0.10;
+    diffuseColor.rgb *= 0.95 + grain * 0.10;
+    // Two-scale de-tiling: the map repeats every ~3 m, which at eye height reads
+    // as one photograph stretched over the beach. Re-sampling it at a much larger
+    // scale and blending the RATIO keeps the material's own tint while breaking
+    // that period, so no second texture is needed.
+    #ifdef USE_MAP
+    if (vMapUv.x > -1.0) {
+      vec3 m1 = texture2D(map, vMapUv).rgb;
+      vec3 m2 = texture2D(map, vMapUv * 0.29 + vec2(0.37, 0.61)).rgb;
+      vec3 ratio = clamp(m2 / max(m1, vec3(0.02)), vec3(0.55), vec3(1.8));
+      diffuseColor.rgb *= mix(vec3(1.0), ratio, smoothstep(0.38, 0.72, dune) * 0.45);
+    }
+    #endif
+    roughnessFactor *= (0.88 + patchy * 0.24) * (0.94 + grain * 0.12);
+    // Relief from the same noise, faded out past ~24 m so it cannot shimmer.
+    float nf = 1.0 - smoothstep(3.0, 38.0, length(cameraPosition - P));
+    if (nf > 0.001) {
+      vec2 duv = P.xz * 1.63;
+      float h0 = texture2D(uNoise, duv).b;
+      float hx = texture2D(uNoise, duv + vec2(0.0035, 0.0)).b;
+      float hz = texture2D(uNoise, duv + vec2(0.0, 0.0035)).b;
+      vec3 nW = normalize(vec3((h0 - hx) * 12.0, 1.0, (h0 - hz) * 12.0));
+      normal = normalize(mix(normal, normalize((viewMatrix * vec4(nW, 0.0)).xyz), 0.60 * nf));
+    }
+  }
   roughnessFactor = clamp(roughnessFactor, 0.02, 1.0);
 }`;
 
@@ -596,7 +630,7 @@ export class Materials {
       mat.normalScale.set(s * Math.sign(mat.normalScale.x || 1), s * Math.sign(mat.normalScale.y || 1));
     }
     const uUni = { value: new THREE.Vector4(p.grime ?? 0.3, p.wet ?? 0.7, p.puddle ?? 0, p.rmin ?? 0.38) };
-    const uUni2 = { value: new THREE.Vector4(p.sat ?? 0.86, p.contact ?? 1, p.streaks ?? 0.5, 0) };
+    const uUni2 = { value: new THREE.Vector4(p.sat ?? 0.86, p.contact ?? 1, p.streaks ?? 0.5, p.detail ?? 0) };
     const prev = mat.onBeforeCompile;
     const prevKey = mat.customProgramCacheKey?.bind(mat);
     mat.onBeforeCompile = (sh, r) => {
@@ -616,8 +650,8 @@ export class Materials {
   /** Preset table, mirroring the reference art pipeline. */
   static PRESETS = {
     level: { grime: 0.42, wet: 0.9, puddle: 0, rmin: 0.4, sat: 0.9, contact: 1, streaks: 1 },
-    ground: { grime: 0.5, wet: 1, puddle: 1, rmin: 0.34, sat: 0.9, contact: 1, streaks: 0 },
-    sand: { grime: 0.24, wet: 0.85, puddle: 0.04, rmin: 0.5, sat: 0.94, contact: 1, streaks: 0 },
+    ground: { grime: 0.5, wet: 1, puddle: 1, rmin: 0.34, sat: 0.9, contact: 1, streaks: 0, detail: 1 },
+    sand: { grime: 0.24, wet: 0.85, puddle: 0.04, rmin: 0.5, sat: 0.94, contact: 1, streaks: 0, detail: 1 },
     wall: { grime: 0.3, wet: 0.55, puddle: 0, rmin: 0.45, sat: 0.9, contact: 0.55, streaks: 0.8 },
     metal: { grime: 0.32, wet: 0.65, puddle: 0, rmin: 0.3, sat: 0.88, contact: 1, streaks: 0.4 },
     cloth: { grime: 0.26, wet: 0.55, puddle: 0, rmin: 0.55, sat: 0.85, contact: 1, streaks: 0 },
