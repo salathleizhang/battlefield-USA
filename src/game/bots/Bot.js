@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { G, groups } from '../../core/Physics.js';
 import { SoldierModel } from './SoldierModel.js';
+import { equipBotGun } from './BotGun.js';
 import { clamp, damp, rand, randInt, pick } from '../../core/MathUtil.js';
 
 const US_NAMES = ['米勒', '卡特', '沃克', '布朗', '戴维斯', '汤普森', '里德', '霍华德', '肖', '格雷'];
@@ -84,6 +85,8 @@ export class Bot {
     if (!this.model) this.model = new SoldierModel(team, game.materials);
     this.model.setPosition(position.x, position.y, position.z, yaw);
     game.worldGroup.add(this.model.group);
+    // Reference-project gun models instead of the character pack's low-poly rifle.
+    equipBotGun(this.model, team === 0 ? 'ak47' : 'm4a1');
 
     const R = game.physics.R;
     this.collider = game.physics.world.createCollider(
