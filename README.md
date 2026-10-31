@@ -38,6 +38,7 @@ npm run build    # 生产构建到 dist/
 | V | 刺刀突击 |
 | G | 手榴弹 |
 | Shift / C / Space | 冲刺 / 蹲下 / 跳跃 |
+| Q / E | 掩体探头（左 / 右，贴墙自动收窄） |
 | Esc | 暂停 |
 
 ## 技术栈
@@ -45,7 +46,7 @@ npm run build    # 生产构建到 dist/
 - **three.js r186**：渲染、天空、粒子、第一人称武器层（独立 viewScene，避免穿模）。
 - **Rapier 0.21**：角色控制器（胶囊 KCC）、地形 trimesh、静态碰撞、射线检测。
 - **后处理**：`postprocessing` 6.39（ACES 色调映射、调色、暗角、色差、胶片颗粒、SMAA、CAS 锐化、God Rays、Bloom、镜头脏污）+ `n8ao` 2.0（屏幕空间环境光遮蔽）。武器层作为独立 pass 在 HDR 之后合成，保留自己的 FOV 与光照。
-- **WebAudio 采样 + 合成混音**：141 个 CC0 音效（真实枪声、拉栓/桥夹、脚步、命中、爆炸、UI），按距离做空气吸收、延迟、立体声定位与卷积混响；每发枪声再叠一层合成的瞬态与低频冲击，近处和远处听起来不是同一个采样。风与浪仍是实时合成。授权见 [audio/CREDITS.md](public/assets/audio/CREDITS.md)。
+- **WebAudio 采样 + 合成混音**：180 个 CC0 音效（真实枪声、拉栓/桥夹、脚步、弹着、爆炸、UI），按距离做空气吸收、延迟、立体声定位与卷积混响；每发枪声再叠一层合成的瞬态与低频冲击，近处和远处听起来不是同一个采样。三八大盖与 M1 加兰德改用各自的实弹录音，不再互相借用 AWM / M24 采样；弹着按混凝土、金属、木材、玻璃、泥土、血肉分层，M1 打空第八发时播放真实的 en-bloc 弹夹 ping，命中与爆头各有独立反馈音。风与浪仍是实时合成。授权见 [audio/CREDITS.md](public/assets/audio/CREDITS.md)。另有 4 条战场人声/军号（集体冲杀、八路军冲锋号、骂阵、进攻口令）：开局按“口令 → 冲锋号 → 喊杀 → 骂阵”铺开，之后每次 Shift+W 向前冲刺还有冷却随机的喊杀/骂阵，见 [audio/voice/README.md](public/assets/audio/voice/README.md)。
 - **程序化关卡**：地形高度函数 + 建筑/道具批处理（按材质合并，控制 draw call）。
 - **AI**：视锥 + 视线检测、推进/交火/占点状态机、简易避障与涉水规避、重生与目标分配。
 - **士兵动画分层**：基础移动用 UAL 全身片段，瞄准时再叠一层只含脊柱/双臂/头部的 `aim` 遮罩片段（权重平滑过渡），所以边跑边瞄时上身持枪、下身继续跑；受击与死亡各自触发一次性片段。
@@ -60,7 +61,7 @@ npm run build    # 生产构建到 dist/
 - **金门大桥为 1:2 结构复刻**：主跨 640 m、桥面净空 33.5 m、塔顶 113.5 m，与真实桥的 1280 / 67 / 227 m 严格同比；双塔为带竖向凹槽与分层收分的 Art Deco 钢塔，塔间 6 道门式横撑，主缆按真实垂度成抛物线并在中跨落到桥面，吊索按 7.6 m 间距成对布置、带索夹，桥面下有 3.8 m 加劲桁架、伸缩缝、六车道标线与 1937 年式路灯。全部构件按材质合批，桥体仍是十余个 draw call。
 - 环境按真实海峡重建：北侧马林岬角、南侧旧金山要塞区、西面恶魔岛、雾中锚泊的货轮，以及贴着桥面漂移的体积雾团；能见度压到 2 km 以内以还原金门雾。
 - **换成付费正版资产不需要改代码**：把贴图按 `albedo / normal / roughness / metalness / ao` 五个文件名放进 `public/assets/pbr/<材质名>/`，或在 manifest 里新增条目即可。具体命名映射见 CREDITS.md。
-- **第一人称武器改用公版扫描资产**：三八大盖换成 Poly Haven 的 **CC0「Bolt Action Rifle 7.62」**（20k 面、完整 PBR，去掉瞄准镜/枪布/散弹后按 1.275 m 三八式长度归一，枪机 `bolt_a/bolt_b` 重新挂到膛线枢轴，栓动与桥夹动画沿用原锚点）；手榴弹换成 Poly Haven 的 **CC0 木柄手榴弹**。模型与授权见 [weapons/CREDITS.md](public/assets/models/weapons/CREDITS.md)。旧程序化步枪保留为加载失败时的兜底。第一人称瞄准改用枪机上方 28 mm 的觇孔照门 + 准星（扫描件的表尺是折叠状态，无法直接当照门用），枪身、觇孔与准星共用同一条膛线轴，机瞄时不再隐藏枪模。
+- **第一人称武器改用公版扫描资产**：三八大盖换成 Poly Haven 的 **CC0「Bolt Action Rifle 7.62」**（20k 面、完整 PBR，去掉瞄准镜/枪布/散弹后按 1.275 m 三八式长度归一，枪机 `bolt_a/bolt_b` 重新挂到膛线枢轴，栓动与桥夹动画沿用原锚点）；手榴弹换成 Poly Haven 的 **CC0 木柄手榴弹**。模型与授权见 [weapons/CREDITS.md](public/assets/models/weapons/CREDITS.md)。旧程序化步枪保留为加载失败时的兜底。第一人称瞄准改用枪机上方 28 mm 的觇孔照门 + 准星（扫描件的表尺是折叠状态，无法直接当照门用），枪身、觇孔与准星共用同一条膛线轴，机瞄时不再隐藏枪模。第一人称手臂改用参考项目（Ironline）那套戴手套的蒙皮小臂：拆掉枪只留 68 骨手臂与 3 张贴图，缩放 0.44 后用两骨 IK 贴到枪自身的 `handR`/`handL` 锚点上，前臂滚转按手腕目标朝向分摊到 `Forearm` 与两根 twist 骨，避免袖管拧成麻花；腰射姿态相应收近（0.47 m）并加了 17° 偏转，护木上的左手才在手臂可达范围内。手臂模型为 **CC‑BY 4.0**（DJMaesen / ccransh），署名见 [weapons/CREDITS.md](public/assets/models/weapons/CREDITS.md)。
 - 建筑、桥梁、纪念碑、士兵、植被等主体仍为 **程序化建模**；战壕沙袋改为参考项目的「压扁球体 + 收口」堆垛方式（4 层错缝、双层垛），不再是方盒贴图。
 - 场景小道具复用参考项目的 **CC0 GLB 模型**：混凝土路障、军用木箱、木条箱、油桶、弹药箱、汽油桶、消防栓、井盖，按实例化批渲染放入四张地图的据点、人行道与补给点，授权与来源见 [props/CREDITS.md](public/assets/models/props/CREDITS.md)。
 - UI 版式参考 [Ironline](https://github.com/cktang88/3d-fps)：左栏战役导航、半透明战役卡片、圆形小地图与紧凑比分区；视觉改为 **红色警戒 / 共和国之辉** 式的赤红搪瓷 + 黄铜描边军械面板，主按钮为金色斜面，次按钮为暗红钢板。战役卡片使用低透明度玻璃底 + 背景压暗，让战役循环影像从卡片后透出。字体保留自托管的毛笔楷书 **Ma Shan Zheng**（SIL OFL 1.1），按钮与标签改用黑体系统栈；正文为宋体系统字体栈，数字与英文为等宽字体。字体与授权见 `public/fonts/`，不依赖外部字体 CDN。
@@ -72,6 +73,7 @@ npm run build    # 生产构建到 dist/
 - 第一人称步枪与手榴弹来自 [Poly Haven](https://polyhaven.com/)（CC0 1.0）：[Bolt Action Rifle 7.62](https://polyhaven.com/a/bolt_action_rifle_7_62)（Mateusz Sadek）与 [Stick Grenade](https://polyhaven.com/a/stick_grenade)。其余美术仍为本项目自制或程序化生成，后续替换路径见 [weapons/CREDITS.md](public/assets/models/weapons/CREDITS.md)。
 - 湿地面 / 积水 / unify 材质层、后处理链与火焰烟雾系统迁移自 [cktang88/3d-fps](https://github.com/cktang88/3d-fps)（Ironline）的 `Materials.applyUnify`、`Renderer` 与 `world/ambience/*`。其烟雾、火焰、爆炸翻书图集为 **Unity Labs「Free VFX image sequences & flipbooks」**，作者以 **CC0 1.0** 发布；来源与授权见 [vfx/CREDITS.md](public/assets/vfx/CREDITS.md)。
 - 音频库（真实枪声 / 拉栓 / 脚步 / 命中 / 爆炸 / UI）来自 [cktang88/3d-fps](https://github.com/cktang88/3d-fps) 的 CC0 音效集：The Free Firearm Sound Library 与 Kenney（CC0 1.0），逐条列在 [audio/CREDITS.md](public/assets/audio/CREDITS.md)。
+- 三八大盖的实弹录音取自 [Free Firearm Sound Library](https://github.com/buddingmonkey/FreeFirearmsSFXLibrary) 的 Arisaka 近/中距立体声轨；M1 加兰德枪声、弹夹 ping、血肉/混凝土/金属/木材/玻璃/泥土/水花弹着、命中与爆头反馈、子弹掠过声取自 [Freesound](https://freesound.org/) 的 **CC0 1.0** 条目（Rijam、serøutōnin--deprivəd、BorekPL、craigsmith、qubodup 等），逐条链接同样列在 [audio/CREDITS.md](public/assets/audio/CREDITS.md)。
 - 迈阿密海滩的**棕榈树系统**与**敞篷车模型**移植自 [StarKnightt/ocean-drive](https://github.com/StarKnightt/ocean-drive)（MIT）：棕榈部分包括椰子/王棕/菜棕的程序化树干、叶片图集、椰果与风摆着色器，按战役地形重新布置了树列；车辆为 `public/assets/models/miami/convertible.glb`，按停车位重新上色并做了低开销阴影。
 
 ## 开发进度
