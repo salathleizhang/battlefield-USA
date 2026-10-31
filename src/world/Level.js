@@ -221,7 +221,7 @@ export class Level {
   }
 
   _window(x, y, z, rotY, w, h, doorLike = false, { awning = 0 } = {}) {
-    const dark = this._facadeMat('glass');
+    const dark = this.mats.get('glass');
     this.batch.box(w, h, 0.1, x, y, z, dark, { rotY });
     // Frame.
     this.batch.box(w + 0.22, 0.1, 0.12, x, y + h / 2 + 0.06, z, this.mats.get('plasterWhite'), { rotY });
@@ -365,11 +365,11 @@ export class Level {
    * Place one GLB scene prop (see world/Props.js) on the ground and give it a
    * cuboid collider. Returns null when the asset library is unavailable.
    */
-  prop(name, x, z, rot = 0, { base = null, scale = null, y = 0, solid = true, surface = null } = {}) {
+  prop(name, x, z, rot = 0, { base = null, scale = null, y = 0, solid = true, surface = null, color = null } = {}) {
     const lib = this.game.props;
     if (!lib) return null;
     const gy = base ?? this.groundHeight(x, z);
-    const hit = lib.place(name, { x, z, y: gy + y, rot, scale });
+    const hit = lib.place(name, { x, z, y: gy + y, rot, scale, color });
     if (!hit) return null;
     if (solid) {
       const p = hit.center;
@@ -378,6 +378,50 @@ export class Level {
       });
     }
     return hit;
+  }
+
+  /**
+   * 撒道具 —— 随机落点、随机朝向、随机缩放。
+   *
+   * 战场上的东西没人摆正过：成排对齐、等间距的工事一眼就假。所以除了确有意义的
+   * 主线（比如一道防线），一律用这个撒，位置和角度都带抖动。
+   * `avoid` 用来给出生点、据点圆心留空，免得把玩家卡在箱子里。
+   */
+  scatter(names, x, z, w, d, count, {
+    base = null, rot = null, jitter = 0.7, scale = null, scaleJitter = 0.3,
+    solid = true, avoid = null, y = 0,
+  } = {}) {
+    const list = Array.isArray(names) ? names : [names];
+    let placed = 0;
+    for (let i = 0; i < count; i++) {
+      const px = x + (this.rand() - 0.5) * w;
+      const pz = z + (this.rand() - 0.5) * d;
+      if (avoid && Math.hypot(px - avoid.x, pz - avoid.z) < avoid.r) continue;
+      const name = list[(this.rand() * list.length) | 0];
+      const s = scale === null ? null : scale * (1 + (this.rand() - 0.5) * scaleJitter);
+      const r = rot === null ? this.rand() * Math.PI * 2 : rot + (this.rand() - 0.5) * jitter;
+      if (this.prop(name, px, pz, r, { base, scale: s, solid, y })) placed += 1;
+    }
+    return placed;
+  }
+
+  /**
+   * 断续的墙线：沿 rot 方向铺一段工事，随机塌口、随机歪斜，像被打过一轮。
+   * 注意模型的长轴是 +X，所以 rot 同时决定走向 —— 沿 (cos rot, -sin rot) 前进。
+   */
+  wallRun(name, x, z, rot, length, {
+    step = 2, gap = 0.28, jitter = 0.22, base = null, solid = true, drift = 0.3,
+  } = {}) {
+    const c = Math.cos(rot), s = Math.sin(rot);
+    let placed = 0;
+    for (let t = -length / 2; t <= length / 2; t += step) {
+      if (this.rand() < gap) continue;
+      const px = x + t * c + (this.rand() - 0.5) * drift;
+      const pz = z - t * s + (this.rand() - 0.5) * drift;
+      const r = rot + (this.rand() - 0.5) * jitter;
+      if (this.prop(name, px, pz, r, { base, solid })) placed += 1;
+    }
+    return placed;
   }
 
   crate(x, z, size = 1.1, { base = null, rot = 0 } = {}) {
