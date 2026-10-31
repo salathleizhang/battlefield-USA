@@ -23,9 +23,9 @@ const cache = new Map();
 const LENGTH = { m4a1: 0.84, ak47: 0.88, scarl: 0.89, mp5a5: 0.52, vss: 0.89, m24: 1.10, awm: 1.24, shotgun: 0.98, p226: 0.20, m1911: 0.22 };
 
 /** Shoulder-pocket height trim (m): bore sits a little under the eye. */
-const POCKET_Y = 0.055;
+const POCKET_Y = 0.10;
 /** Sprint carry engages above this ground speed (m/s). */
-const CARRY_SPEED = 3.0;
+const CARRY_SPEED = 4.2;
 
 const UP = new THREE.Vector3(0, 1, 0);
 const DOWN = new THREE.Vector3(0, -1, 0);
@@ -98,7 +98,8 @@ async function buildTemplate(id) {
   const support = supportP
     ? supportP.clone().sub(gripP).applyQuaternion(qRootToGun).multiplyScalar(s)
     : new THREE.Vector3(0, -0.02, -0.25).multiplyScalar(s);
-  const butt = new THREE.Vector3(0, Math.min(muzzlePos.y, bb.max.y - 0.03), bb.max.z - 0.015);
+  // Butt plate sits ~3 cm below the bore (stock drop at heel), at the rear of the stock.
+  const butt = new THREE.Vector3(0, Math.min(muzzlePos.y, bb.max.y - 0.03) - 0.03, bb.max.z - 0.015);
 
   return {
     template: wrap,
@@ -173,6 +174,12 @@ export async function equipBotGun(model, id) {
     rc: { pitch: { x: 0, v: 0 }, yaw: { x: 0, v: 0 }, back: { x: 0, v: 0 } },
   };
   return gun;
+}
+
+/** Hand the rifle to the corpse: it rides the firing hand through the death clip. */
+export function dropBotGun(model) {
+  const gun = model?._botGun;
+  if (gun && model.handR && gun.parent !== model.handR) model.handR.attach(gun);
 }
 
 /* ------------------------------------------------------------------ maths */
@@ -280,9 +287,9 @@ export function botGunFire(bot) {
   const st = bot?.model?._gunState;
   if (!st) return;
   const r = st.rc;
-  r.pitch.v += 1.2 + Math.random() * 0.5;
-  r.yaw.v += (Math.random() * 2 - 1) * 0.8;
-  r.back.v += 0.85;
+  r.pitch.v += 2.2 + Math.random() * 0.8;
+  r.yaw.v += (Math.random() * 2 - 1) * 1.2;
+  r.back.v += 1.6;
 }
 
 /**
@@ -301,20 +308,22 @@ export function updateBotGun(bot, dt = 1 / 60) {
   model.group.updateMatrixWorld(true);
 
   // Reach only depends on bone lengths; measure it once per soldier.
-  if (!b.reachR) {
-    b.reachR = wpos(b.upperR, _v1).distanceTo(wpos(b.lowerR, _v2)) + wpos(b.lowerR, _v2).distanceTo(wpos(b.handR, _v3));
+  if (!b.reachL) {
     b.reachL = b.upperL
       ? wpos(b.upperL, _v1).distanceTo(wpos(b.lowerL, _v2)) + wpos(b.lowerL, _v2).distanceTo(wpos(b.handL, _v3))
       : 0;
   }
+  // A corpse's rifle rides the firing hand (Bot.die re-parents it); respawning puts it back here.
+  if (gun.parent !== model.group) model.group.attach(gun);
 
   // --- alert / low-ready / sprint-carry / reload blends (reference `_placeWeapon`) ---
   const target = bot.target;
   const alert = !!(bot.aiming && target?.alive && target.position);
   const speed = model.speed || 0;
-  st.readyW = damp(st.readyW, alert ? 0 : 1, alert ? 12 : 8, dt);
-  st.carryW = damp(st.carryW, !alert && speed > CARRY_SPEED ? 1 : 0, 7, dt);
-  st.reloadW = damp(st.reloadW, model.oneShotName === 'reload' ? 1 : 0, 9, dt);
+  st.readyW = damp(st.readyW, alert ? 0 : 1, alert ? 12 : 9, dt);
+  st.carryW = damp(st.carryW, !alert && speed > CARRY_SPEED ? 1 : 0, 8, dt);
+  // `oneShotName` lingers after the clip ends, so require the action to still be running.
+  st.reloadW = damp(st.reloadW, model.oneShot && model.oneShotName === 'reload' ? 1 : 0, 9, dt);
   st.settle += dt;
   st.aimT = alert ? (st.aimT || 0) + dt : 0;
   const rw = st.reloadW;
@@ -322,9 +331,10 @@ export function updateBotGun(bot, dt = 1 / 60) {
   const carry = st.carryW * (1 - rw);
 
   // Recoil springs (weapon root). Pitch/yaw are radians, back is metres.
-  spring(st.rc.pitch, 0, 0.055, dt);
-  spring(st.rc.yaw, 0, 0.055, dt);
-  spring(st.rc.back, 0, 0.05, dt);
+  // 95 % of the kick is back home in ~0.15 s (critically damped: x ∝ t·e^(-y t), y = 2·ln2/h).
+  spring(st.rc.pitch, 0, 0.032, dt);
+  spring(st.rc.yaw, 0, 0.032, dt);
+  spring(st.rc.back, 0, 0.032, dt);
 
   // --- aim line: flat yaw when patrolling, exact bore-to-target when engaging ---
   let aimYaw = bot.yaw;

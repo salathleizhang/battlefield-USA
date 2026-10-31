@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { G, groups } from '../../core/Physics.js';
 import { SoldierModel } from './SoldierModel.js';
-import { equipBotGun, updateBotGun, botGunFire } from './BotGun.js';
+import { equipBotGun, updateBotGun, botGunFire, dropBotGun } from './BotGun.js';
 import { clamp, damp, rand, randInt, pick } from '../../core/MathUtil.js';
 
 const US_NAMES = ['米勒', '卡特', '沃克', '布朗', '戴维斯', '汤普森', '里德', '霍华德', '肖', '格雷'];
@@ -488,6 +488,7 @@ export class Bot {
     this.deadT = 0;
     this.health = 0;
     this.model.setDead();
+    dropBotGun(this.model);
     this.game.physics.world.removeCollider(this.collider);
     this.collider = null;
     this.game.onActorKilled(this, attacker, info);
