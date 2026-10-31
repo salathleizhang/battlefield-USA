@@ -540,7 +540,7 @@ export class Tank {
     this.aimTurret(dt, player.yaw, player.pitch, 1);
     this.mgTimer -= dt;
     if (cmd.firePressed && this.reload <= 0) this.fire(player);
-    if (cmd.fire && this.mgTimer <= 0 && this.mgAmmo > 0) {
+    if (cmd.sprint && this.mgTimer <= 0 && this.mgAmmo > 0) {
       this.mgTimer = this.def.mg.interval;
       this.mgAmmo--;
       this._fireMG(player);

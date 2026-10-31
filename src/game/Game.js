@@ -740,6 +740,8 @@ export class Game {
     if (cmd.interact && this.player.alive) this.vehicles.tryToggle(this.player);
 
     if (this.playerVehicle) {
+      this.player.aiming = !!cmd.aim;
+      this.player.crouching = false;
       this.player.look(look.x, look.y, this.settings.sens * 0.92);
       this.player.syncCamera(dt);
       if (this.playerBody?.group) this.playerBody.group.visible = false;

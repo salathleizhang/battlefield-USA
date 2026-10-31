@@ -81,6 +81,8 @@ export class Vehicles {
     player.crouching = false;
     player.sprinting = false;
     player.sliding = false;
+    // While seated the capsule is parked: the hull takes the hits, not the man.
+    player.collider?.setEnabled?.(false);
     // Hide the infantry presentation: body, hands and weapon live in separate scenes.
     if (this.game.playerBody?.group) this.game.playerBody.group.visible = false;
     this.game.viewmodel?.setEnabled(false);
@@ -103,6 +105,7 @@ export class Vehicles {
     this.game.viewmodel?.setEnabled(true);
     this.game.hud?.showVehicle?.(null);
     if (!force && player) {
+      player.collider?.setEnabled?.(true);
       const spot = this._exitSpot(tank);
       player.position.set(spot.x, spot.y + 0.12, spot.z);
       player.velocity.set(0, 0, 0);
