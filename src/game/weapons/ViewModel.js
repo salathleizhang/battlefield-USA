@@ -131,6 +131,15 @@ export class ViewModel {
     const adsTarget = (player.aiming && !weapon.reloading && !player.sprinting) ? 1 : 0;
     this.ads = damp(this.ads, adsTarget, 14, dt);
 
+    // The weapon camera has its own FOV: it narrows slightly at the sights so the
+    // receiver and rear sight grow with the zoom instead of staying flat.
+    const vmFov = 58 - this.ads * 8;
+    const vc = this.game.renderer.viewCamera;
+    if (Math.abs(vc.fov - vmFov) > 0.01) {
+      vc.fov = vmFov;
+      vc.updateProjectionMatrix();
+    }
+
     const sprintTarget = player.sprinting ? 1 : 0;
     this.sprint = damp(this.sprint, sprintTarget, 9, dt);
     this.reloadW = damp(this.reloadW, weapon.reloading ? 1 : 0, 10, dt);
