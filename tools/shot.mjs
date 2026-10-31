@@ -79,6 +79,14 @@ const evalExpr = async (expression) => {
 let extra = null;
 if (evalFile) extra = await evalExpr(fs.readFileSync(evalFile, 'utf8'));
 
+// 场景太密时 SwiftShader 抓帧会卡死；只取数据时用 SKIP_SHOT=1
+if (process.env.SKIP_SHOT === '1') {
+  console.log(JSON.stringify({ shot: null, extra, logs: logs.slice(-25) }, null, 2));
+  ws.close();
+  chrome.kill('SIGKILL');
+  process.exit(0);
+}
+
 const shot = await send('Page.captureScreenshot', { format: 'png' });
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, Buffer.from(shot.data, 'base64'));

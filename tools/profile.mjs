@@ -91,9 +91,15 @@ await send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceSc
 
 const t0 = Date.now();
 
-for (let i = 0; i < 120; i++) {
-  if (await ev('!!(window.__game && window.__game.started)')) break;
+let ready = false;
+for (let i = 0; i < 180; i++) {
+  if (await ev('!!(window.__game && window.__game.started)')) { ready = true; break; }
   await sleep(1000);
+}
+if (!ready) {
+  const state = await ev('({ game: !!window.__game, started: !!window.__game?.started, loading: !!document.getElementById("loading"), href: location.href })').catch(() => null);
+  console.error(JSON.stringify({ error: 'page never reached gameplay', state, logs: logs.slice(-6) }, null, 2));
+  process.exit(1);
 }
 const bootMs = Date.now() - t0;
 
@@ -116,6 +122,9 @@ await sleep(3000);
 
 const samples = await ev(`(async () => {
   const game = window.__game;
+  // Headless cannot acquire pointer lock, so the game parks itself in the pause
+  // state and stops ticking gameplay. Force it live so the sample is real play.
+  game.paused = false;
   const r = game.renderer.renderer;
   const out = [];
   let last = performance.now();
