@@ -39,6 +39,17 @@ export class Effects {
     this.tmp = new THREE.Vector3();
     this.up = new THREE.Vector3(0, 1, 0);
     /**
+     * Sprite / tracer pools.
+     *
+     * Firing allocates hundreds of sprites a second; each one used to be a fresh
+     * Sprite, SpriteMaterial and (for tracers) a Mesh with its own material, all
+     * disposed a fraction of a second later. That churn showed up in the
+     * profiler as 30 MB heap sawtooth and hitch frames with no shader or
+     * geometry delta at all — pure GC. Objects are now recycled by kind, and the
+     * material is reused too, so steady-state gameplay allocates nothing here.
+     */
+    this._pool = { sprite: [], tracer: [] };
+    /**
      * Explosion lights are pooled and stay in the scene forever.
      *
      * three bakes the number of VISIBLE point lights into every material's
@@ -70,16 +81,33 @@ export class Effects {
     return best;
   }
 
+  /** Take a sprite + material out of the pool (or build one if the pool is dry). */
+  _takeSprite(tex, color, additive) {
+    const item = this._pool.sprite.pop();
+    const sprite = item ? item.sprite : new THREE.Sprite(new THREE.SpriteMaterial({
+      transparent: true, depthWrite: false,
+    }));
+    const mat = sprite.material;
+    mat.map = tex;
+    mat.color.setHex(color);
+    mat.blending = additive ? THREE.AdditiveBlending : THREE.NormalBlending;
+    mat.opacity = 1;
+    mat.needsUpdate = false;
+    sprite.visible = true;
+    this.scene.add(sprite);
+    return sprite;
+  }
+
+  _putSprite(sprite) {
+    this.scene.remove(sprite);
+    sprite.visible = false;
+    this._pool.sprite.push({ sprite });
+  }
+
   _sprite(tex, pos, vel, size, life, color, additive = true, gravity = 0) {
-    const mat = new THREE.SpriteMaterial({
-      map: tex, color, transparent: true, depthWrite: false,
-      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
-      opacity: 1,
-    });
-    const s = new THREE.Sprite(mat);
+    const s = this._takeSprite(tex, color, additive);
     s.position.copy(pos);
     s.scale.setScalar(size);
-    this.scene.add(s);
     const p = { sprite: s, vel: vel.clone(), life, maxLife: life, size, gravity, drag: 1.6 };
     this.particles.push(p);
     return p;
@@ -91,24 +119,18 @@ export class Effects {
       this._sprite(this.tex.smoke, pos, dir.clone().multiplyScalar(rand(1, 3)).add(new THREE.Vector3(rand(-0.3, 0.3), rand(0.2, 0.7), 0)),
         rand(0.18, 0.34), rand(0.35, 0.7), 0x8d8a80, false);
     }
-    const flash = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: this.tex.flash, color: 0xffdd99, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
-    }));
+    const flash = this._takeSprite(this.tex.flash, 0xffdd99, true);
     flash.position.copy(origin);
     flash.scale.setScalar(rand(0.25, 0.5));
-    this.scene.add(flash);
     this.flashes.push({ sprite: flash, life: 0.06, max: 0.06 });
   }
 
   botMuzzle(muzzleObj, dir) {
     const pos = new THREE.Vector3();
     muzzleObj.getWorldPosition(pos);
-    const flash = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: this.tex.flash, color: 0xffcf88, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
-    }));
+    const flash = this._takeSprite(this.tex.flash, 0xffcf88, true);
     flash.position.copy(pos);
     flash.scale.setScalar(rand(0.35, 0.6));
-    this.scene.add(flash);
     this.flashes.push({ sprite: flash, life: 0.055, max: 0.055 });
     for (let i = 0; i < 2; i++) {
       this._sprite(this.tex.smoke, pos, dir.clone().multiplyScalar(rand(0.8, 2)), 0.2, 0.6, 0x8d8a80, false);
@@ -118,10 +140,15 @@ export class Effects {
   tracer(from, to, color = 0xffcf7a) {
     const dist = from.distanceTo(to);
     if (dist < 0.5) return;
-    const mat = new THREE.MeshBasicMaterial({
-      color, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false,
-    });
-    const mesh = new THREE.Mesh(this.tracerGeo, mat);
+    const pooled = this._pool.tracer.pop();
+    const mesh = pooled
+      ? pooled
+      : new THREE.Mesh(this.tracerGeo, new THREE.MeshBasicMaterial({
+        transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false,
+      }));
+    mesh.material.color.setHex(color);
+    mesh.material.opacity = 0.85;
+    mesh.visible = true;
     mesh.position.copy(from);
     mesh.scale.set(1, dist, 1);
     const dir = this.tmp.subVectors(to, from).normalize();
@@ -227,9 +254,7 @@ export class Effects {
       const p = this.particles[i];
       p.life -= dt;
       if (p.life <= 0) {
-        this.scene.remove(p.sprite);
-        p.sprite.material.dispose();
-        if (p.sprite.geometry) p.sprite.geometry.dispose();
+        this._putSprite(p.sprite);
         this.particles.splice(i, 1);
         continue;
       }
@@ -247,7 +272,8 @@ export class Effects {
       t.mesh.material.opacity = Math.max(0, t.life / t.max) * 0.9;
       if (t.life <= 0) {
         this.scene.remove(t.mesh);
-        t.mesh.material.dispose();
+        t.mesh.visible = false;
+        this._pool.tracer.push(t.mesh);
         this.tracers.splice(i, 1);
       }
     }
@@ -267,9 +293,14 @@ export class Effects {
         f.sprite.material.opacity = Math.max(0, 0.9 * (1 - t));
       }
       if (f.life <= 0) {
-        this.scene.remove(f.sprite);
-        if (f.sprite.material) f.sprite.material.dispose();
-        if (f.sprite.geometry) f.sprite.geometry.dispose();
+        // Muzzle flashes come from the sprite pool; explosion cores and shock
+        // rings are one-off meshes and are disposed as before.
+        if (f.sprite.isSprite) this._putSprite(f.sprite);
+        else {
+          this.scene.remove(f.sprite);
+          f.sprite.material?.dispose();
+          f.sprite.geometry?.dispose();
+        }
         this.flashes.splice(i, 1);
       }
     }
@@ -293,9 +324,13 @@ export class Effects {
   }
 
   clear() {
-    for (const p of this.particles) { this.scene.remove(p.sprite); p.sprite.material?.dispose(); }
-    for (const t of this.tracers) { this.scene.remove(t.mesh); t.mesh.material.dispose(); }
-    for (const f of this.flashes) { this.scene.remove(f.sprite); f.sprite.material?.dispose(); }
+    for (const p of this.particles) this.scene.remove(p.sprite);
+    for (const t of this.tracers) this.scene.remove(t.mesh);
+    for (const f of this.flashes) this.scene.remove(f.sprite);
+    for (const item of this._pool.sprite) item.sprite.material?.dispose();
+    for (const mesh of this._pool.tracer) mesh.material.dispose();
+    this._pool.sprite.length = 0;
+    this._pool.tracer.length = 0;
     for (const b of this.flipbooks) { this.scene.remove(b.sprite); b.map.dispose(); b.sprite.material.dispose(); }
     this.particles.length = 0;
     this.tracers.length = 0;
