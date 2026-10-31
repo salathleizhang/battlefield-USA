@@ -120,36 +120,51 @@ const boot = await ev(`(() => {
 // Let the level settle: the first frames after a build are one-time costs.
 await sleep(3000);
 
-const samples = await ev(`(async () => {
-  const game = window.__game;
-  // Headless cannot acquire pointer lock, so the game parks itself in the pause
-  // state and stops ticking gameplay. Force it live so the sample is real play.
-  game.paused = false;
-  const r = game.renderer.renderer;
-  const out = [];
+// Measure from inside the game's own loop. A second rAF chain samples the same
+// frames but can drift out of phase with the game's, doubling the intervals it
+// reports — which is exactly how a 60 fps build gets read as 30.
+await ev(`(() => {
+  const g = window.__game;
+  // Headless cannot acquire pointer lock, so the game parks itself paused and
+  // stops ticking gameplay. Force it live so the sample is real play.
+  g.paused = false;
+  window.__FT = [];
+  window.__CALLS = [];
+  const orig = g.update.bind(g);
   let last = performance.now();
-  const frame = () => new Promise((res) => requestAnimationFrame(res));
-  for (let i = 0; i < ${FRAMES}; i++) {
-    // Walk and fire in bursts so particles, decals and bots stay active.
-    game.input.keys?.add?.('KeyW');
-    if (i % 90 < 30) game.input.keys?.add?.('Mouse0'); else game.input.keys?.delete?.('Mouse0');
-    await frame();
+  g.update = (dt) => {
     const now = performance.now();
-    out.push({
-      i, dt: +(now - last).toFixed(2),
-      pr: +r.getPixelRatio().toFixed(3),
-      heap: performance.memory ? performance.memory.usedJSHeapSize >> 20 : 0,
-      progs: r.info.programs.length,
-      calls: r.info.render.calls,
-      tris: r.info.render.triangles,
-      geos: r.info.memory.geometries,
-      texs: r.info.memory.textures,
-    });
+    window.__FT.push(+((now - last) / 1).toFixed(2));
     last = now;
-  }
-  return out;
+    orig(dt);
+    const info = g.renderer?.renderer?.info;
+    window.__CALLS.push({
+      progs: info?.programs?.length ?? 0,
+      calls: info?.render?.calls ?? 0,
+      tris: info?.render?.triangles ?? 0,
+      geos: info?.memory?.geometries ?? 0,
+      texs: info?.memory?.textures ?? 0,
+      pr: +(g.renderer?.renderer?.getPixelRatio?.() ?? 1).toFixed(3),
+      heap: performance.memory ? performance.memory.usedJSHeapSize >> 20 : 0,
+    });
+  };
+  return true;
 })()`);
 
+// Drive input while the game's own loop runs, then stop and collect.
+await ev(`(() => {
+  const g = window.__game;
+  window.__DRIVE = setInterval(() => {
+    g.input.keys?.add?.('KeyW');
+    const t = window.__CALLS.length;
+    if (t % 90 < 30) g.input.keys?.add?.('Mouse0'); else g.input.keys?.delete?.('Mouse0');
+  }, 16);
+  return true;
+})()`);
+await sleep(Math.round((FRAMES / 55) * 1000) + 1500);
+const raw = await ev(`(() => { clearInterval(window.__DRIVE); const g = window.__game; return { ft: window.__FT, meta: window.__CALLS }; })()`);
+
+const samples = raw.ft.map((dt, i) => ({ i, dt, ...(raw.meta[i] || {}) }));
 const warm = samples.slice(WARMUP);
 const dts = warm.map((s) => s.dt).sort((a, b) => a - b);
 const q = (p) => +(dts[Math.min(dts.length - 1, Math.floor(dts.length * p))] ?? 0).toFixed(2);
