@@ -12,7 +12,7 @@ import { Level } from '../world/Level.js';
 import { Player } from './Player.js';
 import { PlayerBody } from './PlayerBody.js';
 import { Weapon } from './weapons/Weapon.js';
-import { DEFAULT_LOADOUT, weaponDef } from './weapons/WeaponDefs.js';
+import { DEFAULT_LOADOUT, WEAPONS, weaponDef } from './weapons/WeaponDefs.js';
 import { ViewModel } from './weapons/ViewModel.js';
 import { loadRifle } from './weapons/RifleModel.js';
 import { Bot } from './bots/Bot.js';
@@ -177,13 +177,17 @@ export class Game {
     const spawn = this.level.playerSpawn || { position: new THREE.Vector3(0, 2, 0), yaw: 0 };
     this.player.spawn(spawn.position, spawn.yaw);
 
-    this.weapons = DEFAULT_LOADOUT.map((id) => new Weapon(this, this.player, weaponDef(id)));
+    // ?loadout=zb26,c96 — comma-separated ids; unknown ids fall back to the default kit.
+    const pick = (q.get('loadout') || '').split(',').map((v) => v.trim()).filter((id) => WEAPONS[id]);
+    const loadout = pick.length ? pick : DEFAULT_LOADOUT;
+    this.weapons = loadout.map((id) => new Weapon(this, this.player, weaponDef(id)));
     this.weaponIndex = 0;
     this.weapon = this.weapons[0];
     this.viewmodel = new ViewModel(this);
     this.viewmodel.setWeapon(this.weapon.def);
     this.match = new Match(this);
     this.hud = new HUD(this);
+    this.hud.setWeapon?.(this.weapon.def);
     this.hud.show(true);
     this.hud.setObjective(`${campaign.objectives[0]}`);
     this.hud.banner(campaign.name, `${campaign.date} · ${campaign.location}`, 4.2);
@@ -417,6 +421,7 @@ export class Game {
     this.lastKiller = attacker;
     this.stats.deaths++;
     this.respawnT = 5;
+    this.renderer?.splatter?.(0.85);
     this.viewmodel?.setEnabled(false);
     if (this.hud) this.hud.killfeed(attacker, this.player, WEAPON_NAMES[weapon] || '战斗');
     if (this.match) this.match.onKill(this.player, attacker);

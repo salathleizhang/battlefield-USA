@@ -307,10 +307,14 @@ export class HUD {
       this.el.reserve.textContent = String(w.reserve);
       this.el.ammo.classList.toggle('low', w.ammo <= 1 && w.ammo > 0);
       this.el.ammo.classList.toggle('empty', w.ammo === 0);
-      if (this.lastPips !== w.ammo) {
+      if (this.lastPips !== w.ammo || this.lastPipsMag !== (w.def?.magazine ?? 5)) {
         this.lastPips = w.ammo;
         const mag = w.def?.magazine ?? 5;
-        this.el.pips.innerHTML = Array.from({ length: mag }, (_, i) => `<i class="${i < w.ammo ? 'on' : ''}"></i>`).join('');
+        this.lastPipsMag = mag;
+        // Large magazines would overflow the panel: at most ten pips, each worth mag/10.
+        const count = Math.min(10, mag);
+        const per = mag / count;
+        this.el.pips.innerHTML = Array.from({ length: count }, (_, i) => `<i class="${i < Math.round(w.ammo / per) ? 'on' : ''}"></i>`).join('');
       }
     }
 

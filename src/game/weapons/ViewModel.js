@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { buildType38 } from './Type38.js';
 import { buildC96 } from './PistolModel.js';
+import { buildLmg } from './LmgModel.js';
 import { FpHands, loadFpHands } from './FpHands.js';
 import { clamp, damp, rand, smoothstep } from '../../core/MathUtil.js';
 
@@ -30,6 +31,20 @@ const POSES = {
     kickRot: 0.075,
     flashSize: 0.32,
   },
+  lmg: {
+    hipPos: new THREE.Vector3(0.170, -0.150, -0.520),
+    hipRot: new THREE.Euler(0.020, 0.290, -0.070),
+    adsPos: new THREE.Vector3(0, 0, -0.150),
+    adsRot: new THREE.Euler(0, 0, 0),
+    sprintPos: new THREE.Vector3(0.170, -0.270, -0.160),
+    sprintRot: new THREE.Euler(0.52, 0.62, 0.44),
+    reloadPos: new THREE.Vector3(0.070, -0.260, -0.200),
+    reloadRot: new THREE.Euler(-0.18, 0.36, 0.52),
+    flashLight: new THREE.Vector3(0.02, -0.10, -0.60),
+    kickZ: 0.034,
+    kickRot: 0.070,
+    flashSize: 0.34,
+  },
   pistol: {
     hipPos: new THREE.Vector3(0.100, -0.080, -0.400),
     hipRot: new THREE.Euler(0.020, 0.100, -0.020),
@@ -55,6 +70,7 @@ export class ViewModel {
 
     this.rigs = {};
     this._build('rifle', buildType38(game.materials, game.weaponTemplate));
+    this._build('lmg', buildLmg(game.materials, game.weaponTemplate));
     this._build('pistol', buildC96(game.materials));
     this.active = 'rifle';
     this._bind('rifle');
@@ -144,7 +160,7 @@ export class ViewModel {
 
   /** Point the viewmodel at a weapon rig ('rifle' | 'pistol'). */
   setWeapon(def) {
-    const key = def?.model === 'pistol' ? 'pistol' : 'rifle';
+    const key = def?.model === 'pistol' ? 'pistol' : def?.model === 'lmg' ? 'lmg' : 'rifle';
     if (key === this.active && this.gun) return;
     const prev = this.rigs[this.active];
     if (prev) prev.holder.visible = false;
@@ -299,6 +315,7 @@ export class ViewModel {
     this.gun.rotation.z = damp(this.gun.rotation.z, rot.z, 18, dt);
 
     if (this.active === 'rifle') this._updateRifle(dt, weapon, reloadP);
+    else if (this.active === 'lmg') this._updateAuto(dt, weapon, reloadP);
     else this._updatePistol(dt, weapon, reloadP);
 
     // ---------------------------------------------------------------- arms
@@ -403,6 +420,20 @@ export class ViewModel {
       if (this.lastReload < 0.56 && reloadP >= 0.56) this.game.audio?.reload('clip');
       if (this.lastReload < 0.86 && reloadP >= 0.86) this.game.audio?.bolt();
     }
+    this.lastReload = weapon.reloading ? reloadP : 0;
+  }
+
+  /** Automatic weapons: no bolt choreography — hands stay on the grips, brass keeps flying. */
+  _updateAuto(dt, weapon, reloadP) {
+    this.bolt.rotation.z = damp(this.bolt.rotation.z, 0, 30, dt);
+    this.bolt.position.z = damp(this.bolt.position.z, this.w.boltRest.z, 30, dt);
+    this.handR.position.lerp(this.gripR, 1 - Math.exp(-24 * dt));
+    this.handL.position.lerp(this.gripL, 1 - Math.exp(-24 * dt));
+    this.handR.rotation.z = damp(this.handR.rotation.z, -Math.PI / 2, 20, dt);
+
+    if (weapon.cycleT > 0 && this.lastCycle <= 0) this._ejectCasing();
+    this.lastCycle = weapon.cycleT > 0 ? 1 : 0;
+    if (weapon.reloading && this.lastReload < 0.62 && reloadP >= 0.62) this.game.audio?.reload('clip');
     this.lastReload = weapon.reloading ? reloadP : 0;
   }
 
