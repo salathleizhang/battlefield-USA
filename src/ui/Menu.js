@@ -100,6 +100,8 @@ export class Menu {
         <div class="setting-row"><label>主音量</label><input type="range" id="set-vol" min="0" max="1" step="0.05"><span class="val" id="val-vol">70%</span></div>
         <div class="setting-row"><label>后坐力强度</label><input type="range" id="set-rec" min="0" max="1.5" step="0.05"><span class="val" id="val-rec">100%</span></div>
         <div class="setting-row"><label>画质</label><input type="range" id="set-qual" min="0" max="3" step="1"><span class="val" id="val-qual">高</span></div>
+        <div class="setting-row toggle"><label>史诗镜头</label><input type="checkbox" id="set-epic"><span class="val" id="val-epic">开启</span></div>
+        <div class="setting-row toggle"><label>镜头血溅</label><input type="checkbox" id="set-blood"><span class="val" id="val-blood">开启</span></div>
         <button class="btn settings-close" id="btn-settings-close">返回</button>
       </div>`;
     this.root.appendChild(settingsPanel);
@@ -211,6 +213,22 @@ export class Menu {
     bind('#set-vol', 'volume', (v) => `${Math.round(v * 100)}%`);
     bind('#set-rec', 'recoil', (v) => `${Math.round(v * 100)}%`);
     bind('#set-qual', 'quality', (v) => ['低', '中', '高', '极致'][v | 0] ?? '高');
+
+    const bindToggle = (id, key) => {
+      const input = this.settingsEl.querySelector(id);
+      if (this.settings[key] == null) this.settings[key] = true;
+      input.checked = !!this.settings[key];
+      const out = this.settingsEl.querySelector(id.replace('set-', 'val-'));
+      out.textContent = input.checked ? '开启' : '关闭';
+      input.addEventListener('change', () => {
+        this.settings[key] = input.checked;
+        out.textContent = input.checked ? '开启' : '关闭';
+        this._applySettings();
+        saveSettings(this.settings);
+      });
+    };
+    bindToggle('#set-epic', 'fxEpic');
+    bindToggle('#set-blood', 'fxBlood');
   }
 
   _applySettings() {

@@ -5,7 +5,9 @@ import {
   KernelSize,
 } from 'postprocessing';
 import { N8AOPostPass } from 'n8ao';
-import { GradeEffect, LensEffect, SharpenEffect, lensDirtTexture } from './PostFX.js';
+import {
+  GradeEffect, LensEffect, SharpenEffect, EpicLensEffect, BloodLensEffect, lensDirtTexture, bloodSplatTexture,
+} from './PostFX.js';
 
 const _lodPos = new THREE.Vector3();
 
@@ -182,7 +184,8 @@ export class Renderer {
     this.viewScene.add(new THREE.AmbientLight(0xffffff, 0.22));
 
     this.settings = {
-      quality: 2, adaptiveRes: true, fxBloom: true, fxGodRays: true, fxLens: true, fxCA: true, fxGrain: true, fxAO: true,
+      quality: 2, adaptiveRes: true, fxBloom: true, fxGodRays: true, fxLens: true, fxEpic: true, fxBlood: true,
+      fxCA: true, fxGrain: true, fxAO: true,
     };
     this.features = QUALITY_PRESETS[2];
     this.damagePulse = 0;
@@ -216,7 +219,7 @@ export class Renderer {
 
     // HDR stage: god rays from the sun, tight bloom, lens smudges.
     this.bloom = new BloomEffect({
-      intensity: 0.42, luminanceThreshold: 1.15, luminanceSmoothing: 0.35, mipmapBlur: true, radius: 0.62, levels: 7,
+      intensity: 0.50, luminanceThreshold: 1.05, luminanceSmoothing: 0.35, mipmapBlur: true, radius: 0.68, levels: 7,
     });
     this.sunSource = new THREE.Mesh(
       new THREE.SphereGeometry(18, 16, 8),
@@ -224,11 +227,12 @@ export class Renderer {
     );
     this.sunDir = null;
     this.godRays = new GodRaysEffect(this.camera, this.sunSource, {
-      resolutionScale: 0.5, kernelSize: KernelSize.SMALL, density: 0.94, decay: 0.93, weight: 0.18, exposure: 0.45,
+      resolutionScale: 0.5, kernelSize: KernelSize.SMALL, density: 0.94, decay: 0.93, weight: 0.22, exposure: 0.50,
       samples: 40, clampMax: 1.0, blur: true,
     });
     this.lens = new LensEffect(this.bloom, lensDirtTexture());
-    this.hdrPass = new EffectPass(this.camera, this.godRays, this.bloom, this.lens);
+    this.epic = new EpicLensEffect(this.bloom);
+    this.hdrPass = new EffectPass(this.camera, this.godRays, this.bloom, this.lens, this.epic);
     this.composer.addPass(this.hdrPass);
 
     // Viewmodel after the depth-reading HDR effects (the pass clears depth, so the sun cannot shine through walls).
@@ -242,10 +246,13 @@ export class Renderer {
     this.toneMap = new ToneMappingEffect({ mode: ToneMappingMode.ACES_FILMIC });
     this.grade = new GradeEffect();
     this.chroma = new ChromaticAberrationEffect({ offset: new THREE.Vector2(0, 0), radialModulation: true, modulationOffset: 0.45 });
-    this.vignette = new VignetteEffect({ offset: 0.4, darkness: 0.26 });
+    this.vignette = new VignetteEffect({ offset: 0.4, darkness: 0.28 });
     this.noise = new NoiseEffect({ blendFunction: BlendFunction.OVERLAY, premultiply: false });
     this.noise.blendMode.opacity.value = 0.022;
-    this.gradePass = new EffectPass(this.camera, this.toneMap, this.grade, this.vignette, this.chroma, this.noise);
+    this.blood = new BloodLensEffect(bloodSplatTexture({ seed: 91 }), bloodSplatTexture({ seed: 407 }));
+    this.gradePass = new EffectPass(
+      this.camera, this.toneMap, this.grade, this.blood, this.vignette, this.chroma, this.noise,
+    );
     this.composer.addPass(this.gradePass);
 
     this.smaa = new SMAAEffect({ preset: SMAAPreset.HIGH });
@@ -260,7 +267,7 @@ export class Renderer {
     this._route();
 
     // Effects whose blend is "off" must also skip their internal passes.
-    for (const e of [this.godRays, this.bloom, this.lens]) {
+    for (const e of [this.godRays, this.bloom, this.lens, this.epic, this.blood]) {
       const u = e.update.bind(e);
       e._blendOn = e.blendMode.blendFunction;
       e.update = (...a) => { if (e._active !== false) u(...a); };
@@ -297,6 +304,8 @@ export class Renderer {
     this._setEffectActive(this.godRays, this.features.godRays > 0 && on('fxGodRays'));
     this.lensOn = on('fxLens');
     this._setEffectActive(this.lens, this.lensOn || on('fxBloom'));
+    this._setEffectActive(this.epic, on('fxEpic'));
+    this._setEffectActive(this.blood, on('fxBlood'));
     this.caOn = on('fxCA');
     this.noise.blendMode.opacity.value = on('fxGrain') ? 0.022 : 0;
     this.aoPass.enabled = !!this.features.ao && on('fxAO');
@@ -340,15 +349,35 @@ export class Renderer {
     if (window.__CAPTURE__ || this.dprOverride > 0 || this.settings.adaptiveRes === false) return;
     const ms = dt * 1000;
     if (!(ms > 0 && ms < 200)) return;      // ignore tab-switch spikes
-    this._ftAvg = this._ftAvg ? this._ftAvg * 0.9 + ms * 0.1 : ms;
+    this._ftAvg = this._ftAvg ? this._ftAvg * 0.88 + ms * 0.12 : ms;
     this._rsTick = (this._rsTick || 0) + 1;
-    if (this._rsTick < 45) return;
-    this._rsTick = 0;
+
+    const TARGET = 16.7;   // 60 fps
+    const HI = 18.5;       // above this, give up pixels
+    const LO = 14.5;       // below this, reclaim them
+    const avg = this._ftAvg;
+    const far = avg > HI * 1.35;
+    // Converge fast when the frame is far over budget, settle slowly near it.
+    if (this._rsTick < (far ? 20 : 60)) return;
+
     const scale = this.renderScale ?? 1;
     let next = scale;
-    if (this._ftAvg > 20 && scale > 0.56) next = scale - 0.07;
-    else if (this._ftAvg < 13 && scale < 1) next = scale + 0.05;
-    if (Math.abs(next - scale) > 0.001) this.setRenderScale(next);
+    if (avg > HI) {
+      // Time scales with pixel count, so scale ~ sqrt(target / actual).
+      const want = Math.sqrt(TARGET / avg);
+      next = Math.min(scale - 0.02, scale * want);
+    } else if (avg < LO && scale < 1) {
+      next = scale + 0.04;
+    } else {
+      this._rsTick = 0;
+      return;
+    }
+    next = THREE.MathUtils.clamp(next, 0.55, 1);
+    if (Math.abs(next - scale) < 0.005) { this._rsTick = 0; return; }
+    this._rsTick = 0;
+    // The average describes the old resolution; start measuring the new one fresh.
+    this._ftAvg = 0;
+    this.setRenderScale(next);
   }
 
   applyQuality(q) {
@@ -486,6 +515,8 @@ export class Renderer {
     this.renderer.setSize(w, h);
     this.composer?.setSize(w, h);
     if (this.lens) this.lens.uniforms.get('aspect').value = w / h;
+    if (this.epic) this.epic.uniforms.get('epicAspect').value = w / h;
+    if (this.blood) this.blood.uniforms.get('bloodAspect').value = w / h;
   }
 
   setEnvironment({
@@ -500,9 +531,12 @@ export class Renderer {
     if (fogDensity !== undefined) this.fog.density = fogDensity;
     if (sunColor !== undefined) this.sun.color.set(sunColor);
     if (sunIntensity !== undefined) this.sun.intensity = sunIntensity;
-    if (hemiIntensity !== undefined) this.hemi.intensity = hemiIntensity;
-    if (hemiColor !== undefined) this.hemi.color.set(hemiColor);
-    if (hemiGround !== undefined) this.hemi.groundColor.set(hemiGround);
+    // These are written on every mission, not only when a campaign overrides
+    // them: the renderer survives a campaign switch, and a fog map's dimmer sun
+    // or brighter ambient must not leak into the next mission.
+    this.hemi.intensity = hemiIntensity ?? 1.55;
+    this.hemi.color.set(hemiColor ?? 0xb6c2cc);
+    this.hemi.groundColor.set(hemiGround ?? 0x5f5342);
     if (sunDir) {
       this.sun.position.copy(sunDir).normalize().multiplyScalar(160);
       this.skyUniforms.uSun.value.copy(sunDir).normalize();
@@ -510,8 +544,8 @@ export class Renderer {
     }
     // Dense weather diffuses the sun: the disc and the shafts both soften
     // without disabling the sun source the lens and god rays read from.
-    if (sunDisc !== undefined) this.skyUniforms.uSunDisc.value = sunDisc;
-    if (godRayWeight !== undefined) this.godRays.weight = godRayWeight;
+    this.skyUniforms.uSunDisc.value = sunDisc ?? 1;
+    this.godRays.weight = godRayWeight ?? 0.18;
     if (skyTop !== undefined) this.skyUniforms.uTop.value.set(skyTop);
     if (skyHorizon !== undefined) this.skyUniforms.uHorizon.value.set(skyHorizon);
     if (cloudiness !== undefined) this.skyUniforms.uCloudiness.value = cloudiness;
@@ -523,6 +557,18 @@ export class Renderer {
   }
 
   setDamage(amount) { this.damagePulse = Math.min(1, this.damagePulse + amount); }
+
+  /**
+   * Throw blood on the lens. `amount` is 0..1 and lands as film opacity; the
+   * effect itself decides placement, mirroring and drip phase so repeated hits
+   * from the same direction still look like separate splashes.
+   */
+  splatter(amount = 0.5) {
+    if (this.settings.fxBlood === false) return;
+    this.blood?.splat(amount);
+  }
+
+  clearSplatter() { this.blood?.clear(); }
 
   update(dt, playerPos) {
     this.skyUniforms.uTime.value += dt;
@@ -590,7 +636,8 @@ export class Renderer {
     const adsT = this.camera.fov < 60 ? 1 : 0;
     this.ads += (adsT - this.ads) * Math.min(1, dt * 8);
     this.vignette.darkness = 0.24 + this.ads * 0.12 + this.damagePulse * 0.25;
-    this.grade.uniforms.get('saturation').value = 0.94 - this.damagePulse * 0.25;
+    this.grade.uniforms.get('saturation').value = 0.95 - this.damagePulse * 0.22;
+    this.blood.tick(dt);
     this._updateSun();
     r.info.reset();
     r.shadowMap.needsUpdate = true;
