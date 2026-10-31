@@ -12,6 +12,8 @@ export class HUD {
     this.bannerT = 0;
     this.hitT = 0;
     this.damageT = 0;
+    this.damagePeak = 0;
+    this._fwd = new THREE.Vector3();
     this.killfeedItems = [];
     this.spread = 0;
     this.reloading = false;
@@ -88,6 +90,7 @@ export class HUD {
 
         <div class="damage-overlay" data-damage></div>
         <div class="hit-flash" data-hitflash></div>
+        <canvas class="dmg-canvas" data-dmg-canvas></canvas>
         <div class="capture-toast" data-toast></div>
         <div class="lowhp" data-lowhp></div>
         <div class="lock-hint" data-lock>点击画面 · 锁定鼠标</div>
@@ -115,6 +118,11 @@ export class HUD {
       toast: q('[data-toast]'), lowhp: q('[data-lowhp]'), lock: q('[data-lock]'),
       mmTitle: q('[data-mm-title]'),
     };
+    this.dmgMarks = Array.from({ length: 6 }, () => ({ t: 0, life: 1, deg: 0, power: 1 }));
+    this.dmgCtx = q('[data-dmg-canvas]').getContext('2d');
+    this._dmgActive = false;
+    this._resizeDmg();
+    addEventListener('resize', () => this._resizeDmg());
     this.ctx = this.el.compass.getContext('2d');
     this.mmCtx = this.el.minimap.getContext('2d');
     this.el.mmTitle.textContent = this.game.campaign?.location?.split('·').pop()?.trim() || '战场';
@@ -143,6 +151,11 @@ export class HUD {
     this.visible = v;
     this.el.hud.style.display = v ? 'block' : 'none';
     if (v) this._buildFlags();
+    else {
+      for (const m of this.dmgMarks) m.t = 0;
+      this.dmgCtx.clearRect(0, 0, this.dmgW, this.dmgH);
+      this._dmgActive = false;
+    }
   }
 
   setObjective(text) { this.el.objective.textContent = text; }
@@ -184,15 +197,44 @@ export class HUD {
     this.game.audio.hitmark(kill);
   }
 
-  damage(attacker) {
-    this.damageT = 0.55;
-    this.el.damage.classList.add('show');
-    if (attacker) {
-      const bearing = Math.atan2(attacker.position.x - this.game.player.position.x,
-        -(attacker.position.z - this.game.player.position.z));
-      const rel = ((bearing + this.game.player.yaw) * 180 / Math.PI + 360) % 360;
-      this.el.damage.style.setProperty('--dir', `${rel}deg`);
-    }
+  /**
+   * A hit from a known point draws a red bearing arc on the side it came from.
+   * `amount` only sets how loud the feedback is; the direction has to be exact,
+   * so it is projected onto the camera's own forward/right vectors instead of
+   * `player.yaw`, which ignores lean, recoil and camera shake.
+   */
+  damage(attacker, info = {}, amount = 0) {
+    const power = clamp(amount / 55, 0.25, 1);
+    this.damageT = 0.42 + power * 0.28;
+    this.damagePeak = 0.55 + power * 0.4;
+    this.el.damage.style.opacity = this.damagePeak.toFixed(3);
+    this.el.hitflash.classList.remove('show');
+    void this.el.hitflash.offsetWidth;
+    this.el.hitflash.classList.add('show');
+
+    const src = info.from || attacker?.position;
+    if (!src) return;
+    const p = this.game.player;
+    const dx = src.x - p.position.x;
+    const dz = src.z - p.position.z;
+    if (dx * dx + dz * dz < 0.36) return;
+
+    const cam = this.game.renderer.camera;
+    cam.getWorldDirection(this._fwd);
+    const len = Math.hypot(this._fwd.x, this._fwd.z) || 1;
+    const fx = this._fwd.x / len, fz = this._fwd.z / len;
+    const rx = -fz, rz = fx;                 // camera right, flattened to the ground
+    const f = dx * fx + dz * fz;
+    const r = dx * rx + dz * rz;
+    let deg = Math.atan2(r, f) * 180 / Math.PI;
+    if (deg < 0) deg += 360;
+
+    let slot = this.dmgMarks.find((a) => a.t <= 0);
+    if (!slot) slot = this.dmgMarks.reduce((a, b) => (a.t < b.t ? a : b));
+    slot.deg = deg;
+    slot.life = 0.95 + power * 0.55;
+    slot.t = slot.life;
+    slot.power = 0.72 + power * 0.28;
   }
 
   killfeed(killer, victim, weapon, headshot = false) {
@@ -277,9 +319,12 @@ export class HUD {
     if (this.toastT > 0) { this.toastT -= dt; if (this.toastT <= 0) this.el.toast.classList.remove('show'); }
     if (this.hitT > 0) { this.hitT -= dt; if (this.hitT <= 0) this.el.hitmarker.classList.remove('show'); }
     if (this.damageT > 0) {
-      this.damageT -= dt;
-      if (this.damageT <= 0) this.el.damage.classList.remove('show');
+      this.damageT = Math.max(0, this.damageT - dt);
+      const k = Math.min(1, this.damageT / 0.18);
+      this.el.damage.style.opacity = (this.damagePeak * k).toFixed(3);
     }
+    for (const m of this.dmgMarks) if (m.t > 0) m.t = Math.max(0, m.t - dt);
+    this._drawDamage();
     for (let i = this.killfeedItems.length - 1; i >= 0; i--) {
       const k = this.killfeedItems[i];
       k.t -= dt;
@@ -309,6 +354,90 @@ export class HUD {
 
     this._drawCompass();
     this._drawMinimap();
+  }
+
+  _resizeDmg() {
+    const dpr = Math.min(devicePixelRatio || 1, 1.5);
+    this.dmgW = innerWidth;
+    this.dmgH = innerHeight;
+    const c = this.dmgCtx.canvas;
+    c.width = Math.round(this.dmgW * dpr);
+    c.height = Math.round(this.dmgH * dpr);
+    this.dmgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  /**
+   * Draw every live bearing arc. Canvas rather than a masked conic-gradient:
+   * Chrome drops the mask on a conic gradient here, leaving a full wedge, and
+   * the canvas also lets the core glow fade outward instead of sitting as a
+   * flat ring.
+   */
+  _drawDamage() {
+    const ctx = this.dmgCtx;
+    if (!ctx) return;
+    const w = this.dmgW, h = this.dmgH;
+    const live = this.dmgMarks.some((m) => m.t > 0);
+    if (!live) {
+      if (this._dmgActive) {
+        ctx.clearRect(0, 0, w, h);
+        this._dmgActive = false;
+      }
+      return;
+    }
+    this._dmgActive = true;
+    ctx.clearRect(0, 0, w, h);
+    const cx = w * 0.5, cy = h * 0.5;
+    const r0 = Math.min(w, h) * 0.34;
+    const DEG = Math.PI / 180;
+    for (const m of this.dmgMarks) {
+      if (m.t <= 0) continue;
+      const age = m.life - m.t;
+      const k = Math.min(1, age / 0.05) * Math.min(1, m.t / 0.5) * m.power;
+      if (k <= 0) continue;
+      const R = r0 * (0.97 + (1 - m.t / m.life) * 0.06);
+      const mid = -Math.PI / 2 + m.deg * DEG;
+      const a0 = mid - 13 * DEG, a1 = mid + 13 * DEG;
+
+      // Soft wedge of light reaching in from the source.
+      const g = ctx.createRadialGradient(cx, cy, R * 0.5, cx, cy, R * 1.3);
+      g.addColorStop(0, 'rgba(255, 58, 26, 0)');
+      g.addColorStop(0.55, `rgba(255, 58, 26, ${(0.06 * k).toFixed(3)})`);
+      g.addColorStop(0.86, `rgba(255, 74, 34, ${(0.2 * k).toFixed(3)})`);
+      g.addColorStop(1, 'rgba(255, 42, 18, 0)');
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, R * 1.3, a0, a1);
+      ctx.closePath();
+      ctx.fillStyle = g;
+      ctx.fill();
+
+      ctx.save();
+      ctx.lineCap = 'round';
+      const bands = [
+        [R * 0.13, `rgba(255, 46, 18, ${(0.24 * k).toFixed(3)})`, 18],
+        [R * 0.052, `rgba(255, 78, 36, ${(0.9 * k).toFixed(3)})`, 12],
+        [R * 0.016, `rgba(255, 232, 190, ${(0.98 * k).toFixed(3)})`, 7],
+      ];
+      for (const [width, color, blur] of bands) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, R, a0, a1);
+        ctx.lineWidth = width;
+        ctx.strokeStyle = color;
+        ctx.shadowColor = 'rgba(255, 60, 20, 0.9)';
+        ctx.shadowBlur = blur;
+        ctx.stroke();
+      }
+      // A one-pixel bearing needle through the middle of the arc.
+      const nx = Math.cos(mid), ny = Math.sin(mid);
+      ctx.beginPath();
+      ctx.moveTo(cx + nx * (R - R * 0.06), cy + ny * (R - R * 0.06));
+      ctx.lineTo(cx + nx * (R + R * 0.05), cy + ny * (R + R * 0.05));
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = `rgba(255, 245, 226, ${(0.85 * k).toFixed(3)})`;
+      ctx.shadowBlur = 8;
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   _drawCompass() {

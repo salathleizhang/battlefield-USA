@@ -937,18 +937,17 @@ html, body {
   letter-spacing: 0.04em; color: var(--paper-faint);
 }
 
-/* damage */
+/* damage — a red bearing arc snaps to the side the round came from.
+   The arcs are drawn on a 2D canvas (HUD._drawDamage): a masked conic-gradient
+   loses its mask in this Chrome build and degrades to a full wedge, while the
+   canvas also gives the core a cheap outward glow. */
 .damage-overlay {
-  position: absolute; inset: 0; opacity: 0; transition: opacity 0.5s;
-  background: radial-gradient(ellipse at center, transparent 46%, rgba(150, 20, 10, 0.58) 100%);
+  position: absolute; inset: 0; opacity: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 32%,
+      rgba(168, 22, 10, 0.22) 60%, rgba(148, 14, 6, 0.58) 87%, rgba(96, 6, 2, 0.8) 100%);
 }
-.damage-overlay.show { opacity: 1; transition: opacity 0.05s; }
-.damage-overlay::after {
-  content: ""; position: absolute; inset: 0;
-  background: conic-gradient(from var(--dir, 0deg), transparent 0deg, transparent 30deg, rgba(210, 46, 22, 0.58) 44deg, transparent 58deg);
-  mask-image: radial-gradient(circle at center, transparent 40%, #000 78%);
-  opacity: 0.9;
-}
+.dmg-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .hit-flash { position: absolute; inset: 0; background: rgba(200, 60, 35, 0.28); opacity: 0; pointer-events: none; }
 .hit-flash.show { animation: hitflash 0.25s ease-out; }
 @keyframes hitflash { 0% { opacity: 1; } 100% { opacity: 0; } }
