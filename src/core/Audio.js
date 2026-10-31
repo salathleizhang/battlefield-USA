@@ -21,6 +21,8 @@ const GROUPS = {
     'm1_player_near_000', 'm1_world_000',
     'm1_enemy_distant_000', 'm1_enemy_distant_001',
     'm1_clip_ping_000',
+    // Sidearm for the C96; the M1911 was the period counterpart.
+    'm1911_player_near', 'm1911_world', 'm1911_enemy_distant',
     // Kept as a fallback if the period recordings above fail to load.
     'awm_player_near', 'awm_world', 'awm_enemy_distant',
     'm24_player_near', 'm24_world', 'm24_enemy_distant',
@@ -71,8 +73,11 @@ const GROUP_DIR = {
 };
 
 const GUN_PROFILES = {
-  type38: { clip: 'type38', fallback: 'awm', pitch: 0.98, volume: 0.9 },
-  m1: { clip: 'm1', fallback: 'm24', pitch: 1.0, volume: 0.85 },
+  type38: { clip: 'type38', fallback: 'awm', pitch: 0.98, volume: 0.9, synth: 1 },
+  m1: { clip: 'm1', fallback: 'm24', pitch: 1.0, volume: 0.85, synth: 1 },
+  // The pistol is a lighter report: a dedicated sidearm recording at near-unity
+  // pitch, with the synthesised thump pulled back so it does not read as a rifle.
+  c96: { clip: 'm1911', fallback: 'type38', pitch: 1.12, volume: 0.62, synth: 0.55, sharp: true },
 };
 
 const IMPACT_GROUPS = {
@@ -126,7 +131,15 @@ export class Audio {
     comp.knee.value = 18;
     comp.ratio.value = 6;
     comp.attack.value = 0.003;
-    comp.release.value = 0.25;
+    // Fast enough that rapid fire does not duck the whole bed between shots.
+    comp.release.value = 0.2;
+
+    // Last stage before the speakers: the compressor still lets a 3 ms transient
+    // through, so a close explosion plus overlapping reports can hand the DAC
+    // samples above full scale. A soft knee saturates those instead of clipping.
+    const clip = ctx.createWaveShaper();
+    clip.curve = softClipCurve();
+    clip.oversample = '4x';
 
     // Low-pass used for distance and explosion concussion.
     this.muffle = ctx.createBiquadFilter();
@@ -138,7 +151,10 @@ export class Audio {
     this.master.gain.value = this.volume;
     this.master.connect(this.muffle);
     this.muffle.connect(comp);
-    comp.connect(ctx.destination);
+    comp.connect(clip);
+    clip.connect(ctx.destination);
+    this.comp = comp;
+    this.clipper = clip;
 
     this.sfx = ctx.createGain();
     this.sfx.connect(this.master);
@@ -191,14 +207,25 @@ export class Audio {
   }
 
   _makeNoise(seconds) {
-    const n = Math.floor(this.ctx.sampleRate * seconds);
-    const buf = this.ctx.createBuffer(1, n, this.ctx.sampleRate);
-    const d = buf.getChannelData(0);
+    const sr = this.ctx.sampleRate;
+    const fade = Math.floor(sr * 0.05);
+    const n = Math.floor(sr * seconds);
+    const raw = new Float32Array(n + fade);
     let last = 0;
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < raw.length; i++) {
       const white = Math.random() * 2 - 1;
       last = (last + 0.02 * white) / 1.02;
-      d[i] = last * 3.2;
+      raw[i] = last * 3.2;
+    }
+    // The wind and surf buses loop this buffer; without a seam the wrap-around
+    // is a step discontinuity, i.e. a tick every 2.5 s. Crossfade the tail into
+    // the head and loop only the head, so the last sample flows into the first.
+    const buf = this.ctx.createBuffer(1, n, sr);
+    const d = buf.getChannelData(0);
+    d.set(raw.subarray(0, n));
+    for (let i = 0; i < fade; i++) {
+      const t = i / fade;
+      d[i] = raw[i] * t + raw[n + i] * (1 - t);
     }
     return buf;
   }
@@ -357,10 +384,11 @@ export class Audio {
         reverb: suppressed ? 0.12 : 0.6,
       });
     }
-    // Layer: sharp transient + low punch, quieter for distant reports.
-    const synth = near ? 0.35 : 0.2;
+    // Layer: sharp transient + low punch, quieter for distant reports and for
+    // lighter weapons (the profile scales the synth, not just the sample).
+    const synth = (near ? 0.35 : 0.2) * (profile.synth ?? 1);
     const out = this._out(dist, pan, { reverb: suppressed ? 0.1 : 0.5 });
-    const sharp = kind === 'type38' || kind === 'm1';
+    const sharp = kind === 'type38' || kind === 'm1' || !!profile.sharp;
     const src = this._srcNoise();
     const bp = this.ctx.createBiquadFilter();
     bp.type = 'bandpass';
@@ -625,3 +653,22 @@ export class Audio {
 }
 
 function rollout(dist) { return 1 / (1 + dist / 38); }
+
+/**
+ * Output transfer curve: linear to about −2 dBFS, then a tanh knee that lands on
+ * 0.98 rather than 1.0, leaving room for reconstruction overshoot at 4× oversampling.
+ */
+function softClipCurve(points = 4096) {
+  const knee = 0.8;
+  const top = 0.98;
+  const curve = new Float32Array(points);
+  for (let i = 0; i < points; i++) {
+    const x = (i / (points - 1)) * 2 - 1;
+    const a = Math.abs(x);
+    const y = a <= knee
+      ? a
+      : knee + (top - knee) * (Math.tanh(((a - knee) / (1 - knee)) * 1.6) / Math.tanh(1.6));
+    curve[i] = Math.sign(x) * y;
+  }
+  return curve;
+}

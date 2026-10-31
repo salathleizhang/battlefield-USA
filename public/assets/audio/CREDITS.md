@@ -15,6 +15,9 @@ All files are **CC0 1.0** and redistributable, except the AI-generated `voice/` 
 - **M1 Garand en-bloc clip ping** — Freesound #725398, “An M1 Garand clip being ejected
   w/ ping” by **serøutōnin--deprivəd**, CC0:
   https://freesound.org/people/ser%C3%B8ut%C5%8Dnin--depriv%C9%99d/sounds/725398/
+- **Mauser C96** — no dedicated take; the sidearm uses the library's M1911 pistol set
+  (`m1911_player_near` / `m1911_world` / `m1911_enemy_distant`) pitched up 1.12×, with the
+  synthesised transient scaled to 0.55 so the pistol does not read as a rifle.
 - Bolt/charger foley, shell handling, footsteps and explosions — The Free Firearm Sound
   Library and **Kenney Impact Sounds / Interface Sounds** (CC0, https://kenney.nl), copied
   from the reference project `cktang88/3d-fps`.
