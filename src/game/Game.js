@@ -10,6 +10,7 @@ import { Materials } from '../world/Materials.js';
 import { Props } from '../world/Props.js';
 import { Level } from '../world/Level.js';
 import { Player } from './Player.js';
+import { PlayerBody } from './PlayerBody.js';
 import { Weapon } from './weapons/Weapon.js';
 import { ViewModel } from './weapons/ViewModel.js';
 import { loadRifle } from './weapons/RifleModel.js';
@@ -154,6 +155,8 @@ export class Game {
     this.atmosphere = new Atmosphere(this);
     this.ambience = new Ambience(this);
     this.player = new Player(this);
+    // First-person body + its (unclipped) shadow, driven by the same rig as the bots.
+    this.playerBody = new PlayerBody(this);
     this.player.recoilScale = this.settings.recoil ?? 1;
     const spawn = this.level.playerSpawn || { position: new THREE.Vector3(0, 2, 0), yaw: 0 };
     this.player.spawn(spawn.position, spawn.yaw);
@@ -522,7 +525,7 @@ export class Game {
       const dmg = 120 * (1 - d / radius) ** 1.4;
       const src = a.isPlayer ? { x: a.position.x, y: a.position.y + 1.2, z: a.position.z } : a.eye;
       if (!this.physics.lineOfSight(pos, new THREE.Vector3(src.x, src.y, src.z))) continue;
-      this.damageActor(a, dmg, owner, { weapon: 'grenade' });
+      this.damageActor(a, dmg, owner, { weapon: 'grenade', from: pos });
     }
   }
 
@@ -555,6 +558,7 @@ export class Game {
       this.player.update(dt, cmd, this.weapon);
       this.weapon.update(dt, cmd);
       this.viewmodel.update(dt, this.player, this.weapon, look);
+      this.playerBody?.update(dt);
       if (this.player.sprinting) this.viewmodel.setEnabled(true);
     } else {
       this.player.update(dt, cmd, this.weapon);
