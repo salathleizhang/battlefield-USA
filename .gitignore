@@ -13,3 +13,6 @@ tools/sketchfab-cli/
 
 # reference clones (third-party)
 reference/
+
+# local wrangler config + OAuth credentials (never commit)
+.wrangler-config/

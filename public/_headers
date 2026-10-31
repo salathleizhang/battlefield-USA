@@ -1,0 +1,9 @@
+# Cloudflare Pages response headers.
+# Models, textures, audio and video rarely change; let the edge and the
+# browser keep them for a day while revalidating in the background.
+/assets/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
