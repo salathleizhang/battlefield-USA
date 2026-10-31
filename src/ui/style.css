@@ -1143,3 +1143,58 @@ html, body {
   .brand-logo { width: 48px; height: 48px; }
   .brand-word { font-size: 28px; }
 }
+
+/* ------------------------------------------------------------- armour HUD
+   Tank panel: reads like a stamped data plate, not a second ammo counter. It
+   slides in only while seated, and the infantry ammo block gets out of the way. */
+.vehicle {
+  position: absolute; right: 32px; bottom: 28px; width: 316px;
+  padding: 13px 15px 11px;
+  background: linear-gradient(180deg, rgba(30, 28, 21, 0.9), rgba(12, 11, 8, 0.92));
+  border-left: 2px solid var(--gold);
+  box-shadow: inset 0 0 0 1px rgba(255, 193, 46, 0.12), 0 12px 32px rgba(0, 0, 0, 0.5);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%);
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  pointer-events: none; text-align: right;
+}
+.hud.driving .vehicle { opacity: 1; transform: none; }
+.hud.driving .ammo { opacity: 0; }
+.hud.driving .crosshair .ch { background: #e2cd93; box-shadow: 0 0 5px rgba(255, 210, 130, 0.5); }
+.hud.driving .crosshair { --gap: 13px; }
+.veh-head { display: flex; align-items: baseline; justify-content: flex-end; gap: 9px; }
+.veh-kicker { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.28em; color: rgba(200, 180, 138, 0.6); }
+.veh-head b { font-family: var(--brush); font-weight: 400; font-size: 21px; letter-spacing: 0.08em; color: var(--paper); }
+.veh-speed { display: flex; align-items: baseline; justify-content: flex-end; gap: 5px; margin-top: 4px; }
+.veh-speed b { font-family: var(--mono); font-size: 34px; line-height: 1; color: var(--gold-bright); text-shadow: 0 0 16px rgba(255, 170, 40, 0.28); }
+.veh-speed span { font-family: var(--mono); font-size: 9px; letter-spacing: 0.18em; color: var(--paper-faint); }
+.veh-speed i { font-family: var(--mono); font-style: normal; font-size: 10px; margin-left: 7px; padding: 1px 5px; color: #c9b98e; border: 1px solid rgba(200, 170, 110, 0.28); }
+.veh-bar-row { display: flex; align-items: center; justify-content: flex-end; gap: 9px; margin-top: 7px; font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em; color: var(--paper-faint); }
+.veh-bar { width: 168px; height: 5px; background: rgba(255, 220, 160, 0.1); box-shadow: inset 0 0 0 1px rgba(255, 210, 140, 0.12); }
+.veh-bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #8d9a6a, #c3c994); transition: width 0.25s; }
+.veh-gun { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; color: var(--paper-dim); }
+.veh-gun.ready { color: var(--gold-bright); }
+.veh-mod { margin-top: 6px; font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.12em; color: rgba(170, 200, 160, 0.65); }
+.veh-mod.hurt { color: #e2a25c; }
+.veh-hint { margin-top: 8px; padding-top: 7px; border-top: 1px solid rgba(255, 200, 110, 0.12); font-family: var(--serif); font-size: 9.5px; letter-spacing: 0.05em; color: var(--paper-faint); }
+
+.veh-prompt {
+  position: absolute; left: 50%; bottom: 190px; transform: translateX(-50%) translateY(6px);
+  padding: 7px 16px 8px;
+  background: linear-gradient(180deg, rgba(40, 34, 20, 0.86), rgba(14, 12, 8, 0.9));
+  border: 1px solid rgba(255, 200, 110, 0.26);
+  font-family: var(--hei); font-size: 11.5px; letter-spacing: 0.16em; color: #e8dcc0;
+  opacity: 0; transition: opacity 0.18s, transform 0.18s; pointer-events: none;
+}
+.veh-prompt.show { opacity: 1; transform: translateX(-50%); }
+.veh-prompt::before { content: "F"; display: inline-block; margin-right: 8px; padding: 1px 5px; border: 1px solid rgba(255, 210, 140, 0.5); font-family: var(--mono); font-size: 10px; color: var(--gold-bright); }
+
+.armor-hit {
+  position: absolute; left: 50%; top: calc(50% + 58px); transform: translateX(-50%);
+  font-family: var(--hei); font-size: 12px; letter-spacing: 0.2em;
+  color: #e5d7b4; text-shadow: 0 2px 8px #000;
+  opacity: 0; transition: opacity 0.15s; pointer-events: none;
+}
+.armor-hit.show { opacity: 1; }
+.armor-hit.good { color: #ffd77a; }
+.armor-hit.bad { color: #cf7b62; }
