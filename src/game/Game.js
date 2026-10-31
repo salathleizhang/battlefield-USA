@@ -473,13 +473,38 @@ export class Game {
       return;
     }
     this.grenades--;
-    const cam = this.renderer.camera;
-    const dir = new THREE.Vector3();
-    cam.getWorldDirection(dir);
+    const cp = Math.cos(owner.pitch || 0);
+    const dir = new THREE.Vector3(
+      -Math.sin(owner.yaw || 0) * cp,
+      Math.sin(owner.pitch || 0),
+      -Math.cos(owner.yaw || 0) * cp,
+    );
     const pos = owner.eye.clone().addScaledVector(dir, 0.5);
     const vel = dir.clone().multiplyScalar(15).add(new THREE.Vector3(0, 4.4, 0)).add(
       new THREE.Vector3(owner.velocity.x * 0.4, 0, owner.velocity.z * 0.4),
     );
+    this._spawnGrenade(owner, pos, vel);
+    this.hud?.toast(`手榴弹 · 剩余 ${this.grenades}`);
+    this.audio.impact('metal', 0, 0);
+  }
+
+  /** A bot lobbing a grenade at a remembered position (the AI's version of throwGrenade). */
+  throwBotGrenade(owner, from, to) {
+    const dx = to.x - from.x;
+    const dz = to.z - from.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist < 1) return;
+    // Pick a flight time, then solve the arc for the 20 m/s² gravity used by updateGrenades.
+    const T = clamp(dist / 14, 0.7, 2.2);
+    const vel = new THREE.Vector3(dx / T, 0, dz / T);
+    vel.y = (to.y - from.y) / T + 0.5 * 20 * T;
+    vel.x += rand(-0.6, 0.6);
+    vel.z += rand(-0.6, 0.6);
+    const pos = from.clone();
+    this._spawnGrenade(owner, pos, vel);
+  }
+
+  _spawnGrenade(owner, pos, vel) {
     // Poly Haven CC0 Stielhandgranate 24; fall back to a sphere if the asset is missing.
     const mesh = this.grenadeTemplate
       ? this.grenadeTemplate.clone(true)
@@ -490,8 +515,7 @@ export class Game {
     mesh.position.copy(pos);
     mesh.rotation.set(0.4, 0, 0.25);
     this.worldGroup.add(mesh);
-    this.grenadeList.push({ pos, vel, mesh, t: 2.6, owner });
-    this.hud?.toast(`手榴弹 · 剩余 ${this.grenades}`);
+    this.grenadeList.push({ pos: pos.clone(), vel, mesh, t: 2.6, owner });
     this.audio.impact('metal', 0, 0);
   }
 
@@ -517,9 +541,8 @@ export class Game {
       g.mesh.rotation.x += dt * 8;
       if (g.t <= 0) {
         this.explode(g.pos.clone(), g.owner);
+        // The mesh is a clone of the shared grenade template: share its geometry/materials.
         this.worldGroup.remove(g.mesh);
-        g.mesh.geometry.dispose();
-        g.mesh.material.dispose();
         this.grenadeList.splice(i, 1);
       }
     }
@@ -530,6 +553,8 @@ export class Game {
     const radius = 9;
     for (const a of this.combatants()) {
       if (!a.alive) continue;
+      // No friendly fire: the thrower's squad is spared, everyone else (including the thrower) is not.
+      if (owner && a !== owner && a.team === owner.team) continue;
       const d = a.position.distanceTo(pos);
       if (d > radius) continue;
       const dmg = 120 * (1 - d / radius) ** 1.4;
