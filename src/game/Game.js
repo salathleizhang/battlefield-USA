@@ -28,6 +28,7 @@ import { rand, clamp } from '../core/MathUtil.js';
 
 const WEAPON_NAMES = {
   type38: '三八大盖',
+  c96: '毛瑟 C96',
   m1: 'M1 加兰德',
   bayonet: '刺刀',
   grenade: '手榴弹',
@@ -429,6 +430,8 @@ export class Game {
   }
 
   respawnPlayer() {
+    // New body, clean goggles.
+    this.renderer?.clearSplatter?.();
     const spawn = this.match ? this.match.getSpawn(0) : this.level.playerSpawn;
     this.player.spawn(spawn.position, spawn.yaw);
     this.hud?.banner('重新部署', this.hud.game.campaign.name, 1.8);
