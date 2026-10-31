@@ -121,7 +121,14 @@ async function boot() {
     window.__START__ = (id) => { game.startMission(id); return !!game.level; };
     window.__PUMP__ = (n = 30, dt = CAPTURE_DT) => {
       for (let i = 0; i < n; i++) game.update(dt);
-      return { frames: n, time: game.time, programs: game.renderer?.renderer?.info?.programs?.length ?? 0 };
+      const info = game.renderer?.renderer?.info;
+      return {
+        frames: n,
+        time: game.time,
+        programs: info?.programs?.length ?? 0,
+        calls: info?.render?.calls ?? 0,
+        triangles: info?.render?.triangles ?? 0,
+      };
     };
     window.__SHOT__ = (cam) => { game.debug = cam ? { cam } : null; return !!cam; };
     window.__READY__ = true;
