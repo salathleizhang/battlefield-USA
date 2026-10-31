@@ -372,10 +372,6 @@ export class Game {
     const wasAlive = actor.alive;
     actor.damage(amount, attacker, info);
     if (attacker === this.player && actor.alive && wasAlive) this.hud?.hitmarker(false);
-    if (actor.isPlayer) {
-      this.hud?.el?.hitflash?.classList.add('show');
-      setTimeout(() => this.hud?.el?.hitflash?.classList.remove('show'), 250);
-    }
   }
 
   onActorKilled(victim, killer, info = {}) {
@@ -678,6 +674,10 @@ export class Game {
     this.input?.unlock();
     for (const b of this.bots) b.dispose?.();
     this.bots = [];
+    if (this.playerBody) {
+      this.playerBody.dispose();
+      this.playerBody = null;
+    }
     if (this.player) {
       this.player.dispose();
       this.player = null;
