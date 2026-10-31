@@ -29,9 +29,10 @@ const CATALOG = {
   jerrycan: { file: 'props/jerrycan.glb', surface: 'metal', scale: 0.7 },
   hydrant: { file: 'props/fire_hydrant/model.gltf', surface: 'metal' },
   manhole: { file: 'props/water_manhole_cover/model.gltf', surface: 'metal' },
-  // Poly Haven's savanna broadleaf, decimated and rebased to metres. `height`
-  // normalises the source scan (4.5 m) to a mature street tree.
-  treeSmall: { file: 'nature/tree_small_02.glb', surface: 'wood', height: 11 },
+  // Game-ready broadleaf (Fast Urban Tree, gelmi.com.br, CC BY 4.0) with alpha
+  // cards rather than scanned leaf geometry. `height` normalises it to a mature
+  // street tree and keeps placement independent of source units (cm).
+  treeUrban: { file: 'nature/tree_urban.glb', surface: 'wood', height: 11 },
   ...MILITARY_PROPS,
 };
 

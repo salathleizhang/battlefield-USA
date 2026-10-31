@@ -1,19 +1,20 @@
 # Nature assets
 
-| File | Model | Source | License |
-| --- | --- | --- | --- |
-| `tree_small_02.glb` | Tree Small 02 (Burkea africana / wild syringa) | [Poly Haven](https://polyhaven.com/a/tree_small_02) | CC0 1.0 |
+| File | Model | Author | Source | License |
+| --- | --- | --- | --- | --- |
+| `tree_urban.glb` | Fast Urban Tree | gelmi.com.br | [Sketchfab](https://sketchfab.com/3d-models/fast-urban-tree-c6c7cebef37544ee8a80780034a03737) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 
-The source is Poly Haven's 2.07M-triangle scan collection model, 4.53 m tall. The
-shipped GLB is a game-ready derivative:
+The source is a game-ready broadleaf with alpha-card foliage (93,622 triangles,
+110,930 vertices), downloaded through the project's Sketchfab viewer export.
+The shipped GLB is a web derivative:
 
-- baked the branch material's UV set (`TEXCOORD_1` + `KHR_texture_transform`) into
-  `TEXCOORD_0`, so the runtime loader only needs one UV channel;
-- meshoptimizer simplification to ~84k triangles with foliage kept as real
-  geometry (no alpha cards, no transparency sorting);
-- foliage material made opaque so it writes depth and casts a correct shadow;
-- 1K textures re-encoded as WebP;
+- baked the viewer's three maps into two glTF materials: an RGBA leaf atlas
+  (mask baked into the base-colour alpha channel) and an opaque bark material,
+  both sharing one 1K normal map;
+- the leaf material keeps `alphaMode: BLEND` and `doubleSided`, so the canopy
+  reads as full foliage instead of a cut-out silhouette;
+- 1K WebP textures (leaf RGBA 750 KB, normal 399 KB) embedded in a 6.2 MB GLB;
 - rebased to the origin (trunk at 0,0,0, ground at y=0) and normalised to metres
   at load time by `Props.js` (`height: 11`).
 
-Original textures and model are CC0 1.0; see the Poly Haven page above.
+Attribution: **"Fast Urban Tree" by gelmi.com.br**, licensed under CC BY 4.0.
