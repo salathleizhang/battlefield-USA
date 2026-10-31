@@ -15,7 +15,9 @@
 | `weapons/Weapon.js` | 散布膨胀与恢复、开镜过渡、冲刺出枪锁、装填 80% 提交、装填取消、逐发后坐轨迹、多武器状态机 | `src/game/weapons/Weapon.js` |
 | `weapons/WeaponDefs.js` | 数据驱动武器表、槽位与配装（`?loadout=`）、半自动/栓动/全自动开火模式 | `src/game/weapons/WeaponDefs.js` |
 | `weapons/FPRig.js` + `models/fp/*.glb` | 参考项目的作者级第一人称武器 rig（枪 + 手套手臂）、hip/ADS 解算 | `src/game/weapons/FpRig.js`、`public/assets/models/fp/` |
-| `weapons/ReloadChoreo.js` | 换弹枪身关键帧（战术/空仓、步枪/手枪）、弹匣与拉机柄节点动画 | `src/game/weapons/ReloadChoreo.js` |
+| `weapons/ReloadChoreo.js` | 换弹枪身关键帧（战术/空仓、步枪/手枪）、弹匣与拉机柄节点动画、检视关键帧 | `src/game/weapons/ReloadChoreo.js` |
+| `models/weapons/optics.glb` | 红点 / 全息 / 3.5× 镜，按导轨挂载、分划锚点 ADS、倍率缩放、镜筒成像 | `src/game/weapons/FpRig.js`（`OPTICS`）、`public/assets/models/optics/` |
+| `weapons/WeaponDefs.js` 配件表 | 枪口 / 下挂 / 弹匣三类配件、数值折算、消音 | `src/game/weapons/WeaponDefs.js`（`ATTACHMENTS`、`applyAttachments`） |
 | `PlayerBody.js` | 第一人称身体、按世界高度逐片元裁掉胸口以上、完整影子、死亡/蹲伏隐藏 | `src/game/PlayerBody.js` |
 | `bots/Bot.js` | 脚步声/枪声听觉、压制影响精度与射速、反应时间门控、掩体选择（胸线遮蔽+可探头）、对失去视野目标投弹、低矮障碍起跳、四档难度 | `src/game/bots/Bot.js` |
 | `bots/Navigation.js` | **替代实现**：可行走网格（射线+净空+洪泛连通域）与 A*，不引入 recast wasm | `src/game/bots/NavGrid.js` |
@@ -26,7 +28,7 @@
 | 模块 | 原因 |
 | --- | --- |
 | UI（`ui/HUD.js`、`ui/Menu.js`、`hud.css`） | 需求明确排除；本仓库已有赤红搪瓷风格 UI |
-| 配件 / 深度配装（瞄具、枪口、下挂） | 多武器已改为直接使用参考项目的 FP rig 与武器表；瞄具/枪口/下挂与换弹编排仍需引入 `optics.glb` 与动画模板（许可需复核） |
+| 配装界面 / 逐枪解锁 | 数值与挂点已通，缺的是装备界面（属于 UI，按约定不做） |
 | Recast / Detour 导航 | 引入 `@recast-navigation` wasm 依赖；自研网格已覆盖四张图 |
 | `render/` 性能系统（Adaptive、Fsr、GpuTimer、Lod、Occlusion、Pvs、ShadowCache、LightPool、UploadRing、Benchmark） | 与本仓库渲染管线差异大，且当前 `Renderer.js` 正在被并行修改 |
 | `bots/Character.js` 的程序化姿态细节 | 本仓库用 UAL 片段 + `aim` 遮罩层，方向不同 |
@@ -51,3 +53,26 @@
 | 导航 | 迈阿密 18 465 可达格 / 225 ms；254 m 绕障寻路 3 个路点 |
 | 第一人称身体 | 可见、`clipY = eye − 0.48`、投影开启 |
 | 征服 | 10 s 内票数 320 → 310 / 319（交战与失点） |
+
+
+## 回归记录（当前树：已含载具 / 可破坏建筑 / 天气）
+
+在 `?capture=1` 确定性回放下一次性跑通（Miami Beach，26 个 bot）:
+
+| 系统 | 实测 |
+| --- | --- |
+| Q/E 探头 | lean 1.00，镜头 roll −0.21 rad |
+| 滑铲 | 冲刺 6.8 m/s → sliding=true，视点 1.30 m |
+| 战术冲刺 | 8.1 m/s |
+| 跳跃 / 攀爬 | 1.05 m / 0.9 m 矮墙 |
+| 检视 | inspectT 2.60 s |
+| 装填 | 2 发 → 30 发（M4 满匣） |
+| 弹道 | 20 m 命中 28（M4 基础伤害），ADS 无散布溢出 |
+| 武器/瞄具 | m4 / 红点 / 1.25× |
+| AI 听觉 | 5 m 内 `heardPos` 生效 |
+| AI 压制 | onSuppressed(1) → 0.25 |
+| AI 掩体 | 35 HP + 墙后 → 5.1 m 掩体点 |
+| AI 投弹 | 40 HP → 2 HP |
+| 导航 | 18 392 可达格 / 258 ms |
+| 第一人称身体 | 可见，裁剪面 eye−0.48 |
+| 征服 | 10 s 后票数 320 → 308 / 319 |
