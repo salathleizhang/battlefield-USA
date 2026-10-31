@@ -3,6 +3,7 @@ import { G } from '../core/Physics.js';
 import {
   clamp, damp, DEG, Spring, rand, smoothstep, easeOutCubic,
 } from '../core/MathUtil.js';
+import { AimRecoil } from './AimRecoil.js';
 
 export const MOVE = {
   walk: 4.7,
@@ -74,8 +75,10 @@ export class Player {
     this.time = 0;
     this.lean = 0;
     this.leanSmoothed = 0;
-    this.recoilPitch = new Spring(150, 0.85, 0);
-    this.recoilYaw = new Spring(120, 0.9, 0);
+    // True recoil lives in the aim angles; these springs only punch the camera.
+    this.aimRecoil = new AimRecoil();
+    this.kickPitch = new Spring(150, 0.85, 0);
+    this.kickYaw = new Spring(120, 0.9, 0);
     this.stanceBlend = 0;
     this.surface = 'dirt';
     this.footPhase = 0;
@@ -133,8 +136,9 @@ export class Player {
     this._syncBody();
     this.spawnProtect = 1.5;
     this.lastDamage = -99;
-    this.recoilPitch.snap(0);
-    this.recoilYaw.snap(0);
+    this.kickPitch.snap(0);
+    this.kickYaw.snap(0);
+    this.aimRecoil.reset();
     this.trauma = 0;
     this.syncCamera(0, true);
   }
@@ -173,14 +177,18 @@ export class Player {
   }
 
   look(dx, dy, sens = 1) {
+    const p0 = this.pitch, y0 = this.yaw;
     this.yaw -= dx * 0.0022 * sens;
     this.pitch -= dy * 0.0022 * sens;
     this.pitch = clamp(this.pitch, -88 * DEG, 88 * DEG);
+    // Pulling down against the climb uses up the part that would settle back.
+    this.aimRecoil.look(this.pitch - p0, this.yaw - y0);
   }
 
   addRecoil(pitchKick, yawKick) {
-    this.recoilPitch.impulse(pitchKick);
-    this.recoilYaw.impulse(yawKick);
+    this.aimRecoil.add(pitchKick, yawKick);
+    this.kickPitch.impulse(pitchKick * 0.35);
+    this.kickYaw.impulse(yawKick * 0.35);
     this.trauma = Math.min(0.6, this.trauma + 0.12);
   }
 
@@ -193,6 +201,17 @@ export class Player {
     this.slideCooldown = Math.max(0, this.slideCooldown - dt);
     this.stepOffset = damp(this.stepOffset, 0, 16, dt);
     this.landDip = damp(this.landDip, 0, 9, dt);
+
+    // True recoil eases into the aim angles; the camera kick springs are separate.
+    if (!this.mantle) {
+      const rc = this.aimRecoil.update(dt, {
+        time: this.time,
+        lastShot: weapon?.lastShot ?? -9,
+        recoveryMul: weapon?.def?.recoveryMul ?? 1,
+      });
+      this.pitch = clamp(this.pitch + rc.dp, -88 * DEG, 88 * DEG);
+      this.yaw += rc.dy;
+    }
 
     if (this.mantle) { this._updateMantle(dt); this._finish(dt); return; }
 
@@ -317,8 +336,8 @@ export class Player {
   }
 
   _finish(dt) {
-    this.recoilPitch.update(dt);
-    this.recoilYaw.update(dt);
+    this.kickPitch.update(dt);
+    this.kickYaw.update(dt);
     this.trauma = Math.max(0, this.trauma - dt * 1.4);
     this.syncCamera(dt);
   }
@@ -640,8 +659,8 @@ export class Player {
     if (this.tacSprint) targetFov += 4;
     cam.fov = snap ? targetFov : damp(cam.fov, targetFov, 10, dt);
     cam.rotation.set(
-      this.pitch + this.recoilPitch.x + sy,
-      this.yaw + this.recoilYaw.x + sx,
+      this.pitch + this.kickPitch.x + sy,
+      this.yaw + this.kickYaw.x + sx,
       roll,
     );
     cam.updateProjectionMatrix();
