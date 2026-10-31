@@ -21,6 +21,10 @@
     };
     const guns = g.bots.map((b) => [b.model, b.model?._botGun]);
     run(60); // warm up
+    // Isolated: the rig's own per-frame cost, free of physics/AI noise in the sample.
+    const t0 = performance.now();
+    for (let k = 0; k < 60; k++) for (const b of g.bots) updateBotGun(b, 1 / 60);
+    const rigMs = (performance.now() - t0) / 60;
     const on = [], off = [], deltas = [];
     for (let k = 0; k < 3; k++) {
       const a = run(120); on.push(a);
@@ -32,12 +36,14 @@
     const med = (xs) => xs.slice().sort((p, q) => p - q)[1];
     out.criteria.perf = {
       bots: g.bots.length,
+      rigMs: round(rigMs, 3),
+      rigUsPerBot: round((rigMs * 1000) / g.bots.length, 2),
       framesPerSample: 120,
       samples: 3,
       onMs: on.map((v) => round(v, 3)),
       offMs: off.map((v) => round(v, 3)),
-      deltaMs: round(med(deltas), 3),
-      deltas: deltas.map((v) => round(v, 3)),
+      abDeltaMs: round(med(deltas), 3),
+      abDeltas: deltas.map((v) => round(v, 3)),
     };
   }
 

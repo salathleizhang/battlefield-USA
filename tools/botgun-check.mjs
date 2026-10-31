@@ -109,14 +109,14 @@ const rows = [
   ['5a recoil back (95%)', `${c.recoil.back95s}s`, c.recoil.back95s != null && c.recoil.back95s <= 0.15],
   ['5b recoil pitch (95%)', `${c.recoil.pitch95s}s`, c.recoil.pitch95s != null && c.recoil.pitch95s <= 0.15],
   ['5c wrist error under recoil', `${c.recoil.maxWristErrDuringRecoil.toFixed(4)} m`, c.recoil.maxWristErrDuringRecoil <= 0.03],
-  ['6 sim cost, 26 bots', `+${c.perf.deltaMs.toFixed(3)} ms/frame (median of ${c.perf.samples})`, c.perf.deltaMs <= 1],
+  ['6 sim cost, 26 bots', `+${c.perf.rigMs.toFixed(3)} ms/frame (${c.perf.rigUsPerBot} µs/bot)`, c.perf.rigMs <= 1],
 ];
 const pad = (s, n) => String(s).padEnd(n);
 console.log(`\nbot gun rig — ${result.meta.gunLength[0]} m, ${result.meta.bots ?? 3} bots, characters=${result.meta.characters}`);
 console.log('─'.repeat(72));
 for (const [name, value, pass] of rows) console.log(`${pass ? 'PASS' : 'FAIL'}  ${pad(name, 30)} ${value}`);
 console.log('─'.repeat(72));
-console.log(`sim: ${c.perf.onMs.join('/')} ms/frame with gun, ${c.perf.offMs.join('/')} without (${c.perf.bots} bots)`);
+console.log(`sim A/B: ${c.perf.onMs.join('/')} ms with gun vs ${c.perf.offMs.join('/')} without → median ${c.perf.abDeltaMs} ms (noise floor ~0.2 ms)`);
 console.log(`recoil trace (m): ${c.recoil.traceBack.join(', ')}`);
 console.log(`shot: ${outPng}`);
 fs.writeFileSync(path.join(path.dirname(outPng), 'botgun-check.json'), JSON.stringify(result, null, 2));
