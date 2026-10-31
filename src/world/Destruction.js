@@ -72,8 +72,6 @@ const STRUCTURE_TYPES = {
 
 const _v = new THREE.Vector3();
 const _m = new THREE.Matrix4();
-const _q = new THREE.Quaternion();
-const _e = new THREE.Euler();
 const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
 
 /* ---------------------------------------------------------------- textures */
@@ -519,6 +517,18 @@ export class DestructibleWorld {
           return true;
         }, undefined, (0xffff << 16) | G.WORLD,
       );
+      if (blocked) return null;
+      // Palms and light poles just outside the footprint still put a trunk
+      // through the roof; keep a 2 m margin free of tall, non-prop colliders.
+      physics.world.intersectionsWithShape(
+        { x: px, y: y + 1.6, z: pz }, rot,
+        new physics.R.Cuboid(w / 2 + 2, 1.4, d / 2 + 2),
+        (col) => {
+          const data = physics.dataOf(col) || {};
+          if (!data.prop && !data.vehicle && !data.structure) blocked = true;
+          return true;
+        }, undefined, (0xffff << 16) | G.WORLD,
+      );
       return blocked ? null : { x: px, z: pz, y };
     };
     const direct = probe(x, z);
@@ -868,5 +878,7 @@ export class DestructibleWorld {
     this.structures.length = 0;
     this.pendingBlasts.length = 0;
     this._propColliders.clear();
+    for (const m of this._wallMats.values()) m.dispose?.();
+    this._wallMats.clear();
   }
 }
