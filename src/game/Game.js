@@ -708,6 +708,7 @@ export class Game {
     this.weapon = null;
     this.match = null;
     this.level = null;
+    this.nav = null;
     this.started = false;
   }
 }
