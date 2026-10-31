@@ -106,6 +106,10 @@ export class Renderer {
     this.renderer = new THREE.WebGLRenderer({
       canvas, antialias: false, powerPreference: 'high-performance', stencil: false, depth: true,
     });
+    // `?dpr=` pins the render resolution (testing / low-end machines); otherwise
+    // the quality preset chooses it and adaptive resolution trims it.
+    this.dprOverride = Number(new URLSearchParams(location.search).get('dpr') || 0);
+    this.renderScale = 1;
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
     this.renderer.setSize(innerWidth, innerHeight);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -176,7 +180,7 @@ export class Renderer {
     this.viewScene.add(new THREE.AmbientLight(0xffffff, 0.22));
 
     this.settings = {
-      quality: 2, fxBloom: true, fxGodRays: true, fxLens: true, fxCA: true, fxGrain: true, fxAO: true,
+      quality: 2, adaptiveRes: true, fxBloom: true, fxGodRays: true, fxLens: true, fxCA: true, fxGrain: true, fxAO: true,
     };
     this.features = QUALITY_PRESETS[2];
     this.damagePulse = 0;
@@ -298,6 +302,53 @@ export class Renderer {
     this._route();
   }
 
+  /**
+   * Render resolution, as a fraction of the quality preset's pixel ratio.
+   *
+   * Frame cost here is almost entirely fill: AO, god rays, bloom and SMAA all
+   * scale with the number of shaded pixels, and on a Retina panel the preset's
+   * 1.5x means 2.3 MP of them. Dropping the scale is the only lever that buys
+   * frame time without touching what is on screen — it just costs sharpness,
+   * which is why "适配" keeps it as high as the frame budget allows.
+   */
+  setRenderScale(s, { silent = false } = {}) {
+    this.renderScale = THREE.MathUtils.clamp(s, 0.55, 1);
+    this._applyPixelRatio();
+    if (!silent) this.onRenderScale?.(this.renderScale);
+  }
+
+  _applyPixelRatio() {
+    const base = Math.min(devicePixelRatio || 1, this.features?.pr ?? 1);
+    const forced = Number(this.dprOverride || 0);
+    const pr = forced > 0 ? forced : Math.max(0.5, base * (this.renderScale ?? 1));
+    this.renderer.setPixelRatio(pr);
+    this.composer?.setPixelRatio?.(pr);
+    this.resize();
+  }
+
+  /**
+   * Adaptive resolution: hold a frame budget instead of a fixed ratio.
+   *
+   * Sampled as an exponential average of real frame time, adjusted at most once
+   * every 45 frames, with a wide dead band (13-20 ms) so it settles rather than
+   * hunting. Never kicks in under `?capture=1`, where a stable resolution is the
+   * entire point of the harness.
+   */
+  _adaptiveResolution(dt) {
+    if (window.__CAPTURE__ || this.dprOverride > 0 || this.settings.adaptiveRes === false) return;
+    const ms = dt * 1000;
+    if (!(ms > 0 && ms < 200)) return;      // ignore tab-switch spikes
+    this._ftAvg = this._ftAvg ? this._ftAvg * 0.9 + ms * 0.1 : ms;
+    this._rsTick = (this._rsTick || 0) + 1;
+    if (this._rsTick < 45) return;
+    this._rsTick = 0;
+    const scale = this.renderScale ?? 1;
+    let next = scale;
+    if (this._ftAvg > 20 && scale > 0.56) next = scale - 0.07;
+    else if (this._ftAvg < 13 && scale < 1) next = scale + 0.05;
+    if (Math.abs(next - scale) > 0.001) this.setRenderScale(next);
+  }
+
   applyQuality(q) {
     q = THREE.MathUtils.clamp(Math.round(q ?? 2), 0, 3);
     this.settings.quality = q;
@@ -316,9 +367,8 @@ export class Renderer {
       if (!o.isDirectionalLight || !o.castShadow) return;
       if (f.shadow > 0 && o.shadow.mapSize.x !== f.shadow) o.shadow.mapSize.set(f.shadow, f.shadow);
     });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, f.pr));
+    this._applyPixelRatio();
     this.applyToggles();
-    this.resize();
     this.onQuality?.(q);
   }
 
