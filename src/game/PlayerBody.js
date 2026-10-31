@@ -23,6 +23,8 @@ export class PlayerBody {
     if (body.weapon) body.weapon.visible = false;
 
     body.group.traverse((o) => {
+      // The cap's star is a billboard sprite: it can't take the per-fragment cut.
+      if (o.isSprite) { o.visible = false; return; }
       if (!o.isMesh) return;
       // It's right under the camera: never cull it, and keep the shadow.
       o.frustumCulled = false;
@@ -87,6 +89,7 @@ export class PlayerBody {
   }
 
   dispose() {
+    this.model?.dispose?.();
     if (this.group) this.group.removeFromParent();
     for (const m of this._materials) m.dispose?.();
     this._materials.length = 0;
