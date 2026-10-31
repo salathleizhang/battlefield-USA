@@ -6,7 +6,8 @@ import {
 } from 'postprocessing';
 import { N8AOPostPass } from 'n8ao';
 import {
-  GradeEffect, LensEffect, SharpenEffect, EpicLensEffect, BloodLensEffect, lensDirtTexture, bloodSplatTexture,
+  GradeEffect, LensEffect, SharpenEffect, HalationEffect, AnamorphicPass, BloodLensEffect,
+  lensDirtTexture, bloodSplatTexture,
 } from './PostFX.js';
 
 const _lodPos = new THREE.Vector3();
@@ -231,8 +232,8 @@ export class Renderer {
       samples: 40, clampMax: 1.0, blur: true,
     });
     this.lens = new LensEffect(this.bloom, lensDirtTexture());
-    this.epic = new EpicLensEffect(this.bloom);
-    this.hdrPass = new EffectPass(this.camera, this.godRays, this.bloom, this.lens, this.epic);
+    this.halation = new HalationEffect(this.bloom);
+    this.hdrPass = new EffectPass(this.camera, this.godRays, this.bloom, this.lens, this.halation);
     this.composer.addPass(this.hdrPass);
 
     // Viewmodel after the depth-reading HDR effects (the pass clears depth, so the sun cannot shine through walls).
@@ -241,6 +242,11 @@ export class Renderer {
     this.viewPass.ignoreBackground = true;
     this.viewPass.skipShadowMapUpdate = true;
     this.composer.addPass(this.viewPass);
+
+    // The anamorphic streak sits after the viewmodel so a muzzle flash on the
+    // gun flares across the glass too. Own pass: see AnamorphicPass.
+    this.anamorphic = new AnamorphicPass();
+    this.composer.addPass(this.anamorphic);
 
     // Display stage.
     this.toneMap = new ToneMappingEffect({ mode: ToneMappingMode.ACES_FILMIC });
@@ -267,7 +273,7 @@ export class Renderer {
     this._route();
 
     // Effects whose blend is "off" must also skip their internal passes.
-    for (const e of [this.godRays, this.bloom, this.lens, this.epic, this.blood]) {
+    for (const e of [this.godRays, this.bloom, this.lens, this.halation, this.blood]) {
       const u = e.update.bind(e);
       e._blendOn = e.blendMode.blendFunction;
       e.update = (...a) => { if (e._active !== false) u(...a); };
@@ -304,7 +310,10 @@ export class Renderer {
     this._setEffectActive(this.godRays, this.features.godRays > 0 && on('fxGodRays'));
     this.lensOn = on('fxLens');
     this._setEffectActive(this.lens, this.lensOn || on('fxBloom'));
-    this._setEffectActive(this.epic, on('fxEpic'));
+    // Both epic pieces read the bloom's bright pass, so they follow it.
+    const epic = on('fxEpic') && on('fxBloom');
+    this._setEffectActive(this.halation, epic);
+    this.anamorphic.enabled = epic;
     this._setEffectActive(this.blood, on('fxBlood'));
     this.caOn = on('fxCA');
     this.noise.blendMode.opacity.value = on('fxGrain') ? 0.022 : 0;
@@ -340,7 +349,11 @@ export class Renderer {
    * difference is not visible.
    */
   _applyBudget() {
-    const tight = (this.renderScale ?? 1) < 0.9;
+    // Hysteresis: without it, a scaler hovering at the threshold would rebuild
+    // the shadow map target and re-key AO every few frames.
+    const rs = this.renderScale ?? 1;
+    const tight = this._tight ? rs < 0.95 : rs < 0.88;
+    this._tight = tight;
     // On a tight budget the cascades refresh every other frame. The sun is
     // static, so the only thing that can lag is a moving character's shadow by
     // one displayed frame — invisible at 40+ fps, and it halves a pass that
@@ -559,7 +572,6 @@ export class Renderer {
     this.renderer.setSize(w, h);
     this.composer?.setSize(w, h);
     if (this.lens) this.lens.uniforms.get('aspect').value = w / h;
-    if (this.epic) this.epic.uniforms.get('epicAspect').value = w / h;
     if (this.blood) this.blood.uniforms.get('bloodAspect').value = w / h;
   }
 
@@ -682,6 +694,8 @@ export class Renderer {
     this.vignette.darkness = 0.24 + this.ads * 0.12 + this.damagePulse * 0.25;
     this.grade.uniforms.get('saturation').value = 0.95 - this.damagePulse * 0.22;
     this.blood.tick(dt);
+    const mp = this.bloom.mipmapBlurPass;
+    this.anamorphic.sourceTexture = mp?.downsamplingMipmaps?.[0]?.texture ?? this.bloom.texture;
     this._updateSun();
     r.info.reset();
     const every = this._shadowEvery || 1;

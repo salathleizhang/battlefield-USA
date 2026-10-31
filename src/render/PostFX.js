@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Effect, EffectAttribute, BlendFunction } from 'postprocessing';
+import { Effect, EffectAttribute, BlendFunction, Pass } from 'postprocessing';
 
 /**
  * Custom post effects, ported from the reference project's renderer.
@@ -127,68 +127,186 @@ export class LensEffect extends Effect {
 }
 
 /**
- * Anamorphic + halation: the part of the stack that makes a frame read as a
- * film still rather than a render.
+ * Halation: the warm, soft spill a fast film stock leaves around anything hot.
  *
- * The streak is a horizontal smear of the frame's own highlights, not of the
- * bloom texture: the bloom mip chain is already blurred round, so stretching it
- * sideways only yields a wide glow. Sampling the scene at 17 taps along the row
- * and keeping only what is above ~0.9 luminance gives the thin, blue-white
- * horizontal flare that an anamorphic front element produces on a sun disc,
- * a muzzle flash or wet specular. Halation is the complement: a warm, soft
- * spill sampled from the (round) bloom texture, which is what red film dye
- * does when light scatters inside the emulsion.
+ * Sampled from the (already thresholded) bloom texture rather than the scene,
+ * so it only blooms what the bloom pass considered a highlight. This is the
+ * cheap half of the "epic" look; the anamorphic streak needs its own pass,
+ * because a streak is a horizontal smear, not a glow.
  */
-export class EpicLensEffect extends Effect {
+export class HalationEffect extends Effect {
   constructor(bloom) {
-    super('EpicLensEffect', /* glsl */`
-      uniform sampler2D epicBloom;
-      uniform float epicStreak; uniform float epicHalo; uniform float epicAspect;
-      uniform vec3 epicTint; uniform vec3 epicHaloTint;
-
-      vec3 epicBright(vec2 p) {
-        if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) return vec3(0.0);
-        vec3 c = texture2D(inputBuffer, p).rgb;
-        float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
-        return c * smoothstep(0.90, 2.10, l);
-      }
+    super('HalationEffect', /* glsl */`
+      uniform sampler2D haloBloom;
+      uniform float haloAmt;
+      uniform vec3 haloTint;
 
       void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
-        vec3 col = inputColor.rgb;
-
-        // 17-tap anamorphic smear, weighted to a soft triangular core.
-        vec3 streak = vec3(0.0);
-        float wsum = 0.0;
-        for (int i = -8; i <= 8; i++) {
-          float t = float(i) / 8.0;
-          float w = exp(-t * t * 2.7);
-          streak += epicBright(uv + vec2(t * 0.32 / epicAspect, 0.0)) * w;
-          wsum += w;
-        }
-        col += epicTint * (streak / wsum) * epicStreak;
-
-        // Halation: a soft, warm halo around anything the bloom pass found hot.
-        vec3 halo = texture2D(epicBloom, uv).rgb * 0.62
-                  + texture2D(epicBloom, uv + vec2(0.0, 0.010)).rgb * 0.19
-                  + texture2D(epicBloom, uv - vec2(0.0, 0.010)).rgb * 0.19;
-        col += epicHaloTint * halo * epicHalo;
-
-        outputColor = vec4(col, inputColor.a);
+        vec3 halo = texture2D(haloBloom, uv).rgb * 0.62
+                  + texture2D(haloBloom, uv + vec2(0.0, 0.010)).rgb * 0.19
+                  + texture2D(haloBloom, uv - vec2(0.0, 0.010)).rgb * 0.19;
+        outputColor = vec4(inputColor.rgb + haloTint * halo * haloAmt, inputColor.a);
       }`, {
       blendFunction: BlendFunction.NORMAL,
       uniforms: new Map([
-        ['epicBloom', new THREE.Uniform(bloom.texture)],
-        ['epicStreak', new THREE.Uniform(0.55)],
-        ['epicHalo', new THREE.Uniform(0.22)],
-        ['epicAspect', new THREE.Uniform(1.78)],
-        ['epicTint', new THREE.Uniform(new THREE.Color(0.42, 0.62, 1.0))],
-        ['epicHaloTint', new THREE.Uniform(new THREE.Color(1.0, 0.36, 0.16))],
+        ['haloBloom', new THREE.Uniform(bloom.texture)],
+        ['haloAmt', new THREE.Uniform(0.34)],
+        ['haloTint', new THREE.Uniform(new THREE.Color(1.0, 0.34, 0.14))],
       ]),
     });
     this.bloom = bloom;
   }
 
-  update() { this.uniforms.get('epicBloom').value = this.bloom.texture; }
+  update() { this.uniforms.get('haloBloom').value = this.bloom.texture; }
+}
+
+const FS_VERT = /* glsl */`
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = vec4(position.xy, 1.0, 1.0);
+}`;
+
+const ANAMORPHIC_BRIGHT = /* glsl */`
+uniform sampler2D source;
+uniform float gain;
+varying vec2 vUv;
+void main() {
+  gl_FragColor = vec4(texture2D(source, vUv).rgb * gain, 1.0);
+}`;
+
+const ANAMORPHIC_BLUR = /* glsl */`
+uniform sampler2D source;
+uniform vec2 step;
+varying vec2 vUv;
+void main() {
+  vec3 sum = vec3(0.0);
+  float wsum = 0.0;
+  for (int i = -24; i <= 24; i++) {
+    float t = float(i) / 24.0;
+    float w = exp(-abs(t) * 2.6);
+    sum += texture2D(source, vUv + step * float(i)).rgb * w;
+    wsum += w;
+  }
+  gl_FragColor = vec4(sum / wsum, 1.0);
+}`;
+
+const ANAMORPHIC_COMPOSITE = /* glsl */`
+uniform sampler2D inputBuffer;
+uniform sampler2D streakBuffer;
+uniform vec3 tint;
+uniform float strength;
+varying vec2 vUv;
+void main() {
+  vec4 base = texture2D(inputBuffer, vUv);
+  vec3 streak = texture2D(streakBuffer, vUv).rgb;
+  gl_FragColor = vec4(base.rgb + tint * streak * strength, base.a);
+}`;
+
+/**
+ * Anamorphic lens streak.
+ *
+ * Runs as its own composer pass rather than an Effect, because a streak is a
+ * horizontally smeared bright pass and a single full-screen shader cannot both
+ * find the highlights and spread them far enough: densely sampling a whole row
+ * in one go costs a multiple of what three cheap half-resolution draws cost.
+ *
+ *   bright  ->  dense blur  ->  wide blur  ->  add onto the frame
+ *
+ * The first blur is dense (one half-res texel per tap) so a small sun disc
+ * leaves no gaps; the second is wide (four texels per tap) but reads an image
+ * that is already continuous, so it stretches the streak across a third of the
+ * frame without breaking it into dots.
+ */
+export class AnamorphicPass extends Pass {
+  constructor({ gain = 1.0, strength = 150, tint = [0.46, 0.66, 1.0] } = {}) {
+    super('AnamorphicPass');
+    // The bloom's first mip is the cleanest bright pass in the pipeline: it is
+    // already thresholded at 1.05 and half resolution. Using its own luminance
+    // threshold again here would only re-admit the bright sky and turn the
+    // streak into a milky band.
+    this.sourceTexture = null;
+    this.renderTargetA = new THREE.WebGLRenderTarget(1, 1, {
+      depthBuffer: false, stencilBuffer: false, type: THREE.HalfFloatType,
+      minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+    });
+    this.renderTargetB = this.renderTargetA.clone();
+    this.brightMaterial = new THREE.ShaderMaterial({
+      uniforms: { source: { value: null }, gain: { value: gain } },
+      vertexShader: FS_VERT, fragmentShader: ANAMORPHIC_BRIGHT,
+      depthTest: false, depthWrite: false, blending: THREE.NoBlending, toneMapped: false,
+    });
+    this.blurMaterial = new THREE.ShaderMaterial({
+      uniforms: { source: { value: null }, step: { value: new THREE.Vector2() } },
+      vertexShader: FS_VERT, fragmentShader: ANAMORPHIC_BLUR,
+      depthTest: false, depthWrite: false, blending: THREE.NoBlending, toneMapped: false,
+    });
+    this.compositeMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        inputBuffer: { value: null },
+        streakBuffer: { value: null },
+        tint: { value: new THREE.Color(...tint) },
+        strength: { value: strength },
+      },
+      vertexShader: FS_VERT, fragmentShader: ANAMORPHIC_COMPOSITE,
+      depthTest: false, depthWrite: false, blending: THREE.NoBlending, toneMapped: false,
+    });
+    this.fullscreenMaterial = this.compositeMaterial;
+  }
+
+  /** Strength is scaled at runtime so a kill or a hit can flare the lens. */
+  set strength(v) { this.compositeMaterial.uniforms.strength.value = v; }
+  get strength() { return this.compositeMaterial.uniforms.strength.value; }
+
+  setSize(width, height) {
+    const w = Math.max(1, Math.floor(width * 0.5));
+    const h = Math.max(1, Math.floor(height * 0.5));
+    this.renderTargetA.setSize(w, h);
+    this.renderTargetB.setSize(w, h);
+  }
+
+  render(renderer, inputBuffer, outputBuffer, deltaTime, stencilTest) {
+    if (!inputBuffer) return;
+    const a = this.renderTargetA, b = this.renderTargetB;
+    const tw = a.width, th = a.height;
+
+    // 1. Bring the bloom's bright pass into our half-res target. With no
+    //    source yet (first frame) the frame itself stands in.
+    this.brightMaterial.uniforms.source.value = this.sourceTexture ?? inputBuffer.texture;
+    this.fullscreenMaterial = this.brightMaterial;
+    renderer.setRenderTarget(a);
+    renderer.render(this.scene, this.camera);
+
+    // 2. Dense horizontal blur: one half-res texel per tap, no gaps.
+    this.blurMaterial.uniforms.source.value = a.texture;
+    this.blurMaterial.uniforms.step.value.set(1 / tw, 0);
+    this.fullscreenMaterial = this.blurMaterial;
+    renderer.setRenderTarget(b);
+    renderer.render(this.scene, this.camera);
+
+    // 3. Wide horizontal blur over the already-continuous result.
+    this.blurMaterial.uniforms.source.value = b.texture;
+    this.blurMaterial.uniforms.step.value.set(4 / tw, 0);
+    renderer.setRenderTarget(a);
+    renderer.render(this.scene, this.camera);
+
+    // 4. Add the streak back onto the frame.
+    const c = this.compositeMaterial;
+    c.uniforms.inputBuffer.value = inputBuffer.texture;
+    c.uniforms.streakBuffer.value = a.texture;
+    this.fullscreenMaterial = c;
+    renderer.setRenderTarget(this.renderToScreen ? null : outputBuffer);
+    renderer.render(this.scene, this.camera);
+  }
+
+  dispose() {
+    this.renderTargetA.dispose();
+    this.renderTargetB.dispose();
+    this.brightMaterial.dispose();
+    this.blurMaterial.dispose();
+    this.compositeMaterial.dispose();
+    super.dispose();
+  }
 }
 
 /**
@@ -215,14 +333,17 @@ export class BloodLensEffect extends Effect {
       float bloodMask(sampler2D tex, vec2 uv, vec4 m, vec2 off, float drip) {
         vec2 p = uv - 0.5;
         p.x *= bloodAspect / 1.7778;
+        // Offset first: rotating or mirroring the local coordinates afterwards
+        // turns the splat in place instead of swinging it across the screen.
+        p -= off;
         p = mat2(m.x, -m.y, m.y, m.x) * p;   // rotate
         p.x *= m.z;                           // mirror
         p /= max(m.w, 0.001);                 // scale
-        p += off;
         // The film runs down the glass: the sampled pattern slides towards the
         // bottom of the screen and stretches while it does.
-        p.y += drip * 0.055;
-        p.y = (p.y - 0.5) / (1.0 + drip * 0.06) + 0.5;
+        p.y -= drip * 0.045;
+        p.y = (p.y - 0.5) / (1.0 + drip * 0.02) + 0.5;
+        p += 0.5;                             // back into texture space
         if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) return 0.0;
         return texture2D(tex, p).a;
       }
@@ -234,12 +355,20 @@ export class BloodLensEffect extends Effect {
 
         // A thin film absorbs light and reddens the picture; the thick core is
         // nearly opaque, with a wet sheen sitting on top of it.
-        float thin = smoothstep(0.02, 0.55, m);
-        float core = smoothstep(0.40, 0.96, m);
+        float thin = smoothstep(0.008, 0.30, m);
+        float core = smoothstep(0.42, 0.97, m);
         vec3 col = inputColor.rgb;
         vec3 tint = mix(bloodThin, bloodCore, core);
-        col = mix(col, tint + col * 0.14, thin * 0.93);
-        col += vec3(0.95, 0.24, 0.10) * pow(core, 3.0) * 0.045;
+        // Even a thin, fading film absorbs green and blue, so an old splat
+        // reads as a dark red veil instead of grey glass.
+        float film = smoothstep(0.0, 0.10, m);
+        col *= mix(vec3(1.0), vec3(0.52, 0.13, 0.10), film * 0.85);
+        // The thick part is dense enough to replace the picture outright: an
+        // additive few percent of a bright sky is enough to turn it pink, so
+        // the only scene light that survives is the wet sheen below.
+        col = mix(col, tint, thin * 0.74);
+        col += vec3(0.90, 0.20, 0.07) * pow(core, 4.0) * 0.05;
+        col *= 1.0 - pow(1.0 - m, 6.0) * 0.22;
         outputColor = vec4(col, inputColor.a);
       }`, {
       blendFunction: BlendFunction.NORMAL,
@@ -255,8 +384,8 @@ export class BloodLensEffect extends Effect {
         ['bloodDripA', new THREE.Uniform(0)],
         ['bloodDripB', new THREE.Uniform(0)],
         ['bloodAspect', new THREE.Uniform(1.78)],
-        ['bloodCore', new THREE.Uniform(new THREE.Color(0.115, 0.010, 0.007))],
-        ['bloodThin', new THREE.Uniform(new THREE.Color(0.055, 0.003, 0.002))],
+        ['bloodCore', new THREE.Uniform(new THREE.Color(0.105, 0.0055, 0.0036))],
+        ['bloodThin', new THREE.Uniform(new THREE.Color(0.045, 0.0022, 0.0015))],
       ]),
     });
     this.layers = [
@@ -270,15 +399,16 @@ export class BloodLensEffect extends Effect {
     const [A, B] = this.layers;
     const L = A.op <= B.op ? A : B;
     const other = L === A ? B : A;
-    other.op *= 0.62;
-    L.op = Math.min(0.95, Math.max(0.22, amount) + L.op * 0.2);
+    other.op *= 0.52;
+    L.op = Math.min(0.78, Math.max(0.20, amount) + L.op * 0.18);
     // Keep the rotation shallow: the texture's drips are drawn downwards, and
     // a 180-degree instance would send them up the glass.
     L.rot = (Math.random() - 0.5) * 0.7;
     L.mirror = Math.random() < 0.5 ? -1 : 1;
-    L.scale = 0.86 + Math.random() * 0.34;
-    L.ox = (Math.random() - 0.5) * 0.17;
-    L.oy = (Math.random() - 0.5) * 0.13;
+    // Smaller splat, and biased low and left so the sight picture stays clear.
+    L.scale = 0.55 + Math.random() * 0.14;
+    L.ox = -(0.17 + Math.random() * 0.08);
+    L.oy = -(0.23 + Math.random() * 0.08);
     L.drip = 0;
     this._write();
   }
@@ -294,7 +424,7 @@ export class BloodLensEffect extends Effect {
     for (const L of this.layers) {
       if (L.op <= 0) continue;
       L.op = Math.max(0, L.op - dt * 0.052);
-      L.drip = Math.min(1.6, L.drip + dt * 0.22);
+      L.drip = Math.min(1.6, L.drip + dt * 0.12);
       dirty = true;
     }
     if (dirty) this._write();
@@ -331,14 +461,14 @@ export function bloodSplatTexture({ w = 1024, h = 576, seed = 7, density = 1 } =
   const R = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
   const TAU = Math.PI * 2;
 
-  /** Angular profile: round lobes plus a handful of long, narrow spikes. */
+  /** Angular profile: a rounded core with long, narrow radial spikes. */
   const profile = (n) => {
     const spikes = [];
-    for (let i = 0; i < n; i++) spikes.push({ a: R() * TAU, len: 0.5 + R() * 1.6, w: 0.020 + R() * 0.045 });
-    const lobes = 0.55 + R() * 0.5;
+    for (let i = 0; i < n; i++) spikes.push({ a: R() * TAU, len: 0.3 + R() * 0.95, w: 0.010 + R() * 0.030 });
+    const phase = R() * TAU;
     return (a) => {
-      let r = 0.62 + 0.38 * Math.pow(0.5 + 0.5 * Math.sin(a * 3 + lobes), 0.8);
-      r *= 0.92 + 0.16 * Math.sin(a * 7 + 1.7);
+      let r = 0.80 + 0.20 * Math.pow(0.5 + 0.5 * Math.sin(a * 5 + phase), 1.4);
+      r *= 0.94 + 0.06 * Math.sin(a * 11 + 2.1);
       for (const sp of spikes) {
         const d = Math.atan2(Math.sin(a - sp.a), Math.cos(a - sp.a));
         r += sp.len * Math.exp(-(d * d) / sp.w);
@@ -348,51 +478,78 @@ export function bloodSplatTexture({ w = 1024, h = 576, seed = 7, density = 1 } =
   };
 
   const blob = (cx, cy, rad, alpha) => {
-    const prof = profile(9);
-    const N = 400;
+    const prof = profile(10);
+    const N = 480;
     const pts = [];
     for (let i = 0; i < N; i++) {
       const a = (i / N) * TAU;
-      pts.push([cx + Math.cos(a) * rad * prof(a), cy + Math.sin(a) * rad * prof(a)]);
+      const rr = Math.max(0.12, prof(a));
+      pts.push([cx + Math.cos(a) * rad * rr, cy + Math.sin(a) * rad * rr]);
     }
     g.beginPath();
     g.moveTo(pts[0][0], pts[0][1]);
     for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
     g.closePath();
-    const rg = g.createRadialGradient(cx, cy, 0, cx, cy, rad * 1.6);
+    const rg = g.createRadialGradient(cx, cy, 0, cx, cy, rad * 1.12);
     rg.addColorStop(0, `rgba(255,255,255,${alpha})`);
-    rg.addColorStop(0.42, `rgba(255,255,255,${alpha * 0.9})`);
-    rg.addColorStop(0.8, `rgba(255,255,255,${alpha * 0.5})`);
+    rg.addColorStop(0.55, `rgba(255,255,255,${alpha * 0.92})`);
+    rg.addColorStop(0.85, `rgba(255,255,255,${alpha * 0.55})`);
     rg.addColorStop(1, 'rgba(255,255,255,0)');
     g.fillStyle = rg;
     g.fill();
 
+    // Mottling: thin the film out in patches so the splat has grain instead of
+    // reading as one flat decal. Only alpha changes, so `destination-out`.
+    g.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 26; i++) {
+      const a = R() * TAU, d = rad * (0.45 + R() * 0.5);
+      const x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d;
+      const rr = rad * (0.04 + R() * 0.13);
+      const hg = g.createRadialGradient(x, y, 0, x, y, rr);
+      hg.addColorStop(0, `rgba(0,0,0,${0.05 + R() * 0.16})`);
+      hg.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = hg;
+      g.beginPath(); g.arc(x, y, rr, 0, TAU); g.fill();
+    }
+    // A few bright wet cores back on top.
+    g.globalCompositeOperation = 'source-over';
+    for (let i = 0; i < 6; i++) {
+      const a = R() * TAU, d = Math.sqrt(R()) * rad * 0.55;
+      const x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d;
+      const rr = rad * (0.05 + R() * 0.14);
+      const hg = g.createRadialGradient(x, y, 0, x, y, rr);
+      hg.addColorStop(0, 'rgba(255,255,255,0.85)');
+      hg.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = hg;
+      g.beginPath(); g.arc(x, y, rr, 0, TAU); g.fill();
+    }
+
     // Satellite droplets thrown out along the spikes.
-    const drops = 18 + Math.floor(R() * 16);
+    const drops = 22 + Math.floor(R() * 18);
     for (let i = 0; i < drops; i++) {
       const a = R() * TAU;
-      const d = rad * (0.85 + R() * 1.9);
+      const d = rad * (0.7 + R() * 2.1);
       const x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d;
-      const rr = rad * (0.012 + R() * 0.055);
+      const rr = rad * (0.008 + R() * 0.045);
       g.save();
       g.translate(x, y);
       g.rotate(a);
-      g.scale(1 + R() * 1.6, 0.55 + R() * 0.6);
+      g.scale(1 + R() * 1.8, 0.5 + R() * 0.6);
       g.beginPath();
       g.arc(0, 0, rr, 0, TAU);
-      g.fillStyle = `rgba(255,255,255,${0.18 + R() * 0.5})`;
+      g.fillStyle = `rgba(255,255,255,${0.25 + R() * 0.55})`;
       g.fill();
       g.restore();
     }
 
     // Spray mist: many tiny specks thinning out with distance.
-    for (let i = 0; i < 260; i++) {
+    for (let i = 0; i < 300; i++) {
       const a = R() * TAU;
-      const d = rad * (0.2 + Math.pow(R(), 0.55) * 2.6);
-      const rr = 0.5 + R() * 2.2;
+      const d = rad * (0.2 + Math.pow(R(), 0.55) * 2.4);
+      const rr = 0.4 + R() * 2.0;
       g.beginPath();
       g.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, rr, 0, TAU);
-      g.fillStyle = `rgba(255,255,255,${Math.max(0, (0.42 - R() * 0.3) * (1 - d / (rad * 3)))})`;
+      g.fillStyle = `rgba(255,255,255,${Math.max(0, (0.40 - R() * 0.28) * (1 - d / (rad * 2.8)))})`;
       g.fill();
     }
   };
@@ -401,7 +558,7 @@ export function bloodSplatTexture({ w = 1024, h = 576, seed = 7, density = 1 } =
   // mirrored/rotated instance still reads as asymmetric.
   const cx = w * (0.44 + (R() - 0.5) * 0.1);
   const cy = h * (0.46 + (R() - 0.5) * 0.1);
-  const main = Math.min(w, h) * (0.20 + R() * 0.04) * density;
+  const main = Math.min(w, h) * (0.185 + R() * 0.03) * density;
   blob(cx, cy, main, 0.97);
   blob(cx + w * (0.11 + R() * 0.06), cy + h * (0.10 + R() * 0.08), main * 0.46, 0.9);
   blob(cx - w * (0.12 + R() * 0.05), cy + h * (0.16 + R() * 0.09), main * 0.30, 0.85);
@@ -426,8 +583,8 @@ export function bloodSplatTexture({ w = 1024, h = 576, seed = 7, density = 1 } =
   for (let i = 0; i < drips; i++) {
     const x = cx + (R() - 0.5) * main * 1.7;
     const y0 = cy + main * (0.25 + R() * 0.55);
-    const len = main * (0.35 + R() * 1.15);
-    const wid = 1.4 + R() * 4.2;
+    const len = main * (0.22 + R() * 0.62);
+    const wid = 1.8 + R() * 4.6;
     const bow = (R() - 0.5) * 14;
     g.beginPath();
     g.moveTo(x - wid * 0.5, y0);
