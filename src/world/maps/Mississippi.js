@@ -242,6 +242,13 @@ export function buildMississippi(L) {
   L.addCapturePoint({ id: 'B', name: '棉花田堤坝', x: 45, z: -78, radius: 17, owner: -1, base: height(45, -78), height: 6 });
   L.addCapturePoint({ id: 'C', name: '巴吞鲁日港', x: px, z: pz, radius: 18, owner: 1, base: py + 1.0, height: 8 });
 
+  /* 装甲：南岸桥头的斯图亚特，港口前的谢尔曼。 */
+  L.vehicle('stuart', 58, 118, 0, { team: 0, player: true });
+  L.vehicle('sherman', -78, -112, -Math.PI / 2, { team: 1 });
+  L.structure({ type: 'barn', x: 92, z: -104, yaw: 0.2 });
+  L.structure({ type: 'house', x: 14, z: -118, yaw: -0.5, material: 'brick' });
+  L.structure({ type: 'depot', x: -40, z: -150, yaw: 0.1 });
+
   L.setPlayerSpawn(18, 104, 0);
   L.addSpawn(0, -14, 100, 0);
   L.addSpawn(0, 0, 96, 0);

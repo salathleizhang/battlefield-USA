@@ -230,6 +230,13 @@ export function buildGoldenGate(L) {
   L.addCapturePoint({ id: 'B', name: '中跨', x: 0, z: 0, radius: 7, owner: -1, base: DECK, height: 10 });
   L.addCapturePoint({ id: 'C', name: '南塔 · 旧金山', x: 0, z: P.towerZ, radius: 7, owner: 1, base: DECK, height: 10 });
 
+  /* 装甲：桥北引道的斯图亚特，南塔下的谢尔曼。桥面只 13.8 m 宽，
+     所以两侧的掩体都缩到 4.5 m，中央留出一条能过坦克的车道。 */
+  L.vehicle('stuart', 3.4, -505, Math.PI, { team: 0, player: true, base: DECK });
+  L.vehicle('sherman', -3.4, 250, 0, { team: 1, base: DECK });
+  L.structure({ type: 'bunker', x: -5.15, z: -150, w: 4.5, d: 4.5, h: 2.4, base: DECK });
+  L.structure({ type: 'depot', x: 5.15, z: 150, w: 4.5, d: 4.5, h: 3.0, base: DECK });
+
   L.setPlayerSpawn(0, -512, Math.PI, { base: DECK });
   L.addSpawn(0, 0, -512, Math.PI, { base: DECK });
   L.addSpawn(0, -3.2, -500, Math.PI, { base: DECK });
