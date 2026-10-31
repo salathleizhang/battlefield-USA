@@ -688,7 +688,7 @@ export function buildMiamiBeach(L) {
   L.scatter(['chair1', 'table1', 'bench1', 'locker1', 'toilet1'], -16, -40, 20, 16, 9, { jitter: 1.2 });
   L.prop('trash_container1', -30, -36, 0.6);
   L.prop('trash_container1', -8, 44, -0.4);
-  L.prop('fuel_container1', 58, -8, 1.2, { scale: 0.85 });
+  L.prop('fuel_container1', 67, -38, 1.2, { scale: 0.85 });
   L.scatter(['chair1', 'table1', 'bench1', 'locker1'], -18, 42, 18, 14, 7, { jitter: 1.2 });
   // 车辆残骸：一辆卡车斜插在沙里，一辆悍马翻在街边。
   L.prop('m923', 55, -36, 2.35);
@@ -696,11 +696,12 @@ export function buildMiamiBeach(L) {
   L.scatter(['wheel_101', 'wheel_102', 'wheel_103', 'wheel_104'], 50, 8, 34, 54, 7, { solid: false, jitter: 1.5 });
   // 石与碎块：压住沙滩和草地的过渡带。
   L.scatter(['stone1', 'stone2', 'stone3', 'stone4'], 44, 0, 44, 96, 22, { solid: false, scaleJitter: 0.6 });
-  L.scatter(['stone_detail1', 'stone_detail2', 'stone_detail3', 'debris_el1', 'debris_el2'],
+  L.scatter(['stone_detail1', 'stone_detail2', 'stone_detail3', 'stone_detail4', 'debris_el1', 'debris_el2'],
     46, 0, 40, 90, 40, { solid: false, scaleJitter: 0.6 });
   // 一地垃圾：纸杯、瓶子、泡沫、破木头。
-  L.scatter(['garbage_styro1', 'garbage_styro2', 'garbage_styro5', 'garbage_cup', 'garbage_bottle1',
-    'garbage_bottle2', 'garbage_oil1', 'garbage_wood1', 'garbage_metal1', 'styrofoam'],
+  L.scatter(['garbage_styro1', 'garbage_styro2', 'garbage_styro3', 'garbage_styro4', 'garbage_styro5',
+    'garbage_cup', 'garbage_bottle1', 'garbage_bottle2', 'garbage_oil1', 'garbage_oil2',
+    'garbage_wood1', 'garbage_metal1', 'garbage1c', 'garbage1d', 'garbage1e', 'garbage1f', 'garbage1g', 'styrofoam'],
   44, 0, 46, 96, 58, { solid: false, jitter: 1.6, scaleJitter: 0.5 });
   // 弹坑边的碎木、砖头。
   L.scatter(['garbage_wood2', 'garbage_wood3', 'garbage_wood4', 'planks2'], 30, -46, 22, 26, 12, { solid: false });
@@ -708,7 +709,7 @@ export function buildMiamiBeach(L) {
   L.scatter(['shooting_target'], 41, -18, 9, 12, 3);
   L.prop('warning_pole1', 38, 29, 0.2);
   L.prop('warning_pole2', 24, -14, -0.4);
-  L.scatter(['warning1', 'warning2', 'warning3', 'warning5', 'warning7'], 39, 28, 6, 8, 5, { solid: false });
+  L.scatter(['warning1', 'warning2', 'warning3', 'warning4', 'warning5', 'warning6', 'warning7', 'warning8'], 39, 28, 8, 10, 7, { solid: false });
   L.scatter(['boots1', 'shovel'], 44, 4, 22, 40, 7, { solid: false, jitter: 1.4 });
   // 电线杆和灯柱，东倒西歪。
   L.prop('lamp_mast', 26, -20, 0.14);
@@ -716,6 +717,21 @@ export function buildMiamiBeach(L) {
   L.prop('powerpole_cable_30m', 32, 20, Math.PI / 2);
   L.prop('pole1', 28, -62, 0.2);
   L.prop('platform1', 24, 72, 0.5);
+  L.prop('warning_pole3', 6, 66, 0.3);
+  // 营地围栏：一段段歪着的铁丝网，缺口处散了。
+  for (let i = 0; i < 6; i++) {
+    if (L.rand() < 0.2) continue;
+    L.prop('wire_fence1_el1', -52 + i * 4.1, 76 + (L.rand() - 0.5) * 0.6, (L.rand() - 0.5) * 0.12);
+    L.prop('wire_fence1_el2', -50 + i * 4.1, 76, 0);
+  }
+  L.prop('wire_fence2_el1', -20, 70, 0.05);
+  L.prop('wire_fence2_el2', -15.4, 70, 0);
+  L.prop('wire_fence2_el1_fabric', -17.7, 70.1, 0.05, { solid: false });
+  L.prop('gate1', 2, 74, 0.1);
+  // 架在沙袋掩体上的机枪。
+  L.prop('m240', 52, -21.4, 0.55, { y: 1.62 });
+  L.prop('m2hb', 48, 33.2, -1.2, { y: 3.12 });
+  L.prop('spool2', -12, 68, 0.4);
 
   /* ------------------------------------------------------------------ combat */
   const cpA = L.addCapturePoint({ id: 'A', name: '血色沙滩', x: 50, z: 0, radius: 18, owner: -1 });

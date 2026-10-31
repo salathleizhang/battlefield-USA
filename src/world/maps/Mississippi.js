@@ -208,10 +208,11 @@ export function buildMississippi(L) {
   L.scatter(['chair1', 'table1', 'bench1', 'locker1', 'toilet1'], -10, 112, 26, 20, 10, { jitter: 1.4 });
   L.prop('trash_container1', -34, 100, 0.8);
   L.prop('fuel_container1', -28, 128, -0.5, { scale: 0.9 });
-  L.scatter(['garbage_styro1', 'garbage_cup', 'garbage_bottle1', 'garbage_metal1', 'garbage_wood1',
-    'garbage_wood2', 'debris_el1', 'debris_el2', 'styrofoam'],
+  L.scatter(['garbage_styro1', 'garbage_styro3', 'garbage_cup', 'garbage_bottle1', 'garbage_oil2',
+    'garbage_metal1', 'garbage_wood1', 'garbage_wood2', 'garbage1c', 'garbage1e', 'garbage1f',
+    'debris_el1', 'debris_el2', 'styrofoam'],
   0, 104, 120, 60, 66, { solid: false, jitter: 1.8, scaleJitter: 0.5 });
-  L.scatter(['stone1', 'stone2', 'stone3', 'stone_detail1', 'stone_detail2'], 0, 60, 140, 90, 26, { solid: false, scaleJitter: 0.6 });
+  L.scatter(['stone1', 'stone2', 'stone3', 'stone_detail1', 'stone_detail2', 'stone_detail4'], 0, 60, 140, 90, 28, { solid: false, scaleJitter: 0.6 });
   // 桥头路障与灯柱。
   for (const side of [-1, 1]) {
     L.scatter(['barrier_block_el1', 'barrier_block_el3'], side * 6.5, 86, 4, 10, 4, { jitter: 1.0 });
@@ -222,6 +223,19 @@ export function buildMississippi(L) {
   L.prop('powerpole_single', -40, 92, 0.2);
   L.prop('warning_pole1', -8, 84, 0);
   L.prop('platform1', 44, 116, 0.6);
+  L.prop('warning_pole3', -18, 86, 0.2);
+  L.prop('spool2', 12, 124, 0.9);
+  // 营地围栏与大门。
+  for (let i = 0; i < 7; i++) {
+    if (L.rand() < 0.22) continue;
+    L.prop('wire_fence1_el1', -64 + i * 4.1, 84 + (L.rand() - 0.5) * 0.8, (L.rand() - 0.5) * 0.14);
+    L.prop('wire_fence1_el2', -62 + i * 4.1, 84, 0);
+  }
+  L.prop('wire_fence2_el1', -40, 132, 0.02);
+  L.prop('wire_fence2_el1_fabric', -37.5, 132.1, 0.02, { solid: false });
+  L.prop('gate1', -20, 88, 0.05);
+  L.prop('m2hb', 22, -72.4, 0.4, { y: 1.6 });
+  L.prop('m240', -34, -78.2, -0.5, { y: 1.6 });
 
   /* ------------------------------------------------------------- gameplay */
   L.addCapturePoint({ id: 'A', name: '浮桥', x: 0, z: 0, radius: 14, owner: -1, base: bridgeY + 0.2, height: 7 });

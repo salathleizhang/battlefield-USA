@@ -247,10 +247,11 @@ export function buildWashington(L) {
   L.prop('trash_container1', 44, 22, 0.7);
   L.prop('trash_container1', -44, -44, -0.6);
   L.scatter(['lamp_mast', 'lamp1', 'powerpole_single'], 0, 30, 100, 130, 7, { jitter: 0.6 });
-  L.scatter(['garbage_styro1', 'garbage_styro2', 'garbage_cup', 'garbage_bottle1', 'garbage_metal1',
-    'garbage_wood1', 'garbage1a', 'garbage1b', 'debris_el1', 'debris_el2'],
+  L.scatter(['garbage_styro1', 'garbage_styro2', 'garbage_styro3', 'garbage_styro4', 'garbage_cup',
+    'garbage_bottle1', 'garbage_oil2', 'garbage_metal1', 'garbage_wood1', 'garbage1a', 'garbage1b',
+    'garbage1c', 'garbage1d', 'garbage1e', 'garbage1f', 'garbage1g', 'debris_el1', 'debris_el2'],
   0, 20, 110, 190, 70, { solid: false, jitter: 1.8, scaleJitter: 0.5 });
-  L.scatter(['stone1', 'stone2', 'stone3', 'stone_detail1', 'stone_detail2', 'debris_el3'],
+  L.scatter(['stone1', 'stone2', 'stone3', 'stone_detail1', 'stone_detail2', 'stone_detail4', 'debris_el3'],
   0, 40, 100, 170, 30, { solid: false, scaleJitter: 0.6 });
   // 被击毁在广场上的装甲车，侧翻在人行道上。
   L.prop('m1114', -26, 16, 0.9);
@@ -280,6 +281,17 @@ export function buildWashington(L) {
   }
   L.prop('sandbags_box1', 0, -158, 0.2);
   L.prop('shooting_target', 8, -140, 3.1);
+  L.prop('warning_pole3', -4, 124, 0.1);
+  L.prop('spool2', 12, -128, 0.7);
+  L.prop('gate1', -9, 116, 0.05);
+  // 国会山脚下一段塌掉的砖墙，九截各不同。
+  for (let i = 0; i < 9; i++) {
+    L.prop('wall1_el' + (i + 1), -14 + i * 3.4, -116 + (L.rand() - 0.5) * 2.2,
+      Math.PI / 2 + (L.rand() - 0.5) * 0.24);
+  }
+  L.prop('m240', -13, -146.4, 0.7, { y: 1.62 });
+  L.prop('m2hb', 13, -146.4, -0.7, { y: 1.62 });
+  L.prop('building_office', -66, -20, 0.3);
 
   /* ---------------------------------------------------------------- gameplay */
   L.addCapturePoint({ id: 'A', name: '波托马克桥头', x: 0, z: 134, radius: 16, owner: -1, base: height(0, 134), height: 7 });
