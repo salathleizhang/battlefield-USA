@@ -194,12 +194,18 @@ void main() {
 const ANAMORPHIC_COMPOSITE = /* glsl */`
 uniform sampler2D inputBuffer;
 uniform sampler2D streakBuffer;
+uniform sampler2D coreBuffer;
 uniform vec3 tint;
 uniform float strength;
 varying vec2 vUv;
 void main() {
   vec4 base = texture2D(inputBuffer, vUv);
-  vec3 streak = texture2D(streakBuffer, vUv).rgb;
+  // A streak comes off a highlight and fades with distance; it is not the row's
+  // average brightness. Both buffers are normalised horizontal blurs of the
+  // same bright pass, so subtracting the wide one cancels that average: a hazy
+  // horizon or a sunlit wall contributes nothing, while a compact source (sun
+  // disc, muzzle flash) keeps a positive remainder around its own column.
+  vec3 streak = max(texture2D(coreBuffer, vUv).rgb - texture2D(streakBuffer, vUv).rgb, 0.0);
   gl_FragColor = vec4(base.rgb + tint * streak * strength, base.a);
 }`;
 
@@ -211,15 +217,18 @@ void main() {
  * find the highlights and spread them far enough: densely sampling a whole row
  * in one go costs a multiple of what three cheap half-resolution draws cost.
  *
- *   bright  ->  dense blur  ->  wide blur  ->  add onto the frame
+ *   bright  ->  dense blur  ->  wide blur  ->  add (dense - wide) onto the frame
  *
  * The first blur is dense (one half-res texel per tap) so a small sun disc
  * leaves no gaps; the second is wide (four texels per tap) but reads an image
  * that is already continuous, so it stretches the streak across a third of the
- * frame without breaking it into dots.
+ * frame without breaking it into dots. The composite subtracts the wide blur
+ * from the dense one, which is what keeps the pass a highlight effect: without
+ * it the normalised blur *is* the row average, so a bright horizontal strip —
+ * haze, a sunlit façade, the sea — becomes a bar across the whole frame.
  */
 export class AnamorphicPass extends Pass {
-  constructor({ gain = 1.0, strength = 150, tint = [0.46, 0.66, 1.0] } = {}) {
+  constructor({ gain = 1.0, strength = 12, tint = [0.46, 0.66, 1.0] } = {}) {
     super('AnamorphicPass');
     // The bloom's first mip is the cleanest bright pass in the pipeline: it is
     // already thresholded at 1.05 and half resolution. Using its own luminance
@@ -245,6 +254,7 @@ export class AnamorphicPass extends Pass {
       uniforms: {
         inputBuffer: { value: null },
         streakBuffer: { value: null },
+        coreBuffer: { value: null },
         tint: { value: new THREE.Color(...tint) },
         strength: { value: strength },
       },
@@ -290,10 +300,13 @@ export class AnamorphicPass extends Pass {
     renderer.setRenderTarget(a);
     renderer.render(this.scene, this.camera);
 
-    // 4. Add the streak back onto the frame.
+    // 4. Add the streak back onto the frame. The narrow blur is still in B, so
+    //    the composite can subtract it from the wide one to keep only the light
+    //    that actually left a highlight.
     const c = this.compositeMaterial;
     c.uniforms.inputBuffer.value = inputBuffer.texture;
     c.uniforms.streakBuffer.value = a.texture;
+    c.uniforms.coreBuffer.value = b.texture;
     this.fullscreenMaterial = c;
     renderer.setRenderTarget(this.renderToScreen ? null : outputBuffer);
     renderer.render(this.scene, this.camera);
