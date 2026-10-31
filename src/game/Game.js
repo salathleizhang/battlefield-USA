@@ -241,7 +241,16 @@ export class Game {
     // ?loadout=m4,p226 — comma-separated ids; unknown ids fall back to the default kit.
     const pick = (q.get('loadout') || '').split(',').map((v) => v.trim()).filter((id) => WEAPONS[id]);
     const loadout = pick.length ? pick : DEFAULT_LOADOUT;
-    this.weapons = loadout.map((id) => new Weapon(this, this.player, weaponDef(id)));
+    // ?optic=reddot|holo|acog|irons overrides every primary's optic (testing / server rules).
+    const optic = q.get('optic');
+    const att = (q.get('attachments') || '').split(',').map((v) => v.trim()).filter(Boolean);
+    this.weapons = loadout.map((id) => {
+      const base = weaponDef(id);
+      const extra = WEAPONS[id].slot === 'primary'
+        ? { ...(optic ? { optic } : {}), ...(att.length ? { attachments: att } : {}) }
+        : {};
+      return new Weapon(this, this.player, { ...base, ...extra });
+    });
     this.weaponIndex = 0;
     this.weapon = this.weapons[0];
     this.viewmodel = new ViewModel(this, this.weapons.map((w) => w.def));
@@ -788,7 +797,10 @@ export class Game {
       this.player.syncCamera(dt);
       if (this.playerBody?.group) this.playerBody.group.visible = false;
     } else if (this.player.alive) {
-      this.player.look(look.x, look.y, this.settings.sens);
+      // Optic zoom: narrow the ADS FOV and slow the look rate by the same factor.
+      this.player.adsZoom = this.weapon.zoom?.() ?? 1;
+      const zoomK = this.player.aiming ? 1 / Math.max(1, this.player.adsZoom) : 1;
+      this.player.look(look.x * zoomK, look.y * zoomK, this.settings.sens);
       this.player.update(dt, cmd, this.weapon);
       this.weapon.update(dt, cmd);
       this.viewmodel.update(dt, this.player, this.weapon, look);

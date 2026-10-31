@@ -16,15 +16,44 @@ export const FP_IDS = ['m4a1', 'ak47', 'scarl', 'mp5a5', 'vss', 'm24', 'awm', 's
 /** Iron-sight lines measured on the source models (K-space, root-local) + per-platform tweaks. */
 export const FP_TUNE = {
   default: { ironRelief: 0.26, hipPush: 1 },
-  m4a1: { ironRear: [0, 0.2498, 0.255], ironFront: [0, 0.2404, -0.505], hipPush: 1.12 },
-  ak47: { ironRear: [0, 0.1005, -0.645], ironFront: [0, 0.1005, -1.375], hipPush: 1.05 },
-  mp5a5: { ironRear: [0, 0.238, 0.0978], ironFront: [0, 0.254, -0.5722], hipPush: 1.12 },
-  p226: { ironRelief: 0.5, ironRear: [0, 0.1352, 0.1435], ironFront: [0, 0.1359, -0.1692], hipPush: 1.3 },
-  m1911: { ironRelief: 0.5, ironRear: [0, 0.1297, 0.1299], ironFront: [0, 0.1287, -0.1954], hipPush: 1.3 },
+  // `rail` is where an optic's base sits (K-space, root-local) — measured on the source models.
+  m4a1: { ironRear: [0, 0.2498, 0.255], ironFront: [0, 0.2404, -0.505], rail: [0, 0.1786, 0.06], hipPush: 1.12 },
+  ak47: { ironRear: [0, 0.1005, -0.645], ironFront: [0, 0.1005, -1.375], rail: [0, 0.0956, -0.492], hipPush: 1.05 },
+  scarl: { ironRear: [0, 0.2655, 0.2311], ironFront: [0, 0.2777, -0.514], rail: [0, 0.1879, -0.058], hipPush: 1.15 },
+  mp5a5: { ironRear: [0, 0.238, 0.0978], ironFront: [0, 0.254, -0.5722], rail: [0, 0.2286, -0.21], hipPush: 1.12 },
+  p226: { ironRelief: 0.5, ironRear: [0, 0.1352, 0.1435], ironFront: [0, 0.1359, -0.1692], rail: [0, 0.131, 0.04], hipPush: 1.3 },
+  m1911: { ironRelief: 0.5, ironRear: [0, 0.1297, 0.1299], ironFront: [0, 0.1287, -0.1954], rail: [0, 0.1281, 0.045], hipPush: 1.3 },
+};
+
+/** Optic models shipped in `models/optics/optics.glb`, with the zoom they give at the sights. */
+export const OPTICS = {
+  irons: { id: 'irons', name: '机械瞄具', zoom: 1 },
+  reddot: { id: 'reddot', name: '红点', zoom: 1.25, node: 'MicroOptic', relief: 0.30, reticle: 'MicroReticleAnchor', scale: 0.82 },
+  holo: { id: 'holo', name: '全息', zoom: 1.4, node: 'HoloOptic', relief: 0.30, reticle: 'HoloReticleAnchor', scale: 0.82 },
+  acog: { id: 'acog', name: '3.5× 瞄准镜', zoom: 3.5, node: 'ScopeOptic', relief: 0.16, reticle: 'ScopeReticleAnchor', scale: 0.72 },
 };
 
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const cache = new Map();
+
+let opticsPromise = null;
+/** Load (once) the shared optic models. */
+export function loadOptics() {
+  opticsPromise ||= loader.loadAsync('/assets/models/optics/optics.glb').then((gltf) => {
+    gltf.scene.traverse((o) => {
+      if (!o.isMesh) return;
+      o.frustumCulled = false;
+      o.castShadow = false;
+      const list = Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of list) if (m) m.envMapIntensity = 1.0;
+    });
+    return gltf.scene;
+  }).catch((e) => {
+    console.warn('[fp] optics asset failed', e?.message || e);
+    return null;
+  });
+  return opticsPromise;
+}
 
 /** Load (and cache) one FP rig. Returns null if the asset is missing. */
 export async function loadFpRig(id) {

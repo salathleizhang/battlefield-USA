@@ -16,6 +16,7 @@ export const WEAPONS = {
     caliber: '6.5mm',
     slot: 'primary',
     model: 'rifle',
+    optic: 'irons',
     mode: 'bolt',
     magazine: 5,
     reserve: 60,
@@ -47,6 +48,7 @@ export const WEAPONS = {
     caliber: '5.56mm',
     slot: 'primary',
     model: 'm4a1',
+    optic: 'reddot',
     mode: 'auto',
     magazine: 30,
     reserve: 210,
@@ -76,6 +78,7 @@ export const WEAPONS = {
     caliber: '7.62mm',
     slot: 'primary',
     model: 'ak47',
+    optic: 'irons',
     mode: 'auto',
     magazine: 30,
     reserve: 180,
@@ -105,6 +108,7 @@ export const WEAPONS = {
     caliber: '9mm',
     slot: 'primary',
     model: 'mp5a5',
+    optic: 'reddot',
     mode: 'auto',
     magazine: 30,
     reserve: 240,
@@ -134,6 +138,7 @@ export const WEAPONS = {
     caliber: '9mm',
     slot: 'secondary',
     model: 'p226',
+    optic: 'irons',
     mode: 'semi',
     magazine: 15,
     reserve: 90,
@@ -163,6 +168,7 @@ export const WEAPONS = {
     caliber: '.45',
     slot: 'secondary',
     model: 'm1911',
+    optic: 'irons',
     mode: 'semi',
     magazine: 8,
     reserve: 56,
@@ -185,6 +191,52 @@ export const WEAPONS = {
     adsMobility: 0.97,
   },
 };
+
+/**
+ * Attachments (ported from the reference project's table, folded into our stat fields).
+ * Each entry lists the slots it may occupy and the multipliers/additions applied on top of
+ * the base weapon def by `applyAttachments`.
+ */
+export const ATTACHMENTS = {
+  suppressor: { name: '消音器', slot: 'muzzle', suppressed: true, rangeMul: 0.9, adsAdd: 0.02, recoilMul: 0.92, flashMul: 0.15, volumeMul: 0.45 },
+  compensator: { name: '补偿器', slot: 'muzzle', recoilMul: 0.85, flashMul: 1.2 },
+  brake: { name: '制退器', slot: 'muzzle', recoilMul: 0.92, hRecoilMul: 0.85, flashMul: 1.4 },
+  extmag: { name: '扩容弹匣', slot: 'magazine', magMul: 1.5, reloadAdd: 0.3, adsAdd: 0.03, moveMul: 0.97 },
+  fastmag: { name: '快拔弹匣', slot: 'magazine', reloadMul: 0.75 },
+  vgrip: { name: '垂直握把', slot: 'underbarrel', recoilMul: 0.88, adsAdd: 0.02 },
+  agrip: { name: '斜角握把', slot: 'underbarrel', adsMul: -0.1, spreadMul: 0.92 },
+  bipod: { name: '两脚架', slot: 'underbarrel', recoilMul: 0.97, adsAdd: 0.03, moveMul: 0.97, braced: true },
+};
+
+const clampNum = (v, a, b) => Math.max(a, Math.min(b, v));
+
+/**
+ * Return a new def with the given attachment ids folded in.
+ * Unknown ids and duplicates that share a slot are ignored (first wins).
+ */
+export function applyAttachments(def, ids = []) {
+  const out = { ...def, attachments: [] };
+  const slots = new Set();
+  for (const id of ids) {
+    const a = ATTACHMENTS[id];
+    if (!a || slots.has(a.slot)) continue;
+    slots.add(a.slot);
+    out.attachments.push(id);
+    if (a.magMul) out.magazine = Math.round(out.magazine * a.magMul);
+    if (a.reloadMul) out.reloadTime *= a.reloadMul;
+    if (a.reloadAdd) out.reloadTime += a.reloadAdd;
+    if (a.recoilMul) out.recoil *= a.recoilMul;
+    if (a.spreadMul) { out.spreadHip *= a.spreadMul; out.spreadAds *= a.spreadMul; }
+    if (a.adsAdd) out.adsTime += a.adsAdd;
+    if (a.adsMul) out.adsTime *= 1 + a.adsMul;
+    if (a.moveMul) { out.mobility *= a.moveMul; out.adsMobility = (out.adsMobility ?? out.mobility) * a.moveMul; }
+    if (a.suppressed) out.suppressed = true;
+    if (a.braced) out.braced = true;
+    if (a.rangeMul) out.velocity *= a.rangeMul;
+  }
+  out.adsTime = clampNum(out.adsTime, 0.12, 0.6);
+  return out;
+}
 
 /** The loadout every mission starts with (slot order = weapon switch order). */
 export const DEFAULT_LOADOUT = ['m4', 'p226'];

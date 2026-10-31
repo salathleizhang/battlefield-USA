@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { rand, clamp } from '../../core/MathUtil.js';
 
-import { WEAPONS, weaponDef } from './WeaponDefs.js';
+import { WEAPONS, weaponDef, applyAttachments } from './WeaponDefs.js';
+import { OPTICS } from './FpRig.js';
 
 // Back-compat: the Type 38 def used to live here.
 export const TYPE38 = WEAPONS.type38;
@@ -10,8 +11,9 @@ export class Weapon {
   constructor(game, player, def = weaponDef('type38')) {
     this.game = game;
     this.player = player;
-    this.def = def;
-    this.id = def.id;
+    // Per-weapon copy: attachments modify the stats without touching the shared table.
+    this.def = applyAttachments({ ...def }, def.attachments || []);
+    this.id = this.def.id;
     this.ammo = this.def.magazine;
     this.reserve = this.def.reserve;
     this.cycleT = 0;
@@ -26,6 +28,8 @@ export class Weapon {
     this.lastShot = -9;
     this.sprintLock = 0;
     this.equipT = 0;
+    this.inspectT = 0;
+    this.inspectDur = 2.6;
     this.meleeCd = 0;
     this.grenadeCd = 0;
     this.triggerHeld = false;
@@ -34,11 +38,14 @@ export class Weapon {
   }
 
   get canFire() {
-    return !this.reloading && this.cycleT <= 0 && this.ammo > 0 && this.player.alive
+    return !this.reloading && this.inspectT <= 0 && this.cycleT <= 0 && this.ammo > 0 && this.player.alive
       && this.sprintLock <= 0 && this.equipT <= 0 && !this.player.sliding && !this.player.mantle;
   }
 
   mobility() { return this.player.aiming ? (this.def.adsMobility ?? 0.92) : (this.def.mobility ?? 0.97); }
+
+  /** Magnification at the sights: 1 for irons, more for a mounted optic. */
+  zoom() { return OPTICS[this.def.optic]?.zoom ?? 1; }
 
   update(dt, cmd) {
     this.time += dt;
@@ -55,6 +62,12 @@ export class Weapon {
 
     this.cycleT = Math.max(0, this.cycleT - dt);
     this.equipT = Math.max(0, this.equipT - dt);
+    if (this.inspectT > 0) {
+      // Any deliberate action breaks the inspect (reference behaviour).
+      if (cmd.fire || cmd.aim || this.player.sprinting || this.player.mantle) this.inspectT = 0;
+      else this.inspectT = Math.max(0, this.inspectT - dt);
+    }
+    if (cmd.inspect && this.inspectT <= 0 && !this.reloading) this.inspect();
     this.reloadT = Math.max(0, this.reloadT - dt);
     this.meleeCd = Math.max(0, this.meleeCd - dt);
     this.grenadeCd = Math.max(0, this.grenadeCd - dt);
@@ -154,7 +167,7 @@ export class Weapon {
     this.shotIndex += 1;
     this.spread = Math.min(this.def.spreadMax, this.spread + this.def.spreadPerShot);
 
-    this.game.audio.shot(this.def.id, { dist: 0 });
+    this.game.audio.shot(this.def.id, { dist: 0, suppressed: !!this.def.suppressed });
     this.game.alertBots(p.position, 70);
     this.game.viewmodel.onFire(this);
     this.game.effects.muzzleSmoke(origin, dir);
@@ -174,6 +187,11 @@ export class Weapon {
     this.shotIndex = 0;
     this.sprintLock = 0;
     this.equipT = 0;
+  }
+
+  /** Weapon inspect: swings the gun out to show both sides, then settles back. */
+  inspect() {
+    this.inspectT = this.inspectDur;
   }
 
   startReload() {

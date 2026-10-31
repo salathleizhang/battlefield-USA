@@ -98,6 +98,7 @@ export class Input {
       melee: this.hit('KeyV'),
       grenade: this.hit('KeyG'),
       interact: this.hit('KeyF'),
+      inspect: this.hit('KeyI'),
       slot1: this.hit('Digit1'),
       slot2: this.hit('Digit2'),
       wheel: this.mouse.wheel,
