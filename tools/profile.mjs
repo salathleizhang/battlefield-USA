@@ -145,6 +145,9 @@ await ev(`(() => {
       geos: info?.memory?.geometries ?? 0,
       texs: info?.memory?.textures ?? 0,
       pr: +(g.renderer?.renderer?.getPixelRatio?.() ?? 1).toFixed(3),
+      rs: +(g.renderer?.renderScale ?? 1).toFixed(3),
+      avg: +(g.renderer?._ftAvg ?? 0).toFixed(1),
+      ao: g.renderer?._aoMode ?? null,
       heap: performance.memory ? performance.memory.usedJSHeapSize >> 20 : 0,
     });
   };
@@ -195,6 +198,9 @@ const out = {
   worstHitches: worst,
   programs: { start: warm[0]?.progs, end: warm[warm.length - 1]?.progs, compiledDuringPlay: (warm[warm.length - 1]?.progs ?? 0) - (warm[0]?.progs ?? 0) },
   pixelRatio: { start: warm[0]?.pr, min: Math.min(...warm.map((s) => s.pr)), end: warm[warm.length - 1]?.pr },
+  renderScale: { start: warm[0]?.rs, min: Math.min(...warm.map((s) => s.rs)), end: warm[warm.length - 1]?.rs },
+  ctrlAvg: { start: warm[0]?.avg, end: warm[warm.length - 1]?.avg },
+  aoMode: warm[warm.length - 1]?.ao,
   heapMb: { start: warm[0]?.heap, max: Math.max(...warm.map((s) => s.heap)), end: warm[warm.length - 1]?.heap,
             gcDrop: Math.max(0, ...warm.map((s, n) => (n ? Math.max(0, warm[n - 1].heap - s.heap) : 0))) },
   drawCalls: { min: Math.min(...warm.map((s) => s.calls)), max: Math.max(...warm.map((s) => s.calls)) },
