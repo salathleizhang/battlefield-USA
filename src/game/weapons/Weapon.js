@@ -224,6 +224,8 @@ export class Weapon {
       (1 << 0) | (1 << 1) | (1 << 2), this.player.collider);
     if (worldHit?.data?.actor && worldHit.data.actor.team !== 0) {
       this.game.damageActor(worldHit.data.actor, this.def.meleeDamage, this.player, { weapon: 'bayonet' });
+      // At two metres the spray reaches the camera.
+      this.game.renderer?.splatter?.(0.55);
     } else if (worldHit) {
       this.game.effects.impact(worldHit.point, worldHit.normal, worldHit.data.surface || 'dirt');
     }

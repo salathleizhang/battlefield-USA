@@ -753,6 +753,12 @@ export class Player {
     // The post stack already knew how to bruise the screen (chromatic split,
     // vignette, desaturation); nothing fed it until now.
     this.game.renderer?.setDamage(clamp(amount / 90, 0.12, 0.45));
+    // Bullets, shrapnel and bayonets throw blood onto the glass; a long fall
+    // only speckles it. The amount is what the hit felt like, not the wound.
+    const splat = info.weapon === 'fall'
+      ? clamp(amount / 260, 0.08, 0.2)
+      : clamp(amount / 48, 0.24, 0.9);
+    this.game.renderer?.splatter?.(splat);
     this.game.hud?.damage(attacker, info, amount);
     if (this.health <= 0) this.die(attacker, info.weapon || 'rifle');
   }
