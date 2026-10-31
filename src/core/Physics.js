@@ -7,6 +7,7 @@ export const G = {
   BOT: 1 << 2,
   DEBRIS: 1 << 3,
   BULLET: 1 << 4,
+  VEHICLE: 1 << 5,
 };
 
 export const groups = (member, filter) => ((member & 0xffff) << 16) | (filter & 0xffff);
@@ -173,7 +174,7 @@ export class Physics {
     const collider = this.world.createCollider(
       R.ColliderDesc.capsule(halfHeight, radius)
         .setTranslation(0, footY, 0)
-        .setCollisionGroups(groups(G.PLAYER, G.WORLD | G.PLAYER | G.BOT)),
+        .setCollisionGroups(groups(G.PLAYER, G.WORLD | G.PLAYER | G.BOT | G.VEHICLE)),
     );
     const kcc = this.world.createCharacterController(0.02);
     kcc.setUp({ x: 0, y: 1, z: 0 });

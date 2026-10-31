@@ -134,7 +134,7 @@ export class Audio {
     // rode the explosion sub-bass: on a close blast it raised the 3–8 kHz share of
     // the output from 0.1% to 1.6% (audible crackle), and 200 m away it added
     // +2 dB, flattening the distance cues the mixer works to build. A soft clipper
-    // cannot pump: it is linear to −2 dBFS and only rounds the last 2 dB.
+    // cannot pump: it is linear to −1.9 dBFS and only rounds the last 1.5 dB.
     const clip = ctx.createWaveShaper();
     clip.curve = softClipCurve();
     clip.oversample = '4x';
@@ -557,6 +557,50 @@ export class Audio {
     sub.start(t); sub.stop(t + 1.0);
   }
 
+  /**
+   * Tank cannon: a hard muzzle crack, a low-frequency pressure body and a long
+   * tail on top of the recorded explosion, so a 75 mm round reads as a gun and
+   * not as a grenade.
+   */
+  cannon(dist = 0, pan = 0, caliber = 75) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    const weight = caliber >= 70 ? 1 : 0.72;
+    const out = this._out(dist * 0.5, pan, { reverb: 0.65 });
+    if (this.has('explosionCrunch')) {
+      this.play('explosionCrunch', {
+        dist: dist * 0.5, pan, volume: 0.72 * weight, reverb: 0.6, pitch: 1.4, pitchVar: 0.05,
+      });
+    }
+    const crack = this._srcNoise();
+    const hp = this.ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 900;
+    const cg = this._gain(0.0001);
+    crack.connect(hp); hp.connect(cg); cg.connect(out);
+    this._env(cg.gain, t, 0.001, 0.12, 0.5 * weight);
+    crack.start(t); crack.stop(t + 0.3);
+
+    const thump = this.ctx.createOscillator();
+    thump.type = 'sine';
+    thump.frequency.setValueAtTime(120, t);
+    thump.frequency.exponentialRampToValueAtTime(38, t + 0.42);
+    const tg = this._gain(0.0001);
+    thump.connect(tg); tg.connect(out);
+    this._env(tg.gain, t, 0.002, 0.55, 0.7 * weight);
+    thump.start(t); thump.stop(t + 0.8);
+
+    const tail = this._srcNoise();
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(1200, t);
+    lp.frequency.exponentialRampToValueAtTime(180, t + 1.2);
+    const tg2 = this._gain(0.0001);
+    tail.connect(lp); lp.connect(tg2); tg2.connect(out);
+    this._env(tg2.gain, t + 0.02, 0.03, 1.4, 0.2);
+    tail.start(t); tail.stop(t + 1.6);
+  }
+
   whiz(pan = 0) {
     if (!this.ready) return;
     if (this.has('bullet_whiz')) {
@@ -660,8 +704,9 @@ export class Audio {
 function rollout(dist) { return 1 / Math.pow(1 + dist / 30, 1.3); }
 
 /**
- * Output transfer curve: linear to about −2 dBFS, then a tanh knee that lands on
- * 0.98 rather than 1.0, leaving room for reconstruction overshoot at 4× oversampling.
+ * Output transfer curve: linear to 0.8 (−1.9 dBFS), then a tanh knee that matches
+ * the linear slope at the knee and settles at 0.945, leaving room for reconstruction
+ * overshoot at 4× oversampling. Inputs past full scale clamp to that ceiling.
  */
 function softClipCurve(points = 4096) {
   const knee = 0.8;
