@@ -178,7 +178,7 @@ export function buildWashington(L) {
     const gy = height(x, z);
     const s = 0.92 + L.rand() * 0.2;
     const tint = new THREE.Color().setRGB(0.9 + L.rand() * 0.16, 0.96 + L.rand() * 0.1, 0.84 + L.rand() * 0.12);
-    const hit = L.prop('treeSmall', x, z, L.rand() * Math.PI * 2, {
+    const hit = L.prop('treeUrban', x, z, L.rand() * Math.PI * 2, {
       base: gy, scale: s, solid: false, color: tint,
     });
     if (!hit) {
