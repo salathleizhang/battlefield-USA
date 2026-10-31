@@ -4,6 +4,10 @@ dist/
 .DS_Store
 *.log
 screenshots/
+shots/
+
+# scratch harness output
+.tmp-test/
 
 # local tooling environments
 .fontenv/
