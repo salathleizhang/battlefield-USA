@@ -271,11 +271,22 @@ export class Game {
 
   combatants() { return this.player ? [this.player, ...this.bots] : this.bots; }
 
+  /** Gunfire is loud: nearby enemies turn toward the shot even when they can't see it. */
+  alertBots(pos, radius = 70) {
+    for (const bot of this.bots) {
+      if (!bot.alive || bot.team === 0) continue;
+      if (bot.position.distanceTo(pos) > radius) continue;
+      bot.hear?.(this.player, pos);
+    }
+  }
+
   /* ------------------------------------------------------------- gunplay */
   spawnProjectile({ origin, dir, speed, damage, owner, team, kind, headshot = 2.2 }) {
     this.projectiles.push({
-      pos: origin.clone(), dir: dir.clone().normalize(), speed, damage,
-      owner, team, kind, headshot, life: 2.4, whizzed: false,
+      pos: origin.clone(),
+      vel: dir.clone().normalize().multiplyScalar(speed),
+      damage, owner, team, kind, headshot,
+      life: 2.4, whizzed: false, travelled: 0,
     });
     this.effects.tracer(origin, origin.clone().addScaledVector(dir, 16), team === 0 ? 0xffd28a : 0xffb070);
     if (Math.random() < 0.7) this.effects.casing(
@@ -288,38 +299,55 @@ export class Game {
     const mask = G.WORLD | G.PLAYER | G.BOT;
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i];
-      const step = p.speed * dt;
-      const hit = this.physics.raycast(p.pos, p.dir, step, mask, p.owner?.collider);
+      // Gravity acts on the bullet: drop grows with time of flight.
+      p.vel.y -= 9.81 * dt;
+      const stepVec = p.vel.clone().multiplyScalar(dt);
+      const stepLen = stepVec.length();
+      const dir = stepVec.divideScalar(Math.max(stepLen, 1e-6));
+      const from = p.pos.clone();
+      const hit = this.physics.raycast(p.pos, dir, stepLen, mask, p.owner?.collider);
       let dead = false;
       if (hit) {
         const actor = hit.data?.actor;
         if (actor && actor.alive && actor.team !== p.team) {
           const headY = actor.position.y + (actor.isPlayer ? actor.eyeHeight - 0.06 : 1.62);
           const head = hit.point.y > headY;
-          const falloff = hit.distance > 80 ? 0.78 : 1;
+          const dist = p.travelled + hit.distance;
+          // Damage falls off with range instead of a hard cliff at 80 m.
+          const falloff = dist <= 60 ? 1 : dist >= 220 ? 0.82 : 1 - 0.18 * ((dist - 60) / 160);
           this.damageActor(actor, p.damage * falloff * (head ? p.headshot : 1), p.owner, {
-            weapon: p.kind, headshot: head, point: hit.point,
+            weapon: p.kind, headshot: head, point: hit.point, distance: dist,
           });
-          this.effects.blood(hit.point, p.dir);
+          this.effects.blood(hit.point, dir);
+          this.audio.impact(head ? 'flesh_heavy' : 'flesh', 0, 0);
         } else if (actor) {
           // Friendly: bullet is absorbed.
           this.effects.impact(hit.point, hit.normal, 'flesh');
         } else {
           this.effects.impact(hit.point, hit.normal, hit.data?.surface || 'dirt');
         }
+        p.pos.copy(hit.point);
         dead = true;
       } else {
-        p.pos.addScaledVector(p.dir, step);
+        p.pos.addScaledVector(dir, stepLen);
+        p.travelled += stepLen;
         p.life -= dt;
         if (p.life <= 0) dead = true;
       }
-      // Near-miss whizz for enemy fire.
+      // Near-miss whizz for the local player (segment distance, so fast rounds still register).
       if (!p.whizzed && p.team === 1 && this.player?.alive) {
-        const eye = this.player.eye;
-        if (eye.distanceTo(p.pos) < 3.2) {
+        if (segmentPointDistance(from, p.pos, this.player.eye) < 3.2) {
           p.whizzed = true;
           this.audio.whiz(rand(-0.6, 0.6));
           this.player.addTrauma(0.12);
+        }
+      }
+      // ... and suppression for bots the round cracks past.
+      if (!p.suppressed && p.team !== 1) {
+        for (const bot of this.bots) {
+          if (!bot.alive || bot === p.owner || bot.team === p.team) continue;
+          const d = segmentPointDistance(from, p.pos, bot.eye);
+          if (d < 2.5) { p.suppressed = true; bot.onSuppressed?.(p.owner, 1 - d / 2.5); break; }
         }
       }
       if (dead) this.projectiles.splice(i, 1);
