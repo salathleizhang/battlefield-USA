@@ -170,14 +170,22 @@ export function buildWashington(L) {
   L.solidBox(wx, wy + 6.5, wz, 46, 13, 26, 0, { surface: 'concrete' });
   L.flagpole(wx, wz + 20, { base: wy, team: 1, height: 9 });
 
-  // Trees lining the Mall.
+  // Trees lining the Mall. The scanned broadleaf is instanced; rotation, scale and a
+  // slight sap tint break up the row, while only the trunk gets a collider.
   for (let i = 0; i < 16; i++) {
-    const x = (i % 2 ? 1 : -1) * (44 + Math.random() * 10);
-    const z = -110 + Math.floor(i / 2) * 32;
+    const x = (i % 2 ? 1 : -1) * (44 + L.rand() * 10);
+    const z = -110 + Math.floor(i / 2) * 32 + (L.rand() - 0.5) * 6;
     const gy = height(x, z);
-    L.batch.cylinder(0.5, 0.75, 7, 7, x, gy + 3.5, z, L.mats.get('palmTrunk'));
-    L.batch.sphere(4.6, x, gy + 8.5, z, L.mats.get('foliage'), 9);
-    L.physics.addStaticCylinder({ x, y: gy + 3.5, z }, 3.5, 0.7, { surface: 'wood' });
+    const s = 0.92 + L.rand() * 0.2;
+    const tint = new THREE.Color().setRGB(0.9 + L.rand() * 0.16, 0.96 + L.rand() * 0.1, 0.84 + L.rand() * 0.12);
+    const hit = L.prop('treeSmall', x, z, L.rand() * Math.PI * 2, {
+      base: gy, scale: s, solid: false, color: tint,
+    });
+    if (!hit) {
+      L.batch.cylinder(0.5, 0.75, 7, 7, x, gy + 3.5, z, L.mats.get('palmTrunk'));
+      L.batch.sphere(4.6, x, gy + 8.5, z, L.mats.get('foliage'), 9);
+    }
+    L.physics.addStaticCylinder({ x, y: gy + 2.4, z }, 2.4, 0.5 * s, { surface: 'wood' });
   }
 
   /* ------------------------------------------------------------- battlefield */
@@ -223,51 +231,55 @@ export function buildWashington(L) {
     { x: 200, z: 300, w: 60, h: 24, d: 50 },
   ]);
 
-  /* -------------------------------------- 检查站与街具（Military Pack） */
-  // 桥头 A：公路两侧的沙袋工事，中间留一个只能过人的缺口。
+  /* ----------------------------------- 桥头检查站与广场残骸（Military Pack） */
+  // 桥头：混凝土墩横在路上，只留一个被撞开的口子。
   for (const side of [-1, 1]) {
-    for (const dz of [0, 3.5, 7, 10.5]) L.prop('sandbagWall', side * 7.2, 112 + dz, Math.PI / 2);
-    L.prop('concreteBarrier', side * 4.2, 106, 0);
-    L.prop('concreteBarrierShort', side * 4.2, 100, 0);
-    L.prop('barbedWire', side * 11, 108, Math.PI / 2, { solid: false });
-    L.prop('guardTower', side * 20, 116, side > 0 ? Math.PI : 0);
+    L.scatter(['barrier_block_el1', 'barrier_block_el2', 'barrier_block_el3'], side * 4.6, 112, 3, 16, 5, { jitter: 0.9 });
+    L.wallRun('sandbags_1a', side * 8.4, 118, Math.PI / 2, 20, { gap: 0.38, step: 2.0 });
+    L.scatter(['sandbags_1b', 'sandbags_1c'], side * 8, 116, 6, 20, 8, { solid: false });
+    L.scatter(['barbed_wire1'], side * 10.5, 104, 3, 12, 3, { solid: false, jitter: 1.0 });
   }
-  L.prop('signPost', 4.5, 140, 0);
-  L.prop('signBoard', 4.5, 140.1, 0, { solid: false });
-  // 国家广场中段：一道带缺口的铁丝网，逼出绕行路线。
-  for (let x = -44; x <= 44; x += 6.5) {
-    if (Math.abs(x) < 12) continue;
-    L.prop('barbedWire', x, -30, Math.PI / 2, { solid: false });
+  L.scatter(['ammo1', 'weaponbox1', 'weaponbox2', 'barrel1', 'barrel2', 'can1'], -6, 122, 6, 6, 8, { jitter: 1.2 });
+  L.prop('warning_pole1', 3.6, 128, 0.1);
+  L.prop('shooting_target', -5, 126, 2.6);
+  // 国家广场：翻倒的长椅、路灯、流浪垃圾、被丢下的补给。
+  L.scatter(['bench1', 'chair1', 'table1', 'locker1'], 0, 40, 90, 120, 14, { jitter: 1.6, scaleJitter: 0.15 });
+  L.prop('trash_container1', 44, 22, 0.7);
+  L.prop('trash_container1', -44, -44, -0.6);
+  L.scatter(['lamp_mast', 'lamp1', 'powerpole_single'], 0, 30, 100, 130, 7, { jitter: 0.6 });
+  L.scatter(['garbage_styro1', 'garbage_styro2', 'garbage_cup', 'garbage_bottle1', 'garbage_metal1',
+    'garbage_wood1', 'garbage1a', 'garbage1b', 'debris_el1', 'debris_el2'],
+  0, 20, 110, 190, 70, { solid: false, jitter: 1.8, scaleJitter: 0.5 });
+  L.scatter(['stone1', 'stone2', 'stone3', 'stone_detail1', 'stone_detail2', 'debris_el3'],
+  0, 40, 100, 170, 30, { solid: false, scaleJitter: 0.6 });
+  // 被击毁在广场上的装甲车，侧翻在人行道上。
+  L.prop('m1114', -26, 16, 0.9);
+  L.prop('m923', 34, -34, -0.35);
+  L.scatter(['wheel_102', 'wheel_104'], 30, -30, 8, 8, 3, { solid: false });
+  // 带缺口的铁丝网横穿广场，逼出绕行路线。
+  for (let x = -46; x <= 46; x += 13) {
+    if (Math.abs(x) < 16) continue;
+    L.wallRun('barbed_wire1', x, -32 + (L.rand() - 0.5) * 6, Math.PI / 2 + (L.rand() - 0.5) * 0.5,
+      11, { step: 5, gap: 0.2, solid: false });
   }
-  // 广场两侧的街具和补给点。
+  // 林肯堂一侧的营地。
+  L.scatter(['tent1', 'cammo_tent1', 'cammo_tent3'], -34, 78, 22, 16, 3, { jitter: 1.2 });
+  L.scatter(['ammo1', 'weaponbox2', 'barrel1', 'barrel2', 'fuel_container1', 'pallet1'],
+    -30, 74, 12, 10, 9, { jitter: 1.2 });
+  L.scatter(['chair1', 'table1', 'locker1'], -30, 86, 10, 8, 5, { jitter: 1.4 });
+  L.prop('guard_tower1', -22, 74, 0.5);
+  L.prop('guard_tower1', 22, 74, -0.5);
+  // 国会山工事：沙袋弧线 + 隔离墩 + 弹药点。
   for (const side of [-1, 1]) {
-    for (const z of [70, 40, 10, -20]) L.prop('bench', side * 46, z, side > 0 ? -Math.PI / 2 : Math.PI / 2);
-    L.prop('lampMast', side * 58, 20, 0, { scale: 0.7 });
-    L.prop('dumpster', side * 52, -66, side > 0 ? 0.2 : -0.2);
+    L.wallRun('sandbags_2', side * 13, -148, Math.PI / 2, 22, { gap: 0.36, step: 3.1 });
+    L.wallRun('sandbags_1a', side * 20, -134, Math.PI / 2 + side * 0.5, 14, { gap: 0.4, step: 2.0 });
+    L.scatter(['sandbags_1b', 'sandbags_1c'], side * 15, -142, 8, 16, 8, { solid: false });
+    L.scatter(['barrier_block_el1', 'barrier_block_el3'], side * 6.5, -130, 4, 10, 4, { jitter: 1.0 });
+    L.scatter(['ammo1', 'weaponbox1', 'barrel2'], side * 10, -152, 6, 6, 5, { jitter: 1.2 });
+    L.scatter(['barbed_wire1'], side * 16, -120, 4, 14, 3, { solid: false, jitter: 1.0 });
   }
-  L.prop('table', 30, -96, 0.3);
-  L.prop('chair', 32.2, -94.6, 1.4);
-  L.prop('chair', 27.8, -94.6, -1.4);
-  L.prop('weaponChest', 34, -102, 0.9);
-  L.prop('ammoCrate', 26, -102, -0.4);
-  L.prop('drumTall', 24, -99, 0);
-  L.prop('drumSmall', 24.6, -101.2, 0);
-  L.prop('pallet', 30, -104, 0.5, { solid: false });
-  L.prop('tentLarge', -34, -112, 0.35);
-  L.prop('tentCamo', -46, -120, -0.5);
-  L.prop('locker', -28, -104, 0.2);
-  L.prop('target', 36, -88, Math.PI);
-  // 国会山一侧的工事。
-  for (const side of [-1, 1]) {
-    for (const dz of [-6, -2, 2, 6]) L.prop('sandbagLong', side * 12, -146 + dz, Math.PI / 2);
-    L.prop('concreteBarrier', side * 7, -132, 0);
-  }
-  // 池边的石块与碎砖。
-  for (const [x, z, s] of [[-20, 92, 1], [22, 88, 0.8], [-26, 8, 1.2], [28, -54, 0.9], [-16, -128, 1]]) {
-    L.prop(L.rand() > 0.5 ? 'rockMedium' : 'rockSmall', x, z, L.rand() * 6.28, { scale: s, solid: false });
-  }
-  L.prop('rubbleLarge', -30, -62, 0.4, { solid: false });
-  L.prop('rubbleSmall', 18, 72, 0.5, { solid: false });
+  L.prop('sandbags_box1', 0, -158, 0.2);
+  L.prop('shooting_target', 8, -140, 3.1);
 
   /* ---------------------------------------------------------------- gameplay */
   L.addCapturePoint({ id: 'A', name: '波托马克桥头', x: 0, z: 134, radius: 16, owner: -1, base: height(0, 134), height: 7 });

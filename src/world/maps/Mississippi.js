@@ -175,46 +175,53 @@ export function buildMississippi(L) {
     L.batch.cylinder(3 + Math.random() * 3, 4.5 + Math.random() * 3, 0.2, 12, x, height(x, z) + 0.1, z, L.mats.get('ground'), { uv: 0.5 });
   }
 
-  /* ---------------------------------------- 堤坝工事与滩头营地（Military Pack） */
-  // 北岸堤顶战壕线：沙袋墙对着河面，铁丝网压在水线一侧。
-  for (const [x, z] of [[-44, -80], [-30, -82], [-16, -84], [-2, -85], [12, -84], [26, -82], [40, -80]]) {
-    L.prop('sandbagWall', x, z, 0);
+  /* -------------------------------------- 堤坝工事与滩头营地（Military Pack） */
+  // 北岸堤顶：断续沙袋线，缺口处散着塌下来的包。
+  L.wallRun('sandbags_1a', -4, -82, 0, 96, { gap: 0.36, step: 2.0 });
+  L.wallRun('sandbags_2', 46, -78, 0.25, 30, { gap: 0.3, step: 3.1 });
+  L.wallRun('sandbags_3', -62, -86, -0.3, 26, { gap: 0.34, step: 2.4 });
+  L.scatter(['sandbags_1b', 'sandbags_1c'], 0, -84, 130, 10, 26, { solid: false, jitter: 1.4 });
+  // 水线一带的铁丝网，层层叠叠。
+  for (let i = 0; i < 4; i++) {
+    L.wallRun('barbed_wire1', -70 + i * 46, -62 - L.rand() * 10, (L.rand() - 0.5) * 0.5,
+      38, { step: 5.4, gap: 0.2, solid: false, jitter: 0.4 });
   }
-  for (const z of [-64, -70]) {
-    for (let x = -60; x <= 60; x += 12) L.prop('barbedWire', x, z, 0, { solid: false });
+  L.prop('sandbags_box1', 22, -74, 0.3);
+  L.prop('sandbags_box2', -34, -80, -0.2);
+  L.prop('guard_tower1', 34, -98, 0.4);
+  L.prop('guard_tower1', -52, -96, -0.4);
+  L.prop('shooting_target', 52, -70, 2.8);
+  L.prop('shooting_target', 56, -76, 3.0);
+  // 南岸出发营地：帐篷、补给、车辆，全挤在桥头。
+  L.scatter(['tent1', 'cammo_tent1', 'cammo_tent2', 'cammo_tent3'], -44, 108, 34, 26, 6, { jitter: 1.4 });
+  L.prop('tent1_interior', -24, 126, 0.4);
+  for (const [cx, cz] of [[30, 106], [-6, 118], [16, 94]]) {
+    L.scatter(['ammo1', 'weaponbox1', 'weaponbox1b', 'weaponbox2', 'weaponbox3'], cx, cz, 9, 8, 9, { jitter: 1.2 });
+    L.scatter(['barrel1', 'barrel2', 'can1'], cx, cz, 9, 9, 5, { jitter: 1.2 });
+    L.prop('palette1', cx + 1.8, cz + 1.4, L.rand() * 3);
+    L.prop('planks1', cx - 2.0, cz - 1.8, L.rand() * 3);
   }
-  // B 点棉花田堤坝的加固阵地。
-  L.prop('sandbagCorner', 38, -74, 0);
-  L.prop('sandbagPit', 54, -84, Math.PI);
-  L.prop('guardTower', 30, -96, 0.4);
-  // 南岸出发营地：帐篷、补给、灯柱。
-  L.prop('tentLarge', -46, 118, 0.2);
-  L.prop('tentLarge', -46, 92, -0.2);
-  L.prop('tentCamo', -60, 106, 0.6);
-  L.prop('fuelTank', -32, 124, 0, { scale: 0.7 });
-  L.prop('weaponBox', 30, 108, 0.3);
-  L.prop('weaponChest', 33, 112, -0.6);
-  L.prop('ammoCrate', 26, 112, 0.8);
-  L.prop('pallet', 34, 106, 0.2, { solid: false });
-  L.prop('drumTall', 8, 116, 0);
-  L.prop('drumSmall', 6.6, 118, 0);
-  L.prop('drumSmall', 9.4, 118.4, 0);
-  L.prop('cableSpool', -18, 122, 0.5);
-  L.prop('lampMast', 0, 88, 0);
-  L.prop('locker', -6, 110, 0.1);
-  L.prop('table', 14, 120, 0);
-  L.prop('chair', 16.2, 121.4, 1.2);
-  // 桥头两侧的路障。
+  L.prop('m923', -20, 100, 0.9);
+  L.prop('m1114', 38, 92, -0.5);
+  L.scatter(['wheel_101', 'wheel_103'], -14, 96, 10, 10, 3, { solid: false });
+  // 营区生活杂物与垃圾。
+  L.scatter(['chair1', 'table1', 'bench1', 'locker1', 'toilet1'], -10, 112, 26, 20, 10, { jitter: 1.4 });
+  L.prop('trash_container1', -34, 100, 0.8);
+  L.prop('fuel_container1', -28, 128, -0.5, { scale: 0.9 });
+  L.scatter(['garbage_styro1', 'garbage_cup', 'garbage_bottle1', 'garbage_metal1', 'garbage_wood1',
+    'garbage_wood2', 'debris_el1', 'debris_el2', 'styrofoam'],
+  0, 104, 120, 60, 66, { solid: false, jitter: 1.8, scaleJitter: 0.5 });
+  L.scatter(['stone1', 'stone2', 'stone3', 'stone_detail1', 'stone_detail2'], 0, 60, 140, 90, 26, { solid: false, scaleJitter: 0.6 });
+  // 桥头路障与灯柱。
   for (const side of [-1, 1]) {
-    L.prop('concreteBarrier', side * 7.5, 86, 0);
-    L.prop('sandbagLong', side * 9, 80, Math.PI / 2);
+    L.scatter(['barrier_block_el1', 'barrier_block_el3'], side * 6.5, 86, 4, 10, 4, { jitter: 1.0 });
+    L.wallRun('sandbags_1a', side * 10, 80, Math.PI / 2, 16, { gap: 0.35, step: 2.0 });
+    L.scatter(['barbed_wire1'], side * 8, 74, 4, 8, 2, { solid: false });
   }
-  L.prop('target', 24, 96, Math.PI);
-  L.prop('signPost', -10, 84, 0);
-  // 河滩石块。
-  for (const [x, z, s] of [[-70, 60, 1], [70, -58, 0.9], [40, 68, 0.7], [-24, -64, 1.1]]) {
-    L.prop(L.rand() > 0.5 ? 'rockMedium' : 'rockSmall', x, z, L.rand() * 6.28, { scale: s, solid: false });
-  }
+  L.prop('lamp_mast', 3, 88, 0.1);
+  L.prop('powerpole_single', -40, 92, 0.2);
+  L.prop('warning_pole1', -8, 84, 0);
+  L.prop('platform1', 44, 116, 0.6);
 
   /* ------------------------------------------------------------- gameplay */
   L.addCapturePoint({ id: 'A', name: '浮桥', x: 0, z: 0, radius: 14, owner: -1, base: bridgeY + 0.2, height: 7 });

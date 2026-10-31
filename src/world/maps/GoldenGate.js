@@ -171,51 +171,58 @@ export function buildGoldenGate(L) {
   }
 
   /* ------------------------------------------------------------- fog banks */
-  // Soft, camera-facing puffs drifting through the span. The hard-edged planes
-  // of the old build read as floating glass, so these use a radial alpha ramp.
-  const fogTex = softFogTexture();
-  for (let i = 0; i < 16; i++) {
-    const mat = new THREE.SpriteMaterial({
-      map: fogTex, color: 0xd7dcd9, transparent: true,
-      opacity: 0.12 + Math.random() * 0.08, depthWrite: false, fog: true,
-    });
-    const sp = new THREE.Sprite(mat);
-    const z = -520 + i * 68;
-    const x = (Math.random() - 0.5) * 90;
-    const y = P.deckY + 2 + Math.random() * 26;
-    sp.position.set(x, y, z);
-    sp.scale.set(110 + Math.random() * 70, 34 + Math.random() * 18, 1);
-    L.scene.add(sp);
-    L.animated.push({
-      type: 'fog', mesh: sp, baseX: x, baseZ: z, baseY: y,
-      phase: Math.random() * 6.28, opacity: mat.opacity,
-    });
-  }
+  // Fog banks and the sea layer live in Weather: they need per-frame drift and
+  // a breathing density, and the map build only runs once.
 
-  /* ------------------------------------------ 桥面工事（Military Pack） */
-  // 两座塔与中跨各摆一道沙袋胸墙，中间留出车道。
-  for (const z of [-P.towerZ - 12, -P.towerZ + 12, -12, 12, P.towerZ - 12, P.towerZ + 12]) {
-    for (const side of [-1, 1]) L.prop('sandbagWall', side * 4.4, z, Math.PI / 2, { base: DECK });
-  }
-  // 桥面边缘的混凝土墩，兼作掩体；放在车道外侧，不挡路。
-  for (const z of [-430, -380, -250, -180, 180, 250, 380, 430]) {
-    for (const side of [-1, 1]) L.prop('concreteBarrierShort', side * 5.6, z, Math.PI / 2, { base: DECK });
-  }
-  // 北端出发阵地：弹药箱、油桶、栈板。
-  L.prop('ammoCrate', 5.2, -470, 0.3, { base: DECK });
-  L.prop('weaponCrate', 5.4, -476, -0.5, { base: DECK });
-  L.prop('drumSmall', -5.2, -468, 0, { base: DECK });
-  L.prop('drumSmall', -5.6, -471, 0, { base: DECK });
-  L.prop('pallet', 5.75, -464, 0.2, { base: DECK, solid: false, scale: 0.7 });
-  // 南塔一侧的美军补给。
-  L.prop('ammoCrate', -5.2, 466, 0.3, { base: DECK });
-  L.prop('fuelTank', 5.4, 452, 0, { base: DECK, scale: 0.4 });
-  L.prop('plankPile', -5.2, 480, 0.4, { base: DECK, scale: 0.5 });
-  // 北引桥的铁丝网：只压在两侧路肩，中间车道留给人冲。
-  for (const side of [-1, 1]) {
-    for (let dz = 0; dz <= 8; dz += 2.6) {
-      L.prop('barbedWire', side * 5.1, -462 + dz, Math.PI / 2, { base: DECK, solid: false });
+  /* ---------------------------------------- 桥面工事与残骸（Military Pack） */
+  // 三处据点各堆一圈断续沙袋，中间靠隔离墩和废车补位。
+  for (const zc of [-P.towerZ, 0, P.towerZ]) {
+    for (const side of [-1, 1]) {
+      L.wallRun('sandbags_1a', side * 4.6, zc, Math.PI / 2, 26, { base: DECK, gap: 0.4, step: 2.0 });
+      L.scatter(['sandbags_1b', 'sandbags_1c'], side * 4.4, zc, 4, 20, 7, { base: DECK, solid: false });
+      L.scatter(['barrier_block_el1', 'barrier_block_el3'], side * 5.2, zc + 14 * side, 2, 10, 4, { base: DECK, jitter: 1.0 });
     }
+    L.scatter(['ammo1', 'weaponbox1', 'weaponbox2', 'barrel1', 'barrel2', 'can1'],
+      (zc === 0 ? 3.2 : -3.2), zc + 16, 5, 6, 7, { base: DECK, jitter: 1.2 });
+    L.scatter(['palette1', 'planks2', 'spool1'], -3, zc - 18, 6, 6, 3, { base: DECK, jitter: 1.4 });
+    L.scatter(['barbed_wire1'], 0, zc, 8, 4, 3, { base: DECK, solid: false, jitter: 1.2 });
+  }
+  // 桥面残骸：一辆坦克横在中跨附近，只留一条侧道。
+  L.prop('m1a2', 3.1, -150, 0.06, { base: DECK });
+  L.prop('m923', -3.4, 186, 3.2, { base: DECK });
+  L.prop('m1114', 4.2, -404, 0.4, { base: DECK });
+  L.scatter(['wheel_101', 'wheel_103'], 4.6, -158, 3, 8, 3, { base: DECK, solid: false });
+  // 一路上的碎片：桥面被炸过很多轮，从头到尾没有干净路段。
+  L.scatter(['stone_detail1', 'stone_detail2', 'stone_detail3', 'debris_el1', 'debris_el2', 'debris_el3', 'debris_el4'],
+    0, 0, 11, 980, 230, { base: DECK, solid: false, scaleJitter: 0.6 });
+  L.scatter(['garbage_styro1', 'garbage_styro2', 'garbage_styro5', 'garbage_cup', 'garbage_bottle1',
+    'garbage_bottle2', 'garbage_metal1', 'garbage_metal2', 'garbage_wood1', 'garbage_wood2', 'planks2', 'styrofoam'],
+    0, 0, 10, 960, 180, { base: DECK, solid: false, jitter: 1.6, scaleJitter: 0.5 });
+  // 沿桥的路肩隔离墩：每隔一段扔一个，歪着的、缺角的都有。
+  for (let z = -470; z <= 470; z += 26) {
+    for (const side of [-1, 1]) {
+      if (L.rand() < 0.32) continue;
+      L.prop('barrier_block_el3', side * (5.1 + L.rand() * 0.6), z + (L.rand() - 0.5) * 6,
+        (L.rand() - 0.5) * 1.2, { base: DECK });
+    }
+  }
+  // 桥面上的小掩体，每隔一段一组，攻防都要停下来打。
+  for (let i = 0; i < 7; i++) {
+    const z = -440 + i * 125 + L.rand() * 40;
+    const side = i % 2 ? 1 : -1;
+    L.wallRun('sandbags_1a', side * 4.3, z, Math.PI / 2, 9, { base: DECK, gap: 0.3, step: 2.0 });
+    L.scatter(['sandbags_1b', 'sandbags_1c'], side * 4.2, z, 4, 10, 4, { base: DECK, solid: false });
+    L.prop('barbed_wire1', side * 4.6, z + 6, Math.PI / 2, { base: DECK, solid: false });
+  }
+  // 两端的出发阵地。
+  for (const endZ of [-500, 500]) {
+    const dir = endZ < 0 ? 1 : -1;
+    L.scatter(['ammo1', 'weaponbox1', 'weaponbox2', 'weaponbox3', 'barrel1', 'barrel2', 'can1'],
+      0, endZ + dir * 14, 8, 14, 9, { base: DECK, jitter: 1.2 });
+    L.scatter(['sandbags_1b', 'sandbags_1c', 'pallet1'], 0, endZ + dir * 10, 9, 12, 6, { base: DECK, solid: false });
+    L.prop('fuel_container1', -5.3, endZ + dir * 26, 0, { base: DECK, scale: 0.75 });
+    L.prop('planks1', 5.2, endZ + dir * 30, 0, { base: DECK, scale: 0.6 });
+    L.prop('warning_pole1', 4.8, endZ + dir * 24, 0, { base: DECK });
   }
 
   /* ------------------------------------------------------------- gameplay */
@@ -291,20 +298,4 @@ export function buildGoldenGate(L) {
     new THREE.Vector3(0, DECK, 320), new THREE.Vector3(0, DECK, 440),
     new THREE.Vector3(0, DECK, 512),
   ]);
-}
-
-/* A soft radial blob used for the drifting fog banks. */
-function softFogTexture() {
-  const c = document.createElement('canvas');
-  c.width = c.height = 128;
-  const ctx = c.getContext('2d');
-  const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 64);
-  g.addColorStop(0, 'rgba(255,255,255,0.9)');
-  g.addColorStop(0.45, 'rgba(255,255,255,0.45)');
-  g.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 128, 128);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
 }

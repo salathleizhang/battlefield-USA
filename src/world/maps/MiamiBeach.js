@@ -650,57 +650,72 @@ export function buildMiamiBeach(L) {
   L.warship(820, 120, -0.08, 0.7);
   L.warship(700, 250, 0.3, 0.5);
 
-  /* ------------------------------------------- 美军海滩防御工事（Military Pack） */
-  // 沙袋弧线正面朝海，中央留口子方便进攻方突入。
-  for (let z = -16.4; z <= 16.4; z += 2.05) {
-    L.prop('sandbagWall', 46, z, Math.PI / 2);
+  /* -------------------------------------- 滩头工事与战场残留（Military Pack） */
+  // 三道断续的沙袋防线：正面已经被炮火犁过，塌口比完整段还多。
+  L.wallRun('sandbags_1a', 47, -4, Math.PI / 2, 58, { gap: 0.34, step: 2.0 });
+  L.wallRun('sandbags_2', 42.5, 24, Math.PI / 2 + 0.22, 26, { gap: 0.3, step: 3.1 });
+  L.wallRun('sandbags_2', 41, -32, Math.PI / 2 - 0.18, 24, { gap: 0.32, step: 3.1 });
+  L.wallRun('sandbags_3', 52, 0, Math.PI / 2 + 0.5, 12, { gap: 0.25, step: 2.4 });
+  // 塌下来的散袋、被踢翻的单包，一直铺到水线。
+  L.scatter(['sandbags_1b', 'sandbags_1c'], 46, 0, 18, 70, 38, { solid: false, jitter: 1.2 });
+  // 沙袋掩体、观察位、爬上去的梯子。
+  L.prop('sandbags_box1', 52, -23, 0.4);
+  L.prop('sandbags_box1', 53, 25, -0.32);
+  L.prop('sandbags_box2', 48, 35, 0.15);
+  L.prop('ladder1', 50.7, 34.6, -0.2);
+  L.prop('ladder1', 49.4, -23.8, 1.3);
+  // 铁丝网：五条互不平行、彼此压住的卷网，中间留出被炸开的豁口。
+  for (let i = 0; i < 5; i++) {
+    L.wallRun('barbed_wire1', 33 + L.rand() * 5, -44 + i * 22 + L.rand() * 7,
+      Math.PI / 2 + (L.rand() - 0.5) * 0.8, 15, { step: 5.2, gap: 0.18, solid: false, jitter: 0.5 });
   }
-  // 两翼加厚，形成侧射阵地。
-  for (const side of [-1, 1]) {
-    for (let z = 20; z <= 30; z += 3.2) L.prop('sandbagLong', 47, side * z, Math.PI / 2);
-    L.prop('sandbagPit', 52, side * 22, 0);
-    L.prop('sandbagTower', 52, side * 30, 0);
+  // 街区入口的混凝土墩：横七竖八，不是一条线。
+  L.scatter(['barrier_block_el1', 'barrier_block_el2', 'barrier_block_el3'], 20, 0, 7, 58, 13, { jitter: 1.1 });
+  // 滩头补给堆三处，箱子和油桶倒了一地。
+  for (const [cx, cz] of [[61, -19], [57, 41], [-15, -45]]) {
+    L.scatter(['ammo1', 'weaponbox1', 'weaponbox1b', 'weaponbox2', 'weaponbox3'], cx, cz, 8, 8, 11, { jitter: 1.1 });
+    L.scatter(['barrel1', 'barrel2', 'can1'], cx, cz, 9, 9, 6, { jitter: 1.2 });
+    L.prop('palette1', cx + 1.6, cz + 1.3, L.rand() * 3);
+    L.prop('planks1', cx - 2.2, cz - 1.6, L.rand() * 3);
+    L.prop('planks2', cx + 2.4, cz - 2.0, L.rand() * 3);
   }
-  L.prop('sandbagCorner', 46, -18, 0);
-  L.prop('sandbagCorner', 46, 18, Math.PI);
-  // 铁丝网带：只封两翼，不挡住抢滩主线。
-  for (const side of [-1, 1]) {
-    for (let z = 34; z <= 62; z += 6) {
-      L.prop('barbedWire', 36, side * z, Math.PI / 2 + (L.rand() - 0.5) * 0.6, { solid: false });
-    }
-    for (let z = 44; z <= 58; z += 5) L.prop('barbedWire', 30, side * z, Math.PI / 2, { solid: false });
-    L.prop('guardTower', 30, side * 66, side > 0 ? Math.PI : 0);
-  }
-  // 街区入口的混凝土隔离墩。
-  for (const z of [-12, -6, 6, 12]) L.prop('concreteBarrier', 19, z, Math.PI / 2);
-  L.prop('concreteBarrierShort', 19, -18, Math.PI / 2);
-  L.prop('concreteBarrierShort', 19, 18, Math.PI / 2);
-  // 滩头补给堆。
-  L.prop('ammoCrate', 62, -18, 0.4);
-  L.prop('weaponBox', 64, -21, 1.1);
-  L.prop('drumSmall', 60, -22, 0);
-  L.prop('drumSmall', 60.8, -23.4, 0);
-  L.prop('pallet', 65, -16, 0.2, { solid: false });
-  L.prop('plankPile', 66, 26, -0.5);
-  L.prop('drumTall', 58, 30, 0);
-  L.prop('cableSpool', 62, 34, 0.8);
-  // 内陆营地。
-  L.prop('tentLarge', -18, -46, Math.PI / 2);
-  L.prop('tentLarge', -18, 46, -Math.PI / 2);
-  L.prop('tentCamo', -32, -54, 0.3);
-  L.prop('tentCamo', -32, 54, -0.3);
-  L.prop('locker', -8, -38, 0.2);
-  L.prop('table', -12, -34, 0);
-  L.prop('chair', -14.4, -33.2, 0.9);
-  L.prop('lampMast', -6, -52, 0);
-  // 零散石头与碎块，压住沙滩和草地的过渡。
-  for (const [x, z, s] of [[64, 44, 1], [67, -46, 0.8], [40, 70, 1.2], [24, -70, 0.9], [66, 12, 0.7]]) {
-    L.prop(L.rand() > 0.5 ? 'rockMedium' : 'rockSmall', x, z, L.rand() * 6.28, { scale: s, solid: false });
-  }
-  L.prop('rockBoulder', 20, 62, 1.2, { solid: false });
-  L.prop('rubbleLarge', 42, -44, 0.7, { solid: false });
-  L.prop('signPost', 40, 34, 0);
-  L.prop('signBoard', 40, 34.1, 0, { solid: false });
+  // 营地：帐篷乱挤在一起，朝向各不相同。
+  L.scatter(['tent1', 'cammo_tent1', 'cammo_tent2'], -24, -52, 30, 18, 4, { jitter: 1.4 });
+  L.scatter(['tent1', 'cammo_tent2', 'cammo_tent3'], -26, 54, 30, 18, 4, { jitter: 1.4 });
+  L.prop('tent1_interior', -12, -58, 0.7);
+  L.prop('tent1_interior', -40, 60, -2.3);
+  // 营地里的生活杂物，没人收。
+  L.scatter(['chair1', 'table1', 'bench1', 'locker1', 'toilet1'], -16, -40, 20, 16, 9, { jitter: 1.2 });
+  L.prop('trash_container1', -30, -36, 0.6);
+  L.prop('trash_container1', -8, 44, -0.4);
+  L.prop('fuel_container1', 58, -8, 1.2, { scale: 0.85 });
+  L.scatter(['chair1', 'table1', 'bench1', 'locker1'], -18, 42, 18, 14, 7, { jitter: 1.2 });
+  // 车辆残骸：一辆卡车斜插在沙里，一辆悍马翻在街边。
+  L.prop('m923', 55, -36, 2.35);
+  L.prop('m1114', 63, 47, -1.15);
+  L.scatter(['wheel_101', 'wheel_102', 'wheel_103', 'wheel_104'], 50, 8, 34, 54, 7, { solid: false, jitter: 1.5 });
+  // 石与碎块：压住沙滩和草地的过渡带。
+  L.scatter(['stone1', 'stone2', 'stone3', 'stone4'], 44, 0, 44, 96, 22, { solid: false, scaleJitter: 0.6 });
+  L.scatter(['stone_detail1', 'stone_detail2', 'stone_detail3', 'debris_el1', 'debris_el2'],
+    46, 0, 40, 90, 40, { solid: false, scaleJitter: 0.6 });
+  // 一地垃圾：纸杯、瓶子、泡沫、破木头。
+  L.scatter(['garbage_styro1', 'garbage_styro2', 'garbage_styro5', 'garbage_cup', 'garbage_bottle1',
+    'garbage_bottle2', 'garbage_oil1', 'garbage_wood1', 'garbage_metal1', 'styrofoam'],
+  44, 0, 46, 96, 58, { solid: false, jitter: 1.6, scaleJitter: 0.5 });
+  // 弹坑边的碎木、砖头。
+  L.scatter(['garbage_wood2', 'garbage_wood3', 'garbage_wood4', 'planks2'], 30, -46, 22, 26, 12, { solid: false });
+  // 靶子、警告牌、散落的靴子和铁锹。
+  L.scatter(['shooting_target'], 41, -18, 9, 12, 3);
+  L.prop('warning_pole1', 38, 29, 0.2);
+  L.prop('warning_pole2', 24, -14, -0.4);
+  L.scatter(['warning1', 'warning2', 'warning3', 'warning5', 'warning7'], 39, 28, 6, 8, 5, { solid: false });
+  L.scatter(['boots1', 'shovel'], 44, 4, 22, 40, 7, { solid: false, jitter: 1.4 });
+  // 电线杆和灯柱，东倒西歪。
+  L.prop('lamp_mast', 26, -20, 0.14);
+  L.prop('powerpole_single', 32, 56, -0.3);
+  L.prop('powerpole_cable_30m', 32, 20, Math.PI / 2);
+  L.prop('pole1', 28, -62, 0.2);
+  L.prop('platform1', 24, 72, 0.5);
 
   /* ------------------------------------------------------------------ combat */
   const cpA = L.addCapturePoint({ id: 'A', name: '血色沙滩', x: 50, z: 0, radius: 18, owner: -1 });
