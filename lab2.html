@@ -1,0 +1,53 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>retarget lab</title>
+<style>html,body{margin:0;height:100%;background:#1d2126;overflow:hidden}canvas{display:block}
+.hud{position:fixed;left:16px;bottom:14px;font:12px/1.6 ui-monospace,Menlo,monospace;color:#8b97a5}</style>
+</head><body>
+<div class="hud">rifleman_v00 + Ironline 50 clips (retargeted) · ?v=side|three · ?clip=idle|walk|run</div>
+<script type="module">
+import * as THREE from 'three';
+import { CharacterLibrary } from '/src/game/bots/CharacterLibrary.js';
+
+const q = new URLSearchParams(location.search);
+const view = q.get('v') || 'three';
+const r = new THREE.WebGLRenderer({ antialias: true });
+r.setPixelRatio(1); r.setSize(innerWidth, innerHeight);
+r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.15;
+r.shadowMap.enabled = true;
+document.body.appendChild(r.domElement);
+
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0x1d2126);
+sc.add(new THREE.HemisphereLight(0xc3d6ee, 0x3a3630, 1.05));
+const key = new THREE.DirectionalLight(0xfff2df, 2.7); key.position.set(-3, 5, 4); key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024);
+key.shadow.camera.left = -9; key.shadow.camera.right = 9; key.shadow.camera.top = 4; key.shadow.camera.bottom = -1;
+sc.add(key);
+const rim = new THREE.DirectionalLight(0xa9c8ff, 1.6); rim.position.set(5, 3, -5); sc.add(rim);
+const g = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: 0x3b4046, roughness: 0.95 }));
+g.rotation.x = -Math.PI / 2; g.receiveShadow = true; sc.add(g);
+
+const cam = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.1, 100);
+if (view === 'side') { cam.position.set(10.5, 1.9, 0); cam.lookAt(0, 1.05, 0); }
+else { cam.position.set(4.6, 2.0, 7.2); cam.lookAt(0, 1.1, 0); }
+
+const lib = new CharacterLibrary({ renderer: { camera: cam } });
+await lib.load();
+console.log('CLIPS', lib.clips.map(c => c.name).join(','));
+
+const poses = [
+  { team: 0, x: -2.7, name: 'idle', t: 0.9 },
+  { team: 0, x: -0.9, name: 'aim', t: 0.5 },
+  { team: 1, x: 0.9, name: 'run', t: 0.35 },
+  { team: 1, x: 2.7, name: 'rifle_shoot', t: 0.18 },
+];
+for (const p of poses) {
+  const s = lib.create(p.team, 0);
+  s.setPosition(p.x, 0, -0.6, Math.PI * 0.78);
+  sc.add(s.group);
+  s.play(p.name, 0);
+  s.mixer.update(p.t);
+  s._orientWeapon?.();
+  s.aimAction?.setEffectiveWeight(p.name === 'aim' ? 0 : 0);
+}
+r.setAnimationLoop(() => r.render(sc, cam));
+</script></body></html>
