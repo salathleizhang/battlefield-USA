@@ -28,7 +28,6 @@ const POCKET_Y = 0.10;
 const CARRY_SPEED = 4.2;
 
 const UP = new THREE.Vector3(0, 1, 0);
-const DOWN = new THREE.Vector3(0, -1, 0);
 
 /** Build one normalised gun template: grip at the origin, bore -Z, stock +Z. */
 async function buildTemplate(id) {
@@ -51,7 +50,7 @@ async function buildTemplate(id) {
   const bore = muzzleP.clone().sub(gripP).normalize();
   const zAxis = bore.clone().negate();
   const yAxis = UP.clone().addScaledVector(zAxis, -UP.dot(zAxis));
-  if (yAxis.lengthSq() < 1e-5) yAxis.set(0, 0, 1).addScaledVector(zAxis, -zAxis.z * 0);
+  if (yAxis.lengthSq() < 1e-5) yAxis.set(0, 0, 1); // vertical bore: any perpendicular will do
   yAxis.normalize();
   const xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis).normalize();
   const basis = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis); // gun-local -> root
@@ -126,7 +125,9 @@ function bonesOf(model) {
   const r = model.root;
   const find = (n) => r.getObjectByName(n);
   return {
+    pelvis: find('pelvis'),
     spine1: find('spine_01'),
+    spine2: find('spine_02'),
     spine3: find('spine_03'),
     clavR: find('clavicle_r'),
     clavL: find('clavicle_l'),
@@ -136,8 +137,9 @@ function bonesOf(model) {
     upperL: find('upperarm_l'),
     lowerL: find('lowerarm_l'),
     handL: find('hand_l'),
-    reachR: 0,
     reachL: 0,
+    // Bones whose world matrices the rig reads, in hierarchy order (see updateBotGun).
+    chain: null,
   };
 }
 
@@ -161,6 +163,8 @@ export async function equipBotGun(model, id) {
   model._botGun = gun;
   model.muzzle = gun.getObjectByName('muzzle') || model.muzzle;
   const b = bonesOf(model);
+  b.chain = [b.pelvis, b.spine1, b.spine2, b.spine3, b.clavR, b.upperR, b.lowerR, b.handR,
+    b.clavL, b.upperL, b.lowerL, b.handL];
   model._gunBones = b;
   model._gunState = {
     readyW: 1, // bots spawn in low ready
@@ -198,6 +202,12 @@ const _v6 = new THREE.Vector3();
 const _wv = new THREE.Vector3();
 const _ws = new THREE.Vector3();
 const wpos = (o, out) => out.setFromMatrixPosition(o.matrixWorld);
+/** Recompose just this object's world matrix (its parent is already current). */
+function refreshWorld(o) {
+  o.updateMatrix();
+  o.matrixWorld.multiplyMatrices(o.parent.matrixWorld, o.matrix);
+  return o;
+}
 const wquat = (o, out) => { o.matrixWorld.decompose(_wv, out, _ws); return out; };
 
 /** Critically damped spring, exact integration (reference `springDamperExact`). */
@@ -280,7 +290,7 @@ function lockHand(hand, off, gunQ) {
 
 /**
  * Recoil impulse, called the frame a bot fires (reference `onFire`): the whole rifle drives back into
- * the shoulder and pitches up; the spring halves the error in ~55 ms, so it is home in ~0.15 s. The
+ * the shoulder and pitches up, and a 32 ms half-life spring brings 95 % of it home in ~0.15 s. The
  * IK'd arms ride along because they re-solve after the gun is placed.
  */
 export function botGunFire(bot) {
@@ -305,7 +315,13 @@ export function updateBotGun(bot, dt = 1 / 60) {
   if (!b?.upperR || !b?.handR || !b?.spine3) return;
 
   dt = Math.min(0.1, Math.max(1e-3, dt));
-  model.group.updateMatrixWorld(true);
+  // model.update() refreshed the bones' local matrices, not their world matrices. Refresh only the
+  // chains this rig reads: a full group.updateMatrixWorld(true) also walks the three LOD meshes and
+  // costs about half the budget for 26 bots.
+  model.group.updateWorldMatrix(true, false);
+  model.root.updateWorldMatrix(false, false);
+  // Depth-first so each bone sees a current parent (three has no dirty flag to skip fresh nodes).
+  for (const bone of b.chain) bone?.updateWorldMatrix(false, false);
 
   // Reach only depends on bone lengths; measure it once per soldier.
   if (!b.reachL) {
@@ -314,7 +330,8 @@ export function updateBotGun(bot, dt = 1 / 60) {
       : 0;
   }
   // A corpse's rifle rides the firing hand (Bot.die re-parents it); respawning puts it back here.
-  if (gun.parent !== model.group) model.group.attach(gun);
+  // attach() compensates for the hand's inherited scale, so restore the unit scale on the way back.
+  if (gun.parent !== model.group) { model.group.attach(gun); gun.scale.set(1, 1, 1); }
 
   // --- alert / low-ready / sprint-carry / reload blends (reference `_placeWeapon`) ---
   const target = bot.target;
@@ -388,7 +405,7 @@ export function updateBotGun(bot, dt = 1 / 60) {
   gun.quaternion.copy(invParentQ).multiply(_q3);
   _v6.copy(_v2).applyMatrix4(_m1);
   gun.position.copy(_v6);
-  gun.updateMatrixWorld(true);
+  refreshWorld(gun);
 
   // --- reach guard: slide the whole rifle inboard if the support grip is beyond the left arm ---
   // (reference does the same, otherwise a long gun on a short rig leaves the hand floating).
@@ -402,20 +419,19 @@ export function updateBotGun(bot, dt = 1 / 60) {
       _v6.sub(_v5).multiplyScalar(-(dist - lim) / dist);
       _v6.applyQuaternion(_q1); // world delta -> body space (parent has no scale)
       gun.position.add(_v6);
-      gun.updateMatrixWorld(true);
+      refreshWorld(gun);
     }
   }
 
   // --- right hand on the pistol grip ---
   gun.getWorldPosition(_v1); // grip == wrapper origin
   _v4.set(cosY * 0.55, -1, -sinY * 0.55); // elbow down and slightly out
-  // Two passes: the analytic solve is exact for the elbow bend but the shoulder swing is applied in
-  // one shot, so a very folded arm (grip close to the shoulder) lands a few cm short. The reference
-  // re-solves after the pole for the same reason.
-  for (let pass = 0; pass < 2; pass++) {
-    twoBoneIK(b.upperR, b.lowerR, b.handR, _v1);
-    armPole(b.upperR, b.lowerR, b.handR, _v4, 0.75);
-  }
+  // Solve, swing the elbow down, solve again: the analytic pass is exact for the elbow bend but
+  // applies the shoulder swing in one shot, so a tightly folded arm lands a few cm short. The
+  // reference re-solves after the pole for the same reason.
+  twoBoneIK(b.upperR, b.lowerR, b.handR, _v1);
+  armPole(b.upperR, b.lowerR, b.handR, _v4, 0.75);
+  twoBoneIK(b.upperR, b.lowerR, b.handR, _v1);
   if (st.handRelR) lockHand(b.handR, st.handRelR, _q3);
   st.errR = wpos(b.handR, _v5).distanceTo(_v1);
 
@@ -423,10 +439,9 @@ export function updateBotGun(bot, dt = 1 / 60) {
   if (b.upperL && b.handL) {
     _v2.copy(gun.userData.support).applyMatrix4(gun.matrixWorld);
     _v4.set(-cosY * 0.35, -1, sinY * 0.35);
-    for (let pass = 0; pass < 2; pass++) {
-      twoBoneIK(b.upperL, b.lowerL, b.handL, _v2);
-      armPole(b.upperL, b.lowerL, b.handL, _v4, 0.6);
-    }
+    twoBoneIK(b.upperL, b.lowerL, b.handL, _v2);
+    armPole(b.upperL, b.lowerL, b.handL, _v4, 0.6);
+    twoBoneIK(b.upperL, b.lowerL, b.handL, _v2);
     if (st.handRelL) lockHand(b.handL, st.handRelL, _q3);
     st.errL = wpos(b.handL, _v5).distanceTo(_v2);
   }

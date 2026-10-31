@@ -118,6 +118,7 @@ for (const [name, value, pass] of rows) console.log(`${pass ? 'PASS' : 'FAIL'}  
 console.log('─'.repeat(72));
 console.log(`sim A/B: ${c.perf.onMs.join('/')} ms with gun vs ${c.perf.offMs.join('/')} without → median ${c.perf.abDeltaMs} ms (noise floor ~0.2 ms)`);
 console.log(`recoil trace (m): ${c.recoil.traceBack.join(', ')}`);
+if (result.soak) console.log(`soak: ${result.soak.frames} frames of real AI, ${result.soak.alive} alive / ${result.soak.dead} dead, max wrist err ${result.soak.maxErrR} / ${result.soak.maxErrL} m`);
 console.log(`shot: ${outPng}`);
 fs.writeFileSync(path.join(path.dirname(outPng), 'botgun-check.json'), JSON.stringify(result, null, 2));
 if (logs.some((l) => l.startsWith('[pageerror]'))) console.log(logs.filter((l) => l.startsWith('[pageerror]')).join('\n'));

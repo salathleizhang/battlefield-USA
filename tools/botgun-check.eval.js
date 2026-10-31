@@ -14,6 +14,8 @@
 
   // ---------- 6. per-frame simulation cost, 26 bots on one screen ----------
   {
+    // The guns load asynchronously: without this wait the whole block measures the early-return path.
+    for (let i = 0; i < 80 && g.bots.some((b) => !b.model?._botGun); i++) await new Promise((r) => setTimeout(r, 150));
     const run = (n) => {
       const t0 = performance.now();
       for (let i = 0; i < n; i++) g.update(1 / 60);
@@ -22,9 +24,13 @@
     const guns = g.bots.map((b) => [b.model, b.model?._botGun]);
     run(60); // warm up
     // Isolated: the rig's own per-frame cost, free of physics/AI noise in the sample.
-    const t0 = performance.now();
-    for (let k = 0; k < 60; k++) for (const b of g.bots) updateBotGun(b, 1 / 60);
-    const rigMs = (performance.now() - t0) / 60;
+    const rigSamples = [];
+    for (let sample = 0; sample < 3; sample++) {
+      const t0 = performance.now();
+      for (let k = 0; k < 60; k++) for (const b of g.bots) updateBotGun(b, 1 / 60);
+      rigSamples.push((performance.now() - t0) / 60);
+    }
+    const rigMs = rigSamples.slice().sort((p, q) => p - q)[1];
     const on = [], off = [], deltas = [];
     for (let k = 0; k < 3; k++) {
       const a = run(120); on.push(a);
@@ -37,6 +43,7 @@
     out.criteria.perf = {
       bots: g.bots.length,
       rigMs: round(rigMs, 3),
+      rigSamplesMs: rigSamples.map((v) => round(v, 3)),
       rigUsPerBot: round((rigMs * 1000) / g.bots.length, 2),
       framesPerSample: 120,
       samples: 3,
@@ -44,6 +51,30 @@
       offMs: off.map((v) => round(v, 3)),
       abDeltaMs: round(med(deltas), 3),
       abDeltas: deltas.map((v) => round(v, 3)),
+    };
+  }
+
+  // Extra: 12 s of the real mission AI (acquisition, fire, deaths, respawns) with every living
+  // rifleman measured — catches the death re-parent / respawn path too.
+  {
+    for (let i = 0; i < 720; i++) g.update(1 / 60);
+    const alive = g.bots.filter((b) => b.alive && b.model?._botGun);
+    const errs = alive.map((b) => {
+      const gun = b.model._botGun;
+      const grip = gun.getWorldPosition(new V());
+      const sup = gun.userData.support.clone().applyMatrix4(gun.matrixWorld);
+      const hR = b.model.root.getObjectByName('hand_r').getWorldPosition(new V());
+      const hL = b.model.root.getObjectByName('hand_l').getWorldPosition(new V());
+      return [hR.distanceTo(grip), hL.distanceTo(sup)];
+    });
+    const scales = alive.map((b) => b.model._botGun.scale.x);
+    out.soak = {
+      frames: 720,
+      alive: alive.length,
+      dead: g.bots.length - alive.length,
+      maxErrR: errs.length ? round(Math.max(...errs.map((e) => e[0]))) : null,
+      maxErrL: errs.length ? round(Math.max(...errs.map((e) => e[1]))) : null,
+      gunScale: scales.length ? [round(Math.min(...scales), 3), round(Math.max(...scales), 3)] : null,
     };
   }
 
