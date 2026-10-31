@@ -75,6 +75,17 @@ export class HUD {
           <div class="reload-hint" data-reload>R 装填 · V 刺刀 · G 手榴弹</div>
         </div>
 
+        <div class="vehicle" data-vehicle>
+          <div class="veh-head"><span class="veh-kicker">装甲载具</span><b data-veh-name>M3A3 斯图亚特</b></div>
+          <div class="veh-speed"><b data-veh-speed>0</b><span>km/h</span><i data-veh-gear>N</i></div>
+          <div class="veh-bar-row"><span>车体</span><div class="veh-bar"><i data-veh-hp></i></div></div>
+          <div class="veh-bar-row"><span>火炮</span><span class="veh-gun" data-veh-gun>37mm M6 · 待发</span></div>
+          <div class="veh-mod" data-veh-mod>履带 · 发动机 · 炮塔</div>
+          <div class="veh-hint">W/S 行驶 · A/D 转向 · 左键 开炮 · 右键 瞄准镜 · Shift 机枪 · F 下车</div>
+        </div>
+        <div class="veh-prompt" data-veh-prompt></div>
+        <div class="armor-hit" data-armor-hit></div>
+
         <div class="banner" data-banner><h2></h2><p></p><div class="banner-line"></div></div>
         <div class="subtitle" data-subtitle></div>
 
@@ -118,7 +129,11 @@ export class HUD {
       damage: q('[data-damage]'), hitflash: q('[data-hitflash]'),
       toast: q('[data-toast]'), lowhp: q('[data-lowhp]'), lock: q('[data-lock]'),
       mmTitle: q('[data-mm-title]'),
+      vehicle: q('[data-vehicle]'), vehName: q('[data-veh-name]'), vehSpeed: q('[data-veh-speed]'),
+      vehGear: q('[data-veh-gear]'), vehHp: q('[data-veh-hp]'), vehGun: q('[data-veh-gun]'),
+      vehMod: q('[data-veh-mod]'), vehPrompt: q('[data-veh-prompt]'), armorHit: q('[data-armor-hit]'),
     };
+    this.armorT = 0;
     this.dmgMarks = Array.from({ length: 6 }, () => ({ t: 0, life: 1, deg: 0, power: 1 }));
     this.dmgCtx = q('[data-dmg-canvas]').getContext('2d');
     this._dmgActive = false;
@@ -160,6 +175,55 @@ export class HUD {
   }
 
   setObjective(text) { this.el.objective.textContent = text; }
+
+  /* ------------------------------------------------------------- vehicles */
+
+  showVehicle(tank) {
+    this.vehicle = tank;
+    this.el.hud.classList.toggle('driving', !!tank);
+    if (tank) this.el.vehName.textContent = tank.def.name;
+    this.el.vehPrompt.classList.remove('show');
+  }
+
+  setVehiclePrompt(text) {
+    if (!this.el.vehPrompt) return;
+    const show = !!text && !this.vehicle;
+    this.el.vehPrompt.textContent = text || '';
+    this.el.vehPrompt.classList.toggle('show', show);
+  }
+
+  setVehicleState(s) {
+    if (!this.el.vehicle || !s) return;
+    this.el.vehSpeed.textContent = String(Math.round(s.speed));
+    this.el.vehGear.textContent = s.speed < 1 ? 'N' : 'D';
+    this.el.vehHp.style.width = `${Math.max(0, Math.min(1, s.hp)) * 100}%`;
+    this.el.vehHp.style.background = s.hp > 0.55
+      ? 'linear-gradient(90deg,#8d9a6a,#c3c994)'
+      : s.hp > 0.25
+        ? 'linear-gradient(90deg,#b08b3a,#d8b45c)'
+        : 'linear-gradient(90deg,#8e2419,#d1483a)';
+    this.el.vehGun.textContent = s.loaded ? `${s.gun} · 待发` : `${s.gun} · 装填 ${Math.round((s.reload || 0) * 100)}%`;
+    this.el.vehGun.classList.toggle('ready', !!s.loaded);
+    const mods = [];
+    if (s.tracks < 0.95) mods.push('履带受损');
+    if (s.engine < 0.95) mods.push('发动机受损');
+    if (s.turret < 0.95) mods.push('炮塔转动受损');
+    this.el.vehMod.textContent = mods.length ? mods.join(' · ') : '机动正常 · 炮塔正常';
+    this.el.vehMod.classList.toggle('hurt', mods.length > 0);
+    this.el.vehicle.classList.toggle('zoom', !!s.zoom);
+  }
+
+  /** Penetration feedback: floats under the reticle for a moment. */
+  armorResult(text, good = false) {
+    const el = this.el.armorHit;
+    if (!el) return;
+    el.textContent = text;
+    el.classList.remove('show', 'good', 'bad');
+    void el.offsetWidth;
+    el.classList.add('show');
+    el.classList.add(good ? 'good' : 'bad');
+    this.armorT = 1.4;
+  }
 
   /** Weapon slot changed: swap the name and force the ammo widget to rebuild. */
   setWeapon(def) {
@@ -334,6 +398,10 @@ export class HUD {
     if (this.subT > 0) { this.subT -= dt; if (this.subT <= 0) this.el.subtitle.classList.remove('show'); }
     if (this.toastT > 0) { this.toastT -= dt; if (this.toastT <= 0) this.el.toast.classList.remove('show'); }
     if (this.hitT > 0) { this.hitT -= dt; if (this.hitT <= 0) this.el.hitmarker.classList.remove('show'); }
+    if (this.armorT > 0) {
+      this.armorT -= dt;
+      if (this.armorT <= 0) this.el.armorHit.classList.remove('show');
+    }
     if (this.damageT > 0) {
       this.damageT = Math.max(0, this.damageT - dt);
       const k = Math.min(1, this.damageT / 0.18);

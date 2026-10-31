@@ -190,7 +190,10 @@ export class Player {
     const p0 = this.pitch, y0 = this.yaw;
     this.yaw -= dx * 0.0022 * sens;
     this.pitch -= dy * 0.0022 * sens;
-    this.pitch = clamp(this.pitch, -88 * DEG, 88 * DEG);
+    // In a tank the view is the commander's/gunner's: you cannot crane your
+    // neck through the roof, and the gun's own limits are tighter still.
+    const driving = !!this.game.playerVehicle;
+    this.pitch = clamp(this.pitch, (driving ? -22 : -88) * DEG, (driving ? 34 : 88) * DEG);
     // Pulling down against the climb uses up the part that would settle back.
     this.aimRecoil.look(this.pitch - p0, this.yaw - y0);
   }
@@ -693,6 +696,10 @@ export class Player {
   }
 
   syncCamera(dt, snap = false) {
+    if (this.game.playerVehicle) {
+      this._syncVehicleCamera(dt, snap, this.game.playerVehicle);
+      return;
+    }
     const cam = this.game.renderer.camera;
     cam.rotation.order = 'YXZ';
     if (!this.alive) {
@@ -742,6 +749,56 @@ export class Player {
     );
     cam.updateProjectionMatrix();
     this.game.renderer.sun.target.position.copy(this.position);
+  }
+
+  /**
+   * Chase camera on foot? No — on tracks: a third-person rig behind the turret,
+   * and the gunner's sight when aiming. The camera collides with the world so a
+   * wall behind the tank does not put the view inside it.
+   */
+  _syncVehicleCamera(dt, snap, tank) {
+    const cam = this.game.renderer.camera;
+    cam.rotation.order = 'YXZ';
+    const aiming = this.aiming;
+    const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
+    const dir = new THREE.Vector3(-Math.sin(this.yaw) * cp, sp, -Math.cos(this.yaw) * cp);
+    const head = new THREE.Vector3(tank.position.x, tank.position.y + 2.15, tank.position.z);
+
+    let eye;
+    let fov;
+    if (aiming) {
+      // Gunner's sight: sits on the turret roof, slightly behind the mantlet.
+      eye = tank.crewEye(new THREE.Vector3());
+      eye.addScaledVector(dir, 0.55);
+      eye.y += 0.12;
+      fov = tank.def.gun.sightFov;
+    } else {
+      const dist = 9.6;
+      const back = dir.clone().multiplyScalar(-dist);
+      const wall = this.game.physics.raycast(
+        head, back.clone().normalize(), dist + 0.8, G.WORLD,
+      );
+      const reach = wall ? Math.max(2.2, wall.distance - 0.5) : dist;
+      eye = head.clone().addScaledVector(back.normalize(), reach);
+      const ground = this.game.level ? this.game.level.groundHeight(eye.x, eye.z) : 0;
+      if (eye.y < ground + 0.7) eye.y = ground + 0.7;
+      fov = 66;
+    }
+
+    if (snap) cam.position.copy(eye);
+    else cam.position.lerp(eye, 1 - Math.exp(-18 * dt));
+    const speedRumble = Math.min(1, Math.abs(tank.speed) / 8);
+    const t = this.time;
+    const rumble = (0.0016 + speedRumble * 0.0035) * (aiming ? 0.4 : 1);
+    const shake = this.trauma * this.trauma;
+    cam.rotation.set(
+      this.pitch + Math.sin(t * 43) * rumble + Math.sin(t * 71) * shake * 0.025,
+      this.yaw + Math.sin(t * 37) * rumble * 0.6 + Math.sin(t * 59) * shake * 0.025,
+      Math.sin(t * 29) * rumble * 0.5,
+    );
+    cam.fov = snap ? fov : damp(cam.fov, fov, 9, dt);
+    cam.updateProjectionMatrix();
+    this.game.renderer.sun.target.position.copy(tank.position);
   }
 
   damage(amount, attacker = null, info = {}) {
