@@ -355,8 +355,8 @@ export class Audio {
   has(name) { return !!this.buffers.get(name)?.length; }
 
   /**
-   * Voice line: a recorded shout with a little stereo width, used for the
-   * opening charge and for squad barks while the player sprints forward.
+   * Voice line at an explicit position and level. Prefer `shout()` for cries
+   * from soldiers: it re-places the speaker per call, which this cannot do.
    */
   voice(name, { dist = 0, pan = 0, volume = 1, reverb = 0.4, when = 0, spread = 0 } = {}) {
     if (!this.ready || !this.has(name)) return null;
@@ -365,6 +365,52 @@ export class Audio {
       return this.play(name, { dist, pan: pan + spread, volume: volume * 0.72, reverb, when: when + 0.015, pitchVar: 0.01 });
     }
     return this.play(name, { dist, pan, volume, reverb, when, pitchVar: 0.01 });
+  }
+
+  /**
+   * A voice line placed as if a soldier near the player shouted it.
+   *
+   * `voice()` takes one fixed position and level, so every trigger lands
+   * identical: a studio take glued to the camera. `shout()` re-places the
+   * shouter on every call — a random bearing within ±`arc` radians, a distance
+   * sampled from `near`–`far` and biased towards the near end, a 0.62–1.24×
+   * delivery spread, and per-call pitch and onset jitter. `crowd` adds more men
+   * at their own bearings and distances, offset by 20–150 ms, which is what
+   * makes the charge read as people around the player instead of one speaker.
+   */
+  shout(name, {
+    volume = 1, near = 3, far = 12, arc = 1, crowd = 0, reverb = 0.45, when = 0,
+  } = {}) {
+    if (!this.ready || !this.has(name)) return 0;
+    const count = 1 + Math.max(0, Math.min(5, Math.round(crowd)));
+    for (let i = 0; i < count; i++) {
+      const extra = i > 0;
+      // The lead shouter keeps to ±arc radians in front; the crowd fills the
+      // circle, which is what puts some voices behind the player's head.
+      const bearing = extra
+        ? (Math.random() * 2 - 1) * Math.PI * 0.9
+        : (Math.random() * 2 - 1) * arc;
+      const dist = near + Math.random() ** 1.7 * Math.max(0.4, far - near) * (extra ? 1.4 : 1);
+      // Distance is the rolloff's job; this is the shout itself. No two men
+      // bellow at the same level, and the crowd sits under the lead voice.
+      const delivery = (0.62 + Math.random() * 0.62) * (extra ? 0.5 + Math.random() * 0.35 : 1);
+      const behind = Math.abs(bearing) > Math.PI * 0.5;
+      this.play(name, {
+        dist,
+        pan: Math.sin(bearing),
+        volume: volume * delivery,
+        pitch: 1 + (Math.random() * 2 - 1) * 0.06,
+        pitchVar: 0.02,
+        reverb: reverb * (0.7 + Math.random() * 0.6),
+        // The head shadows its own pinna, so a shout from behind loses its top
+        // end; without this a rear voice only pans, which is easy to miss.
+        muffle: behind ? 0.12 + Math.random() * 0.12 : 0,
+        // Sound travels at 343 m/s: 20 m away is 58 ms late, and the extra men
+        // also start when they start, not on a shared downbeat.
+        when: when + dist / 343 + (extra ? 0.02 + Math.random() * 0.13 : Math.random() * 0.03),
+      });
+    }
+    return count;
   }
 
   /* ------------------------------------------------------------ weapons */

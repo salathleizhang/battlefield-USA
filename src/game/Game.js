@@ -583,6 +583,10 @@ export class Game {
    * The first seconds of a mission play the commander's order, then the bugle,
    * then the roar of the squad. Later, every fresh forward sprint (Shift + W)
    * pulls one more shout, with a long cooldown so it never turns into a loop.
+   *
+   * Every line goes through `audio.shout()`, which re-places the speaker each
+   * time: the level, bearing and distance move, so the squad sounds like men
+   * shouting nearby rather than one recording at a fixed volume.
    */
   updateBattleVoices(dt) {
     const a = this.audio;
@@ -591,16 +595,21 @@ export class Game {
     if (intro) {
       intro.t += dt;
       if (intro.stage === 0 && intro.t >= 0.7 && a.has('order-kill-americans')) {
-        a.voice('order-kill-americans', { volume: 0.95, reverb: 0.3 });
+        // The commander is the closest voice: a few metres, near-centred.
+        a.shout('order-kill-americans', { volume: 1, near: 3, far: 8, arc: 0.35, reverb: 0.3 });
         intro.stage = 1; intro.t = 0;
       } else if (intro.stage === 1 && intro.t >= 1.2 && a.has('bugle-charge')) {
-        a.voice('bugle-charge', { volume: 0.62, reverb: 0.55 });
+        // The bugler stands off to a flank and further out, so the horn is
+        // heard against the voices instead of on top of them.
+        a.shout('bugle-charge', { volume: 0.85, near: 9, far: 22, arc: 0.7, reverb: 0.6 });
         intro.stage = 2; intro.t = 0;
       } else if (intro.stage === 2 && intro.t >= 2.8 && a.has('charge-crowd')) {
-        a.voice('charge-crowd', { volume: 0.8, reverb: 0.5, spread: 0.45 });
+        a.shout('charge-crowd', {
+          volume: 0.9, near: 3, far: 18, arc: 1.1, crowd: 2, reverb: 0.5,
+        });
         intro.stage = 3; intro.t = 0;
       } else if (intro.stage === 3 && intro.t >= 9.5 && a.has('curse-american')) {
-        a.voice('curse-american', { volume: 0.8, reverb: 0.4, pan: -0.15 });
+        a.shout('curse-american', { volume: 0.9, near: 2, far: 9, arc: 1, reverb: 0.4 });
         intro.stage = 4; intro.t = 0;
       } else if (intro.stage === 4) {
         this._voiceIntro = null;
@@ -613,11 +622,11 @@ export class Game {
     if (charging && !this._wasSprinting && this._voiceCd <= 0) {
       this._voiceCd = 12 + Math.random() * 7;
       if (Math.random() < 0.32 && a.has('curse-american')) {
-        a.voice('curse-american', {
-          volume: 0.85, reverb: 0.35, pan: (Math.random() * 2 - 1) * 0.2,
-        });
+        a.shout('curse-american', { volume: 0.95, near: 2, far: 10, arc: 1, reverb: 0.35 });
       } else if (a.has('charge-crowd')) {
-        a.voice('charge-crowd', { volume: 0.72, reverb: 0.45, spread: 0.5 });
+        a.shout('charge-crowd', {
+          volume: 0.85, near: 3, far: 16, arc: 1.1, crowd: Math.random() < 0.5 ? 1 : 2, reverb: 0.45,
+        });
       }
     }
     this._wasSprinting = charging;
