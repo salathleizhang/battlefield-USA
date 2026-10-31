@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { G, groups } from '../../core/Physics.js';
 import { SoldierModel } from './SoldierModel.js';
-import { equipBotGun } from './BotGun.js';
+import { equipBotGun, updateBotGun, botGunFire } from './BotGun.js';
 import { clamp, damp, rand, randInt, pick } from '../../core/MathUtil.js';
 
 const US_NAMES = ['米勒', '卡特', '沃克', '布朗', '戴维斯', '汤普森', '里德', '霍华德', '肖', '格雷'];
@@ -367,6 +367,7 @@ export class Bot {
     this.collider.setTranslation({ x: this.position.x, y: this.position.y + 0.9, z: this.position.z });
     this.model.setPosition(this.position.x, this.position.y, this.position.z, this.yaw);
     this.model.update(dt, moved, this.aiming, true);
+    updateBotGun(this, dt);
 
     if (this.position.y < -8) this.die(null);
   }
@@ -416,13 +417,18 @@ export class Bot {
     return right.multiplyScalar(this.strafeDir);
   }
 
+  /** Chest-height point on the current target the rifle is lined up with (and shoots at). */
+  aimPoint(out = new THREE.Vector3()) {
+    const t = this.target;
+    if (!t?.position) return out.copy(this.eye);
+    return out.set(t.position.x, t.position.y + (t.isPlayer ? 1.35 : 1.25), t.position.z);
+  }
+
   shoot() {
     const target = this.target;
     if (!target || !target.alive) return;
     const from = this.eye;
-    const to = target.isPlayer
-      ? new THREE.Vector3(target.position.x, target.position.y + 1.35, target.position.z)
-      : new THREE.Vector3(target.position.x, target.position.y + 1.25, target.position.z);
+    const to = this.aimPoint(new THREE.Vector3());
     const dir = to.sub(from).normalize();
     // Accuracy falls with range; bots intentionally imperfect.
     const dist = from.distanceTo(target.position);
@@ -440,6 +446,7 @@ export class Bot {
     const cam = this.game.renderer.camera;
     const pan = this._panTo(cam);
     this.model.shoot?.();
+    botGunFire(this);
     // The Garand's en-bloc clip pings when the eighth round leaves the rifle.
     let empty = false;
     if (this.team === 1) {
