@@ -24,6 +24,8 @@ import { Atmosphere } from '../render/Atmosphere.js';
 import { Ambience } from '../render/Ambience.js';
 import { Weather } from '../render/Weather.js';
 import { CAMPAIGN_BY_ID } from './campaigns.js';
+import { DestructibleWorld } from '../world/Destruction.js';
+import { Vehicles } from '../vehicles/Vehicles.js';
 import { rand, clamp } from '../core/MathUtil.js';
 
 const WEAPON_NAMES = {
@@ -33,6 +35,9 @@ const WEAPON_NAMES = {
   bayonet: '刺刀',
   grenade: '手榴弹',
   explosion: '爆炸',
+  cannon: '坦克炮',
+  mg: '车载机枪',
+  tank_crush: '履带',
 };
 
 export class Game {
@@ -61,6 +66,10 @@ export class Game {
     this._voiceIntro = null;
     this._voiceCd = 0;
     this._wasSprinting = false;
+    this.playerVehicle = null;
+    this.frameCmd = null;
+    this.destructibles = null;
+    this.vehicles = null;
   }
 
   async init(onProgress) {
@@ -145,6 +154,12 @@ export class Game {
     this.worldGroup = new THREE.Group();
     this.renderer.scene.add(this.worldGroup);
     this.physics = new Physics();
+    this.playerVehicle = null;
+
+    // Destruction and vehicle registries must exist before the map builds: the
+    // map queues tank spawns and places destructible cover as it goes.
+    this.destructibles = new DestructibleWorld(this);
+    this.vehicles = new Vehicles(this);
 
     this.level = new Level(this, campaign);
     this.level.build();
@@ -177,6 +192,9 @@ export class Game {
     this.player.recoilScale = this.settings.recoil ?? 1;
     const spawn = this.level.playerSpawn || { position: new THREE.Vector3(0, 2, 0), yaw: 0 };
     this.player.spawn(spawn.position, spawn.yaw);
+    // Tanks spawn after the level and the player exist: the AI needs targets and
+    // the props/structures are already registered.
+    this.vehicles.spawnAll();
 
     // ?loadout=zb26,c96 — comma-separated ids; unknown ids fall back to the default kit.
     const pick = (q.get('loadout') || '').split(',').map((v) => v.trim()).filter((id) => WEAPONS[id]);
@@ -225,6 +243,9 @@ export class Game {
     if (q.has('nobots')) {
       for (const b of this.bots) { b.dispose(); }
       this.bots.length = 0;
+    }
+    if (q.has('notanks')) {
+      this.vehicles?.dispose();
     }
     if (q.has('debug')) {
       const d = document.createElement('div');
@@ -338,8 +359,20 @@ export class Game {
     );
   }
 
+  /** Tank main gun: a heavy, visible projectile with penetration and blast. */
+  spawnShell({ origin, dir, speed, pen, damage, blast, caliber, owner, team }) {
+    this.projectiles.push({
+      pos: origin.clone(),
+      vel: dir.clone().normalize().multiplyScalar(speed),
+      damage, pen, blast, caliber, owner, team,
+      kind: 'cannon', shell: true, headshot: 1.4,
+      life: 6.5, whizzed: true, travelled: 0, trailT: 0,
+    });
+    this.effects.tracer(origin, origin.clone().addScaledVector(dir, 30), 0xffe3b0);
+  }
+
   updateProjectiles(dt) {
-    const mask = G.WORLD | G.PLAYER | G.BOT;
+    const mask = G.WORLD | G.PLAYER | G.BOT | G.VEHICLE;
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i];
       // Gravity acts on the bullet: drop grows with time of flight.
@@ -351,8 +384,28 @@ export class Game {
       const hit = this.physics.raycast(p.pos, dir, stepLen, mask, p.owner?.collider);
       let dead = false;
       if (hit) {
+        const vehicle = hit.data?.vehicle;
         const actor = hit.data?.actor;
-        if (actor && actor.alive && actor.team !== p.team) {
+        if (vehicle && vehicle.alive) {
+          // Armour resolution lives on the tank: it knows its own plates.
+          const report = p.shell
+            ? vehicle.hitShell({
+              point: hit.point, dir: dir.clone(), pen: p.pen, damage: p.damage,
+              caliber: p.caliber, range: p.travelled,
+            }, p.owner)
+            : (vehicle.hitBullet({ point: hit.point, dir, damage: p.damage }, p.owner), null);
+          if (p.shell) {
+            this.explode(hit.point, p.owner, {
+              radius: 2.2 + (p.blast || 2) * 1.4,
+              damage: 40 + (p.blast || 2) * 18,
+              scale: 1.0,
+              ignore: vehicle,
+            });
+          }
+          this.effects.impact(hit.point, hit.normal, 'metal');
+          p.pos.copy(hit.point);
+          dead = true;
+        } else if (actor && actor.alive && actor.team !== p.team) {
           const headY = actor.position.y + (actor.isPlayer ? actor.eyeHeight - 0.06 : 1.62);
           const head = hit.point.y > headY;
           const dist = p.travelled + hit.distance;
@@ -367,7 +420,24 @@ export class Game {
           // Friendly: bullet is absorbed.
           this.effects.impact(hit.point, hit.normal, 'flesh');
         } else {
-          this.effects.impact(hit.point, hit.normal, hit.data?.surface || 'dirt');
+          const data = hit.data || {};
+          if (data.prop || data.structure) {
+            this.destructibles.bulletHit(data, hit.point, hit.normal, p.damage, dir, p.owner);
+            if (p.shell && data.structure) {
+              this.destructibles.damageStructure(data.structure, p.damage * 1.8, hit.point, {
+                dir, radius: 2.4 + (p.blast || 2), cause: 'shell',
+              });
+            }
+          }
+          this.effects.impact(hit.point, hit.normal, data.surface || 'dirt');
+          if (p.shell) {
+            this.level?.crater(hit.point.x, hit.point.z, 1.2 + (p.blast || 2) * 0.5, hit.point.y);
+            this.explode(hit.point, p.owner, {
+              radius: 3 + (p.blast || 2) * 1.7,
+              damage: 45 + (p.blast || 2) * 22,
+              scale: 0.9 + (p.blast || 2) * 0.16,
+            });
+          }
         }
         p.pos.copy(hit.point);
         dead = true;
@@ -375,6 +445,15 @@ export class Game {
         p.pos.addScaledVector(dir, stepLen);
         p.travelled += stepLen;
         p.life -= dt;
+        if (p.shell) {
+          p.trailT -= dt;
+          if (p.trailT <= 0) {
+            p.trailT = 0.022;
+            this.effects._sprite(this.effects.tex.smoke, p.pos.clone(),
+              new THREE.Vector3(rand(-0.2, 0.2), rand(0, 0.5), rand(-0.2, 0.2)),
+              0.22, 0.7, 0x8f8a7d, false);
+          }
+        }
         if (p.life <= 0) dead = true;
       }
       // Near-miss whizz for the local player (segment distance, so fast rounds still register).
@@ -430,7 +509,8 @@ export class Game {
   }
 
   respawnPlayer() {
-    // New body, clean goggles.
+    // New body, clean goggles. The player's tank is only rebuilt if it was lost.
+    this.vehicles?.onPlayerRespawn();
     this.renderer?.clearSplatter?.();
     const spawn = this.match ? this.match.getSpawn(0) : this.level.playerSpawn;
     this.player.spawn(spawn.position, spawn.yaw);
@@ -572,20 +652,58 @@ export class Game {
     }
   }
 
-  explode(pos, owner) {
-    this.effects.explosion(pos, 1.15);
-    const radius = 9;
+  /**
+   * Explosion: infantry, tanks, structures and props all take it in one place.
+   * `opts` lets a tank shell carry its own radius and weight; grenades keep the
+   * original 9 m / 120 damage feel.
+   */
+  explode(pos, owner, opts = {}) {
+    const radius = opts.radius ?? 9;
+    const damage = opts.damage ?? 120;
+    const scale = opts.scale ?? 1.15;
+    this.effects.explosion(pos, scale);
     for (const a of this.combatants()) {
       if (!a.alive) continue;
       // No friendly fire: the thrower's squad is spared, everyone else (including the thrower) is not.
       if (owner && a !== owner && a.team === owner.team) continue;
       const d = a.position.distanceTo(pos);
       if (d > radius) continue;
-      const dmg = 120 * (1 - d / radius) ** 1.4;
+      const dmg = damage * (1 - d / radius) ** 1.4;
       const src = a.isPlayer ? { x: a.position.x, y: a.position.y + 1.2, z: a.position.z } : a.eye;
       if (!this.physics.lineOfSight(pos, new THREE.Vector3(src.x, src.y, src.z))) continue;
-      this.damageActor(a, dmg, owner, { weapon: 'grenade', from: pos });
+      this.damageActor(a, dmg, owner, { weapon: opts.kind || 'grenade', from: pos });
     }
+    this.vehicles?.blast(pos, radius, damage, owner, opts.ignore);
+    this.destructibles?.blast(pos, radius * 1.12, damage * 1.9, { attacker: owner });
+  }
+
+  /** Vehicle destruction: kill feed, score, and a ticket cost heavier than a man. */
+  onVehicleKilled(vehicle, killer) {
+    const victim = { name: vehicle.def.name, team: vehicle.team };
+    const by = killer === this.player
+      ? { name: this.player.name, team: 0 }
+      : killer?.def
+        ? { name: killer.def.name, team: killer.team }
+        : { name: '反坦克火力', team: 0 };
+    if (this.hud) {
+      this.hud.killfeed(by, victim, WEAPON_NAMES.cannon);
+      if (killer === this.player) {
+        this.hud.hitmarker(true);
+        this.hud.banner('击毁装甲目标', `${vehicle.def.name} · ${vehicle.team === 1 ? '美军' : '中国远征军'}`, 2.2);
+      } else if (vehicle.team === 0) {
+        this.hud.toast(`我方 ${vehicle.def.name} 被击毁`);
+      }
+    }
+    if (killer === this.player) this.stats.kills++;
+    if (this.match) {
+      const t = vehicle.team;
+      this.match.tickets[t] = Math.max(0, this.match.tickets[t] - 6);
+    }
+  }
+
+  /** Called by Tank when the player's hull is lost, and by the F key. */
+  leaveVehicle(force = false) {
+    return this.vehicles?.leave(force, this.player) ?? false;
   }
 
   /* ---------------------------------------------------------------- loop */
@@ -609,6 +727,7 @@ export class Game {
 
     this.physics.step(dt);
     const cmd = this.input.cmd();
+    this.frameCmd = cmd;
     if (this.debug?.aim) cmd.aim = true;
     if (this.started && !this.paused) {
       if (cmd.slot1) this.switchWeapon(0);
@@ -617,7 +736,14 @@ export class Game {
     }
     const look = this.input.takeMouseDelta();
 
-    if (this.player.alive) {
+    // F boards the nearest friendly hull, or climbs out of the one being driven.
+    if (cmd.interact && this.player.alive) this.vehicles.tryToggle(this.player);
+
+    if (this.playerVehicle) {
+      this.player.look(look.x, look.y, this.settings.sens * 0.92);
+      this.player.syncCamera(dt);
+      if (this.playerBody?.group) this.playerBody.group.visible = false;
+    } else if (this.player.alive) {
       this.player.look(look.x, look.y, this.settings.sens);
       this.player.update(dt, cmd, this.weapon);
       this.weapon.update(dt, cmd);
@@ -630,7 +756,10 @@ export class Game {
       if (this.respawnT <= 0) this.respawnPlayer();
     }
     // Runs in both branches so the body hides itself on death.
-    this.playerBody?.update(dt);
+    if (!this.playerVehicle) this.playerBody?.update(dt);
+
+    this.vehicles.update(dt);
+    this.destructibles.update(dt);
 
     const frozen = this.debug?.freeze;
     for (const bot of this.bots) {
@@ -665,6 +794,27 @@ export class Game {
       if (this.assignT <= 0) { this.assignT = 8; this.assignObjectives(); }
     }
     this.hud.update(dt);
+    if (this.hud) {
+      const tank = this.playerVehicle;
+      if (tank) {
+        this.hud.setVehicleState?.({
+          name: tank.def.name,
+          speed: Math.abs(tank.speed) * 3.6,
+          hp: Math.max(0, tank.hp / tank.maxHp),
+          loaded: tank.reload <= 0,
+          reload: tank.reloadProgress?.(),
+          gun: tank.def.gun.name,
+          turret: tank.modules.turret,
+          tracks: tank.modules.tracks,
+          engine: tank.modules.engine,
+          zoom: this.player.aiming,
+          ammo: tank.mgAmmo,
+        });
+      } else {
+        const near = this.player.alive ? this.vehicles.nearestEnterable(0, this.player.position) : null;
+        this.hud.setVehiclePrompt?.(near ? `按 F 登上 ${near.def.name}` : '');
+      }
+    }
 
     if (this.debugEl) {
       const p = this.player;
@@ -709,6 +859,10 @@ export class Game {
     this.input?.unlock();
     for (const b of this.bots) b.dispose?.();
     this.bots = [];
+    if (this.playerVehicle) this.playerVehicle = null;
+    if (this.vehicles) { this.vehicles.dispose(); this.vehicles = null; }
+    if (this.destructibles) { this.destructibles.dispose(); this.destructibles = null; }
+    this.frameCmd = null;
     if (this.playerBody) {
       this.playerBody.dispose();
       this.playerBody = null;
