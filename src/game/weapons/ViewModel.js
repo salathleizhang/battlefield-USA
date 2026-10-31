@@ -48,7 +48,8 @@ const POSES = {
   pistol: {
     hipPos: new THREE.Vector3(0.100, -0.080, -0.400),
     hipRot: new THREE.Euler(0.020, 0.100, -0.020),
-    adsPos: new THREE.Vector3(0, -0.006, -0.320),
+    adsPos: new THREE.Vector3(0.012, -0.006, -0.440),
+    adsRot: new THREE.Euler(0.01, -0.05, 0.015),
     adsRot: new THREE.Euler(0, 0, 0),
     sprintPos: new THREE.Vector3(0.130, -0.190, -0.150),
     sprintRot: new THREE.Euler(0.50, 0.75, 0.45),
