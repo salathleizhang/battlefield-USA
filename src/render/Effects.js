@@ -50,6 +50,28 @@ export class Effects {
      */
     this._pool = { sprite: [], tracer: [] };
     /**
+     * Explosion flipbook textures, cloned once at load.
+     *
+     * The old path cloned the 5x5 atlas and set `needsUpdate` per explosion,
+     * which re-uploads a 2048² RGBA image (~16 MB) mid-frame — the profiler
+     * caught it as 158-433 ms hitches with zero program/geometry deltas, because
+     * a re-upload changes neither count. Two clones are enough to cover
+     * overlapping blasts; beyond that they share an animation phase.
+     */
+    this.flipMaps = [];
+    this._flipIdx = 0;
+    const atlas = game.materials?.vfx?.explosion;
+    if (atlas) {
+      for (let i = 0; i < 2; i++) {
+        const m = atlas.clone();
+        m.needsUpdate = true;
+        m.wrapS = m.wrapT = THREE.ClampToEdgeWrapping;
+        m.repeat.set(1 / 5, 1 / 5);
+        m.offset.set(0, 0.8);
+        this.flipMaps.push(m);
+      }
+    }
+    /**
      * Explosion lights are pooled and stay in the scene forever.
      *
      * three bakes the number of VISIBLE point lights into every material's
@@ -182,12 +204,8 @@ export class Effects {
   explosion(pos, scale = 1) {
     this.game.audio.explosion(this.game.player ? this.game.player.position.distanceTo(pos) : 0);
     // Photoreal fireball flipbook (Unity Labs Explosion01, CC0) when available.
-    const atlas = this.game.materials?.vfx?.explosion;
-    if (atlas) {
-      const map = atlas.clone();
-      map.needsUpdate = true;
-      map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
-      map.repeat.set(1 / 5, 1 / 5);
+    const map = this.flipMaps.length ? this.flipMaps[this._flipIdx++ % this.flipMaps.length] : null;
+    if (map) {
       map.offset.set(0, 0.8);
       const mat = new THREE.SpriteMaterial({
         map, color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 1,
@@ -315,8 +333,10 @@ export class Effects {
       b.sprite.scale.setScalar(b.size * (0.55 + t * 0.8));
       b.sprite.material.opacity = t < 0.7 ? 1 : Math.max(0, 1 - (t - 0.7) / 0.3);
       if (b.life <= 0) {
+        // The map is one of the shared flipbook clones — never dispose it here,
+        // or the next explosion has to re-upload the atlas (the very hitch this
+        // pooling exists to avoid).
         this.scene.remove(b.sprite);
-        b.map.dispose();
         b.sprite.material.dispose();
         this.flipbooks.splice(i, 1);
       }
