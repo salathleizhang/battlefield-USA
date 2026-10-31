@@ -323,9 +323,48 @@ export class Renderer {
    * which is why "适配" keeps it as high as the frame budget allows.
    */
   setRenderScale(s, { silent = false } = {}) {
-    this.renderScale = THREE.MathUtils.clamp(s, 0.55, 1);
+    this.renderScale = THREE.MathUtils.clamp(s, 0.5, 1);
     this._applyPixelRatio();
+    this._applyBudget();
     if (!silent) this.onRenderScale?.(this.renderScale);
+  }
+
+  /**
+   * Tie the two expensive passes to the same budget the resolution follows.
+   *
+   * Measured on an M-class laptop at 1512x982: ambient occlusion is the single
+   * largest post cost (23.2 ms -> 17.4 ms with it off), shadows next (3 ms).
+   * When the adaptive scaler has already given up pixels, it means the machine
+   * cannot afford the full preset; dropping AO to its low mode and the cascade
+   * to 2048 buys back more than the pixels cost, and at a reduced resolution the
+   * difference is not visible.
+   */
+  _applyBudget() {
+    const tight = (this.renderScale ?? 1) < 0.9;
+    const f = this.features;
+    if (this.aoPass && f?.ao) {
+      const mode = tight ? 'Low' : f.ao;
+      if (this._aoMode !== mode) {
+        this._aoMode = mode;
+        this.aoPass.setQualityMode(mode);
+      }
+      const half = tight ? true : !!f.aoHalf;
+      if (this.aoPass.configuration.halfRes !== half) {
+        this.aoPass.configuration.halfRes = half;
+        this.aoPass.setSize?.(this.composer?._width ?? innerWidth, this.composer?._height ?? innerHeight);
+      }
+    }
+    if (f?.shadow) {
+      const want = tight ? Math.min(f.shadow, 2048) : f.shadow;
+      this.scene.traverse((o) => {
+        if (!o.isDirectionalLight || !o.castShadow) return;
+        if (o.shadow.mapSize.x !== want) {
+          o.shadow.mapSize.set(want, want);
+          o.shadow.map?.dispose();
+          o.shadow.map = null;
+        }
+      });
+    }
   }
 
   _applyPixelRatio() {
