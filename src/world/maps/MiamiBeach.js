@@ -163,16 +163,29 @@ export function buildMiamiBeach(L) {
 
     const floorH = h / floors;
     // Continuous ribbon glazing with white mullions: the streamline look.
+    //
+    // Every hotel on Ocean Drive is the same massing, so the ribbon is what the
+    // eye actually compares between buildings. Varying its height, its bay
+    // pitch and where the bays start is the difference between "eleven hotels"
+    // and "one hotel drawn eleven times" — and it costs no extra geometry.
+    const ribbonH = Math.min(1.75, floorH * (0.28 + L.rand() * 0.13));
+    const bay = 2.6 + L.rand() * 1.3;
+    const bayStart = -9 + L.rand() * bay * 0.8;
+    const ribbonZ = 19.5 * (0.93 + L.rand() * 0.07);
+    const ribbonY = 0.56 + L.rand() * 0.12;
     for (let f = 0; f < floors; f++) {
-      const wy = gy + floorH * f + floorH * 0.62;
-      L.batch.box(0.14, Math.min(1.55, floorH * 0.34), 19.5, -0.8, wy, z, windowGlass, { uv: 0.4 });
-      for (let mz = -8.8; mz <= 8.9; mz += 3.2) {
-        L.batch.box(0.18, Math.min(1.8, floorH * 0.42), 0.16, -0.76, wy, z + mz, M.white);
+      const wy = gy + floorH * f + floorH * ribbonY;
+      L.batch.box(0.14, ribbonH, ribbonZ, -0.8, wy, z, windowGlass, { uv: 0.4 });
+      for (let mz = bayStart; mz <= 9.2; mz += bay) {
+        L.batch.box(0.18, ribbonH * 1.16, 0.16, -0.76, wy, z + mz, M.white);
       }
     }
     // Horizontal "eyebrow" ledges: the signature Art Deco shadow line.
+    const browOut = 1.15 + L.rand() * 0.6;
+    const browEvery = L.rand() < 0.35 ? 2 : 1;
     for (let f = 1; f < floors; f++) {
-      L.batch.box(1.5, 0.2, 24, -0.55, gy + floorH * f + 0.4, z, M.white, { uv: 0.5 });
+      if (browEvery === 2 && f % 2) continue;
+      L.batch.box(browOut, 0.2, 24, -0.55, gy + floorH * f + 0.4, z, M.white, { uv: 0.5 });
     }
     // Vertical fins and neon pinstripes.
     for (const dz of [-9, 9]) {
