@@ -549,6 +549,7 @@ export class Game {
   }
 
   onPlayerKilled(attacker, weapon) {
+    if (this.playerVehicle) this.vehicles?.leave(true, this.player);
     this.lastKiller = attacker;
     this.stats.deaths++;
     this.respawnT = 5;

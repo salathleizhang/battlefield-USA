@@ -739,7 +739,8 @@ export class Player {
     );
     if (snap) cam.position.copy(eye); else cam.position.lerp(eye, 1 - Math.exp(-28 * dt));
 
-    let targetFov = this.aiming ? 54 : this.sprinting ? 82 : 76;
+    const zoom = this.aiming ? Math.max(1, this.adsZoom || 1) : 1;
+    let targetFov = this.aiming ? clamp(54 / zoom, 9, 60) : this.sprinting ? 82 : 76;
     if (this.tacSprint) targetFov += 4;
     cam.fov = snap ? targetFov : damp(cam.fov, targetFov, 10, dt);
     cam.rotation.set(
@@ -767,13 +768,14 @@ export class Player {
     let eye;
     let fov;
     if (aiming) {
-      // Gunner's sight: sits on the turret roof, slightly behind the mantlet.
-      eye = tank.crewEye(new THREE.Vector3());
-      eye.addScaledVector(dir, 0.55);
-      eye.y += 0.12;
+      // Gunner's optic: on the turret roof, not at the commander's seat height —
+      // otherwise the camera sits inside the cast turret and the sight is black.
+      eye = new THREE.Vector3(
+        tank.position.x, tank.position.y + tank.def.height * 0.93, tank.position.z,
+      ).addScaledVector(dir, 0.45);
       fov = tank.def.gun.sightFov;
     } else {
-      const dist = 9.6;
+      const dist = 11.5;
       const back = dir.clone().multiplyScalar(-dist);
       const wall = this.game.physics.raycast(
         head, back.clone().normalize(), dist + 0.8, G.WORLD,
