@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { buildType38 } from './Type38.js';
-import { FpArms } from './FpArms.js';
+import { FpHands, loadFpHands } from './FpHands.js';
 import { clamp, damp, rand, smoothstep } from '../../core/MathUtil.js';
 
 /**
@@ -8,13 +8,13 @@ import { clamp, damp, rand, smoothstep } from '../../core/MathUtil.js';
  *
  * The gun is modelled 1:1 with its origin on the rear sight notch, so ADS is a literal
  * alignment: translate the gun until the notch sits on the camera axis. Both hands are
- * mounted on the gun; the arms solve back to fixed shoulders (FpArms). Bolt cycling and
+ * mounted on the gun and the skinned arms solve onto them (FpHands). Bolt cycling and
  * charger loading animate the firing hand off the grip and back, with the left hand
  * staying on the forend the whole time.
  */
 
-const HIP_POS = new THREE.Vector3(0.180, -0.150, -0.620);
-const HIP_ROT = new THREE.Euler(0.035, 0.160, -0.040);
+const HIP_POS = new THREE.Vector3(0.160, -0.130, -0.470);
+const HIP_ROT = new THREE.Euler(0.020, 0.300, -0.060);
 const ADS_POS = new THREE.Vector3(0, 0, -0.130);
 const ADS_ROT = new THREE.Euler(0, 0, 0);
 const SPRINT_POS = new THREE.Vector3(0.150, -0.255, -0.130);
@@ -50,11 +50,17 @@ export class ViewModel {
     viewFill.position.set(0.25, 0.10, 0.15);
     this.rig.add(viewFill);
 
-    this.arms = new FpArms(game.materials);
-    this.rig.add(this.arms.group);
-    // Hands carry the read at the hip; detached forearm tubes are worse than none.
-    this.arms.group.visible = false;
+    // Skinned first-person arms stream in after the level: until they land the rifle's own hand
+    // stubs carry the read, then they are swapped out for the real rig.
+    this.hands = null;
     this.handR.visible = false;
+    loadFpHands().then((scene) => {
+      this.hands = new FpHands(scene).attach(this.rig);
+      this.handR.visible = false;
+      this.handL.visible = false;
+    }).catch((e) => {
+      console.warn('first-person arms failed to load', e);
+    });
 
     // Five-round charger the firing hand carries during a reload.
     this.clip = buildCharger(game.materials);
@@ -181,6 +187,8 @@ export class ViewModel {
     rot.x += this.kickRot - this.lunge * 0.22 + this.swayY * 0.8;
     rot.y += this.swayX * 0.9;
     rot.z += -this.lunge * 0.10;
+    // Lean tilts the rifle with the head, so the sight picture stays level.
+    rot.z += -player.lean * 0.05;
 
     this.gun.position.lerp(pos, 1 - Math.exp(-26 * dt));
     this.gun.rotation.x = damp(this.gun.rotation.x, rot.x, 18, dt);
@@ -268,7 +276,9 @@ export class ViewModel {
 
     // Keep the sight picture clean: the support hand sits right under the receiver
     // at ADS and would cover the lower half of the view.
-    this.handL.visible = this.ads < 0.55;
+    if (!this.hands) this.handL.visible = this.ads < 0.55;
+
+    this.hands?.update(this.gun, this.handR, this.handL);
 
     // ---------------------------------------------------------------- casing
     for (let i = this.casings.length - 1; i >= 0; i--) {

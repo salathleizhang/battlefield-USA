@@ -6,7 +6,7 @@ import * as THREE from 'three';
  * The gun itself is a CC0 scan-grade bolt-action rifle (Poly Haven, see CREDITS): the
  * scene graph is normalised to metres, muzzle down -Z, and the origin is placed on the
  * rear sight notch so ADS is a literal alignment. Two gloved hands ride on the gun and
- * the arms solve back to the shoulders (FpArms); the bolt is re-parented to its bore
+ * the arms solve onto them (FpHands); the bolt is re-parented to its bore
  * pivot so it can lift and travel.
  *
  * When the template has not loaded yet, a procedural stand-in with identical anchors is
