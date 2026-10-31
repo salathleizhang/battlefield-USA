@@ -137,16 +137,17 @@ export class Weapon {
     this.cycleT = this.def.cycleTime;
     this.lastShot = this.time;
 
-    const cam = this.game.renderer.camera;
-    const dir = new THREE.Vector3();
-    cam.getWorldDirection(dir);
+    // Bullets follow the true aim, never the visual camera layers (bob, shake, kick).
+    // The punch is felt, not a hidden aim offset.
+    const cp = Math.cos(p.pitch);
+    const dir = new THREE.Vector3(-Math.sin(p.yaw) * cp, Math.sin(p.pitch), -Math.cos(p.yaw) * cp);
     const spread = this.currentSpread();
     dir.x += rand(-spread, spread);
     dir.y += rand(-spread, spread);
     dir.z += rand(-spread, spread);
     dir.normalize();
 
-    const origin = cam.position.clone().addScaledVector(dir, 0.45);
+    const origin = this.game.renderer.camera.position.clone().addScaledVector(dir, 0.45);
     this.game.spawnProjectile({
       origin, dir,
       speed: this.def.velocity,
@@ -216,8 +217,12 @@ export class Weapon {
     this.game.viewmodel.onMelee();
     this.game.audio.impact('flesh_heavy', 0, 0);
     const cam = this.game.renderer.camera;
-    const dir = new THREE.Vector3();
-    cam.getWorldDirection(dir);
+    const cp = Math.cos(this.player.pitch);
+    const dir = new THREE.Vector3(
+      -Math.sin(this.player.yaw) * cp,
+      Math.sin(this.player.pitch),
+      -Math.cos(this.player.yaw) * cp,
+    );
     const worldHit = this.game.physics.raycast(cam.position, dir, 2.4,
       (1 << 0) | (1 << 1) | (1 << 2), this.player.collider);
     if (worldHit?.data?.actor && worldHit.data.actor.team !== 0) {
