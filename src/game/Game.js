@@ -30,7 +30,11 @@ import { rand, clamp } from '../core/MathUtil.js';
 
 const WEAPON_NAMES = {
   type38: '三八大盖',
-  c96: '毛瑟 C96',
+  m4: 'M4A1',
+  ak: 'AK-47',
+  mp5: 'MP5A5',
+  p226: 'P226',
+  m1911: 'M1911A1',
   m1: 'M1 加兰德',
   bayonet: '刺刀',
   grenade: '手榴弹',
@@ -196,13 +200,13 @@ export class Game {
     // the props/structures are already registered.
     this.vehicles.spawnAll();
 
-    // ?loadout=zb26,c96 — comma-separated ids; unknown ids fall back to the default kit.
+    // ?loadout=m4,p226 — comma-separated ids; unknown ids fall back to the default kit.
     const pick = (q.get('loadout') || '').split(',').map((v) => v.trim()).filter((id) => WEAPONS[id]);
     const loadout = pick.length ? pick : DEFAULT_LOADOUT;
     this.weapons = loadout.map((id) => new Weapon(this, this.player, weaponDef(id)));
     this.weaponIndex = 0;
     this.weapon = this.weapons[0];
-    this.viewmodel = new ViewModel(this);
+    this.viewmodel = new ViewModel(this, this.weapons.map((w) => w.def));
     this.viewmodel.setWeapon(this.weapon.def);
     this.match = new Match(this);
     this.hud = new HUD(this);

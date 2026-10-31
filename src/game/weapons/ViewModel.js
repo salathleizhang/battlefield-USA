@@ -1,114 +1,94 @@
 import * as THREE from 'three';
 import { buildType38 } from './Type38.js';
-import { buildC96 } from './PistolModel.js';
-import { buildLmg } from './LmgModel.js';
 import { FpHands, loadFpHands } from './FpHands.js';
+import { FP_IDS, loadFpRig, fpPoses } from './FpRig.js';
+import { RIFLE_TAC, rifleEmptyKeys, PISTOL_TAC, PISTOL_EMPTY, sampleKeys, phase } from './ReloadChoreo.js';
 import { clamp, damp, rand, smoothstep } from '../../core/MathUtil.js';
 
 /**
  * First-person presentation of the player's weapons.
  *
- * Every gun is modelled 1:1 with its origin on the rear sight notch, so ADS is a literal
- * alignment: translate the gun until the notch sits on the camera axis. Both hands are
- * mounted on the gun and the skinned arms solve onto them (FpHands).
+ * Two rig families:
+ *  - the period Type 38, built locally from the Poly Haven scan (bolt-cycle and charger choreography);
+ *  - the reference project's authored FP rigs (`models/fp/*.glb`): gun + gloved arms posed around it,
+ *    mounted at their authored K-scale and solved from hip to ADS through the iron-sight line.
  *
- * The Type 38 keeps its bolt-cycle / charger-loading choreography; the C96 is a simple
- * two-hand pistol pose with a reciprocating bolt and a magazine-style reload.
+ * Rigs from the reference family bring their own arms, so the legacy skinned-arm pair is hidden there.
  */
 
-const POSES = {
-  rifle: {
-    hipPos: new THREE.Vector3(0.160, -0.130, -0.470),
-    hipRot: new THREE.Euler(0.020, 0.300, -0.060),
-    adsPos: new THREE.Vector3(0, 0, -0.130),
-    adsRot: new THREE.Euler(0, 0, 0),
-    sprintPos: new THREE.Vector3(0.150, -0.255, -0.130),
-    sprintRot: new THREE.Euler(0.46, 0.62, 0.42),
-    reloadPos: new THREE.Vector3(0.060, -0.245, -0.185),
-    reloadRot: new THREE.Euler(-0.16, 0.36, 0.50),
-    flashLight: new THREE.Vector3(0.02, -0.10, -0.55),
-    kickZ: 0.040,
-    kickRot: 0.075,
-    flashSize: 0.32,
-  },
-  lmg: {
-    hipPos: new THREE.Vector3(0.170, -0.150, -0.520),
-    hipRot: new THREE.Euler(0.020, 0.290, -0.070),
-    adsPos: new THREE.Vector3(0, 0, -0.150),
-    adsRot: new THREE.Euler(0, 0, 0),
-    sprintPos: new THREE.Vector3(0.170, -0.270, -0.160),
-    sprintRot: new THREE.Euler(0.52, 0.62, 0.44),
-    reloadPos: new THREE.Vector3(0.070, -0.260, -0.200),
-    reloadRot: new THREE.Euler(-0.18, 0.36, 0.52),
-    flashLight: new THREE.Vector3(0.02, -0.10, -0.60),
-    kickZ: 0.034,
-    kickRot: 0.070,
-    flashSize: 0.34,
-  },
-  pistol: {
-    hipPos: new THREE.Vector3(0.100, -0.080, -0.400),
-    hipRot: new THREE.Euler(0.020, 0.100, -0.020),
-    adsPos: new THREE.Vector3(0.012, -0.006, -0.440),
-    adsRot: new THREE.Euler(0.01, -0.05, 0.015),
-    adsRot: new THREE.Euler(0, 0, 0),
-    sprintPos: new THREE.Vector3(0.130, -0.190, -0.150),
-    sprintRot: new THREE.Euler(0.50, 0.75, 0.45),
-    reloadPos: new THREE.Vector3(0.050, -0.215, -0.170),
-    reloadRot: new THREE.Euler(-0.25, 0.35, 0.45),
-    flashLight: new THREE.Vector3(0.01, -0.05, -0.42),
-    kickZ: 0.026,
-    kickRot: 0.070,
-    flashSize: 0.16,
-  },
+const RIFLE_POSE = {
+  hipPos: new THREE.Vector3(0.160, -0.130, -0.470),
+  hipRot: new THREE.Euler(0.020, 0.300, -0.060),
+  adsPos: new THREE.Vector3(0, 0, -0.130),
+  adsRot: new THREE.Euler(0, 0, 0),
+  sprintPos: new THREE.Vector3(0.150, -0.255, -0.130),
+  sprintRot: new THREE.Euler(0.46, 0.62, 0.42),
+  reloadPos: new THREE.Vector3(0.060, -0.245, -0.185),
+  reloadRot: new THREE.Euler(-0.16, 0.36, 0.50),
+  flashLight: new THREE.Vector3(0.02, -0.10, -0.55),
+};
+
+const CLASS_FEEL = {
+  rifle: { kickZ: 0.032, kickRot: 0.060 },
+  long: { kickZ: 0.045, kickRot: 0.085 },
+  pistol: { kickZ: 0.020, kickRot: 0.075 },
+  compact: { kickZ: 0.026, kickRot: 0.055 },
 };
 
 export class ViewModel {
-  constructor(game) {
+  constructor(game, defs = []) {
     this.game = game;
     this.scene = game.renderer.viewScene;
     this.rig = new THREE.Group();
     this.scene.add(this.rig);
 
     this.rigs = {};
-    this._build('rifle', buildType38(game.materials, game.weaponTemplate));
-    this._build('lmg', buildLmg(game.materials, game.weaponTemplate));
-    this._build('pistol', buildC96(game.materials));
+    this.fp = {};
+    this._buildRifle();
     this.active = 'rifle';
-    this._bind('rifle');
+    this._bindRifle();
 
-    // Dedicated fill so the scanned wood and steel read against the bright sky.
+    // Reference FP rigs load on demand (one GLB per weapon, cached across missions).
+    for (const def of defs) {
+      const m = def?.model;
+      if (!FP_IDS.includes(m) || this.fp[m]) continue;
+      loadFpRig(m).then((rig) => {
+        if (!rig) return;
+        this._buildFp(m, rig);
+        if (this.pendingModel === m) this.setWeapon({ model: m });
+      });
+    }
+
     const viewFill = new THREE.PointLight(0xffe2c4, 2.2, 3.5, 2);
     viewFill.position.set(0.25, 0.10, 0.15);
     this.rig.add(viewFill);
 
-    // Skinned first-person arms stream in after the level: until they land the gun's own hand
-    // stubs carry the read, then they are swapped out for the real rig. One pair per weapon.
-    this.hands = null;
+    // Legacy skinned arms (rifle only) — stream in after the level.
+    this.legacyHands = null;
     loadFpHands().then((scene) => {
-      for (const key of Object.keys(this.rigs)) {
-        const hands = new FpHands(scene).attach(this.rig);
-        hands.root.visible = key === this.active;
-        this.rigs[key].hands = hands;
+      const hands = new FpHands(scene).attach(this.rig);
+      hands.root.visible = false;
+      this.legacyHands = hands;
+      if (!this.fpActive) {
+        hands.root.visible = true;
+        this.hands = hands;
+        this.rifleRig.handR.visible = false;
+        this.rifleRig.handL.visible = false;
       }
-      this.hands = this.rigs[this.active].hands;
-      this.handR.visible = false;
-      this.handL.visible = false;
     }).catch((e) => {
       console.warn('first-person arms failed to load', e);
     });
 
-    // Five-round charger the firing hand carries during a Type 38 reload.
     this.clip = buildCharger(game.materials);
     this.clip.visible = false;
-    this.rifleHand.add(this.clip);
+    this.rifleRig.handR.add(this.clip);
     this.clip.position.set(0, -0.020, 0.055);
     this.clip.rotation.set(-1.15, 0, 0);
 
     this.flashLight = new THREE.PointLight(0xffb060, 0, 7, 2);
-    this.flashLight.position.copy(POSES.rifle.flashLight);
+    this.flashLight.position.copy(RIFLE_POSE.flashLight);
     this.scene.add(this.flashLight);
 
-    // Ejected brass.
     this.casings = [];
     this._casingGeo = new THREE.CylinderGeometry(0.0042, 0.0048, 0.030, 8);
     this._casingMat = new THREE.MeshStandardMaterial({ color: 0xb08a3c, metalness: 0.95, roughness: 0.28 });
@@ -126,72 +106,52 @@ export class ViewModel {
     this.time = 0;
     this.lastCycle = 0;
     this.lastReload = 0;
+    this.pose = RIFLE_POSE;
     this.gun.position.copy(this.pose.hipPos);
     this.gun.rotation.copy(this.pose.hipRot);
-    this._poseTarget = new THREE.Vector3();
-    this._rotTarget = new THREE.Euler();
     this.enabled = true;
   }
 
-  _build(key, gun) {
+  /* ------------------------------------------------------------ rig build */
+  _buildRifle() {
+    const gun = buildType38(this.game.materials, this.game.weaponTemplate);
     const holder = new THREE.Group();
     holder.add(gun);
-    holder.visible = key === 'rifle';
     this.rig.add(holder);
     const u = gun.userData;
-    this.rigs[key] = {
-      key,
-      gun,
-      holder,
-      pose: POSES[key],
-      bolt: u.bolt,
-      boltKnob: u.boltKnob,
-      handR: u.handR,
-      handL: u.handL,
-      clipAnchor: u.clipAnchor,
-      muzzle: u.muzzle,
-      bayonet: u.bayonet,
-      flash: u.flash,
-      gripR: u.handR.position.clone(),
-      gripL: u.handL.position.clone(),
+    this.rifleRig = {
+      gun, holder, pose: RIFLE_POSE,
+      bolt: u.bolt, boltKnob: u.boltKnob, handR: u.handR, handL: u.handL,
+      clipAnchor: u.clipAnchor, muzzle: u.muzzle, bayonet: u.bayonet, flash: u.flash,
+      gripR: u.handR.position.clone(), gripL: u.handL.position.clone(),
       boltRest: u.boltRest || u.bolt.position.clone(),
-      hands: null,
     };
   }
 
-  /** Point the viewmodel at a weapon rig ('rifle' | 'pistol'). */
-  setWeapon(def) {
-    const key = def?.model === 'pistol' ? 'pistol' : def?.model === 'lmg' ? 'lmg' : 'rifle';
-    if (key === this.active && this.gun) return;
-    const prev = this.rigs[this.active];
-    if (prev) prev.holder.visible = false;
-    const w = this.rigs[key];
-    if (!w) return;
-    w.holder.visible = true;
-    this.active = key;
-    this._bind(key);
-    // Snap to the ready pose so the swap doesn't fly across the frame.
-    this.gun.position.copy(this.pose.hipPos);
-    this.gun.rotation.copy(this.pose.hipRot);
-    this.ads = 0;
-    this.sprint = 0;
-    this.reloadW = 0;
-    this.kickZ = 0;
-    this.kickRot = 0;
-    this.lastCycle = 0;
-    this.lastReload = 0;
-    this.flashT = 0;
-    if (this.flash) this.flash.visible = false;
-    this.flashLight.position.copy(this.pose.flashLight);
-    this.flashLight.intensity = 0;
+  _buildFp(id, rig) {
+    const holder = new THREE.Group();
+    holder.add(rig.root);
+    holder.visible = false;
+    this.rig.add(holder);
+    const poses = fpPoses(rig);
+    rig.root.scale.setScalar(poses.scale);
+    const flash = new THREE.Sprite(new THREE.SpriteMaterial({
+      color: 0xffd9a0, transparent: true, opacity: 0.95, depthWrite: false, blending: THREE.AdditiveBlending,
+    }));
+    if (poses.muzzle) {
+      flash.position.copy(poses.muzzle).multiplyScalar(poses.scale);
+      flash.scale.setScalar(0.22);
+    }
+    flash.visible = false;
+    holder.add(flash);
+    this.fp[id] = { id, rig, holder, poses, flash, kind: rig.meta.cls || 'rifle' };
   }
 
-  _bind(key) {
-    const w = this.rigs[key];
-    this.w = w;
-    this.pose = w.pose;
+  _bindRifle() {
+    const w = this.rifleRig;
     this.gun = w.gun;
     this.holder = w.holder;
+    this.pose = w.pose;
     this.bolt = w.bolt;
     this.boltKnob = w.boltKnob;
     this.handR = w.handR;
@@ -202,20 +162,70 @@ export class ViewModel {
     this.flash = w.flash;
     this.gripR = w.gripR;
     this.gripL = w.gripL;
-    this.hands = w.hands;
-    if (key === 'rifle') this.rifleHand = w.handR;
+    this.fpActive = null;
+    this.hands = this.legacyHands || null;
+    if (this.legacyHands) this.legacyHands.root.visible = true;
   }
 
-  onFire(weapon) {
-    const pistol = this.active === 'pistol';
-    this.kickZ = this.pose.kickZ;
-    this.kickRot = this.pose.kickRot;
-    this.flashT = pistol ? 0.045 : 0.055;
-    this.flash.visible = true;
-    this.flash.material.rotation = rand(0, 6.28);
-    this.flash.scale.setScalar(rand(0.7, 1.15) * this.pose.flashSize * 1.6);
-    this.flashLight.intensity = pistol ? 4.5 : 7;
-    if (pistol) this.slideT = 1;
+  /** Point the viewmodel at a weapon def (by its `model` id). */
+  setWeapon(def) {
+    const model = def?.model || 'rifle';
+    const fp = this.fp[model];
+    if (model !== 'rifle' && !fp) {
+      // Asset still streaming in: hide the old rig and switch when it lands.
+      this.pendingModel = model;
+      this.rifleRig.holder.visible = false;
+      if (this.fpActive) this.fp[this.fpActive].holder.visible = false;
+      return;
+    }
+    this.pendingModel = null;
+    if (this.fpActive) this.fp[this.fpActive].holder.visible = false;
+    this.rifleRig.holder.visible = false;
+    if (model === 'rifle') {
+      this.rifleRig.holder.visible = true;
+      this._bindRifle();
+    } else {
+      fp.holder.visible = true;
+      this.fpActive = model;
+      this.gun = fp.holder;
+      this.holder = fp.holder;
+      this.flash = fp.flash;
+      this.pose = null;
+      this.hands = null;
+      if (this.legacyHands) this.legacyHands.root.visible = false;
+    }
+    this.ads = 0;
+    this.sprint = 0;
+    this.reloadW = 0;
+    this.kickZ = 0;
+    this.kickRot = 0;
+    this.lastCycle = 0;
+    this.lastReload = 0;
+    this.flashT = 0;
+    this.flashLight.intensity = 0;
+    if (this.fpActive) {
+      const w = this.fp[this.fpActive];
+      w.holder.position.copy(w.poses.hipPos);
+      w.holder.rotation.copy(w.poses.hipRot);
+    } else {
+      this.gun.position.copy(this.pose.hipPos);
+      this.gun.rotation.copy(this.pose.hipRot);
+    }
+  }
+
+  onFire() {
+    const isFp = !!this.fpActive;
+    const kind = isFp ? this.fp[this.fpActive].kind : 'rifle';
+    const feel = CLASS_FEEL[kind] || CLASS_FEEL.rifle;
+    this.kickZ = feel.kickZ;
+    this.kickRot = feel.kickRot;
+    this.flashT = 0.05;
+    if (this.flash) {
+      this.flash.visible = true;
+      this.flash.material.rotation = rand(0, 6.28);
+      this.flash.scale.setScalar(rand(0.7, 1.2) * (isFp ? 0.25 : 0.32));
+    }
+    this.flashLight.intensity = 7;
   }
 
   onMelee() { this.lunge = 1; }
@@ -241,8 +251,6 @@ export class ViewModel {
     const adsTarget = (player.aiming && !weapon.reloading && !player.sprinting) ? 1 : 0;
     this.ads = damp(this.ads, adsTarget, 14, dt);
 
-    // The weapon camera has its own FOV: it narrows slightly at the sights so the
-    // receiver and rear sight grow with the zoom instead of staying flat.
     const vmFov = 58 - this.ads * 8;
     const vc = this.game.renderer.viewCamera;
     if (Math.abs(vc.fov - vmFov) > 0.01) {
@@ -250,16 +258,12 @@ export class ViewModel {
       vc.updateProjectionMatrix();
     }
 
-    const sprintTarget = player.sprinting ? 1 : 0;
-    this.sprint = damp(this.sprint, sprintTarget, 9, dt);
+    this.sprint = damp(this.sprint, player.sprinting ? 1 : 0, 9, dt);
     this.reloadW = damp(this.reloadW, weapon.reloading ? 1 : 0, 10, dt);
 
-    // Look sway: tiny at the sights, pronounced at the hip.
     const swayScale = 1 - this.ads * 0.85;
-    const sx = clamp(-look.x * 0.00035, -0.030, 0.030) * swayScale;
-    const sy = clamp(look.y * 0.00030, -0.026, 0.026) * swayScale;
-    this.swayX = damp(this.swayX, sx, 10, dt);
-    this.swayY = damp(this.swayY, sy, 10, dt);
+    this.swayX = damp(this.swayX, clamp(-look.x * 0.00035, -0.030, 0.030) * swayScale, 10, dt);
+    this.swayY = damp(this.swayY, clamp(look.y * 0.00030, -0.026, 0.026) * swayScale, 10, dt);
 
     const speed = Math.hypot(player.velocity.x, player.velocity.z);
     const moving = player.grounded ? Math.min(1, speed / 5) : 0;
@@ -273,62 +277,9 @@ export class ViewModel {
     this.kickRot = damp(this.kickRot, 0, 11, dt);
     this.lunge = damp(this.lunge, 0, 7, dt);
 
-    // ---------------------------------------------------------------- pose
-    const reloadP = weapon.reloading
-      ? clamp(1 - weapon.reloadT / (weapon.def?.reloadTime || 2.55), 0, 1)
-      : 0;
-    const P = this.pose;
+    if (this.fpActive) this._updateFp(dt, player, weapon, bobX, bobY);
+    else this._updateRifle(dt, player, weapon, bobX, bobY);
 
-    const carry = new THREE.Vector3().copy(P.hipPos)
-      .lerp(P.sprintPos, this.sprint)
-      .lerp(P.reloadPos, this.reloadW * 0.9);
-    const carryRot = new THREE.Euler(
-      P.hipRot.x + (P.sprintRot.x - P.hipRot.x) * this.sprint + (P.reloadRot.x - P.hipRot.x) * this.reloadW * 0.9,
-      P.hipRot.y + (P.sprintRot.y - P.hipRot.y) * this.sprint + (P.reloadRot.y - P.hipRot.y) * this.reloadW * 0.9,
-      P.hipRot.z + (P.sprintRot.z - P.hipRot.z) * this.sprint + (P.reloadRot.z - P.hipRot.z) * this.reloadW * 0.9,
-    );
-
-    // ADS wins over sprint; a reload pulls the gun out of the sight line.
-    const adsW = this.ads;
-    const pos = carry.lerp(P.adsPos, adsW);
-    const rot = new THREE.Euler(
-      carryRot.x + (P.adsRot.x - carryRot.x) * adsW,
-      carryRot.y + (P.adsRot.y - carryRot.y) * adsW,
-      carryRot.z + (P.adsRot.z - carryRot.z) * adsW,
-    );
-
-    // Breathing: vertical only, ~1.5 cm at the hip and 2 mm at the sights.
-    const breath = Math.sin(this.time * 1.6) * (0.0045 + 0.0015 * moving);
-    pos.y += breath * (1 - adsW * 0.8);
-    pos.x += this.swayX + bobX;
-    pos.y += this.swayY + bobY;
-    pos.z += this.kickZ + this.lunge * 0.16;
-    pos.x += this.lunge * 0.05;
-    rot.x += this.kickRot - this.lunge * 0.22 + this.swayY * 0.8;
-    rot.y += this.swayX * 0.9;
-    rot.z += -this.lunge * 0.10;
-    // Lean tilts the rifle with the head, so the sight picture stays level.
-    rot.z += -player.lean * 0.05;
-
-    this.gun.position.lerp(pos, 1 - Math.exp(-26 * dt));
-    this.gun.rotation.x = damp(this.gun.rotation.x, rot.x, 18, dt);
-    this.gun.rotation.y = damp(this.gun.rotation.y, rot.y, 18, dt);
-    this.gun.rotation.z = damp(this.gun.rotation.z, rot.z, 18, dt);
-
-    if (this.active === 'rifle') this._updateRifle(dt, weapon, reloadP);
-    else if (this.active === 'lmg') this._updateAuto(dt, weapon, reloadP);
-    else this._updatePistol(dt, weapon, reloadP);
-
-    // ---------------------------------------------------------------- arms
-    this.gun.updateMatrixWorld(true);
-    if (!this.hands) {
-      // Without skinned arms, keep the gun's own stubs: the support hand would sit
-      // right under the receiver at ADS and cover the sight picture.
-      if (this.active === 'rifle') this.handL.visible = this.ads < 0.55;
-    }
-    this.hands?.update(this.gun, this.handR, this.handL);
-
-    // ---------------------------------------------------------------- casing
     for (let i = this.casings.length - 1; i >= 0; i--) {
       const c = this.casings[i];
       c.life -= dt;
@@ -340,20 +291,49 @@ export class ViewModel {
       if (c.life <= 0) { c.mesh.removeFromParent(); this.casings.splice(i, 1); }
     }
 
-    // Muzzle flash.
     if (this.flashT > 0) {
       this.flashT -= dt;
-      if (this.flashT <= 0) { this.flash.visible = false; this.flashLight.intensity = 0; }
-      else this.flashLight.intensity = (this.active === 'pistol' ? 4.5 : 7) * (this.flashT / 0.055);
+      if (this.flashT <= 0) { if (this.flash) this.flash.visible = false; this.flashLight.intensity = 0; }
+      else this.flashLight.intensity = 7 * (this.flashT / 0.055);
     }
   }
 
-  /** Bolt-action choreography: lift/travel the bolt, run the firing hand, charger reload. */
-  _updateRifle(dt, weapon, reloadP) {
-    const cycleDur = weapon.cycleDuration || weapon.def?.cycleTime || 0.78;
-    const boltP = weapon.cycleT > 0 && !weapon.reloading
-      ? clamp(1 - weapon.cycleT / cycleDur, 0, 1)
-      : 0;
+  /* ------------------------------------------------------------- rifle rig */
+  _updateRifle(dt, player, weapon, bobX, bobY) {
+    const P = this.pose;
+    const reloadP = weapon.reloading ? clamp(1 - weapon.reloadT / (weapon.def?.reloadTime || 2.55), 0, 1) : 0;
+    const carry = new THREE.Vector3().copy(P.hipPos)
+      .lerp(P.sprintPos, this.sprint)
+      .lerp(P.reloadPos, this.reloadW * 0.9);
+    const carryRot = new THREE.Euler(
+      P.hipRot.x + (P.sprintRot.x - P.hipRot.x) * this.sprint + (P.reloadRot.x - P.hipRot.x) * this.reloadW * 0.9,
+      P.hipRot.y + (P.sprintRot.y - P.hipRot.y) * this.sprint + (P.reloadRot.y - P.hipRot.y) * this.reloadW * 0.9,
+      P.hipRot.z + (P.sprintRot.z - P.hipRot.z) * this.sprint + (P.reloadRot.z - P.hipRot.z) * this.reloadW * 0.9,
+    );
+    const adsW = this.ads;
+    const pos = carry.lerp(P.adsPos, adsW);
+    const rot = new THREE.Euler(
+      carryRot.x + (P.adsRot.x - carryRot.x) * adsW,
+      carryRot.y + (P.adsRot.y - carryRot.y) * adsW,
+      carryRot.z + (P.adsRot.z - carryRot.z) * adsW,
+    );
+    const breath = Math.sin(this.time * 1.6) * 0.0045;
+    pos.y += breath * (1 - adsW * 0.8);
+    pos.x += this.swayX + bobX;
+    pos.y += this.swayY + bobY;
+    pos.z += this.kickZ + this.lunge * 0.16;
+    pos.x += this.lunge * 0.05;
+    rot.x += this.kickRot - this.lunge * 0.22 + this.swayY * 0.8;
+    rot.y += this.swayX * 0.9;
+    rot.z += -this.lunge * 0.10 - player.lean * 0.05;
+
+    this.gun.position.lerp(pos, 1 - Math.exp(-26 * dt));
+    this.gun.rotation.x = damp(this.gun.rotation.x, rot.x, 18, dt);
+    this.gun.rotation.y = damp(this.gun.rotation.y, rot.y, 18, dt);
+    this.gun.rotation.z = damp(this.gun.rotation.z, rot.z, 18, dt);
+
+    const cycleDur = weapon.def?.cycleTime || 0.78;
+    const boltP = weapon.cycleT > 0 && !weapon.reloading ? clamp(1 - weapon.cycleT / cycleDur, 0, 1) : 0;
     let lift = 0, pull = 0;
     if (boltP > 0) {
       if (boltP < 0.20) lift = smoothstep(0, 0.20, boltP);
@@ -362,9 +342,8 @@ export class ViewModel {
       else if (boltP < 0.76) { lift = 1 - smoothstep(0.60, 0.76, boltP); pull = 0; }
     }
     this.bolt.rotation.z = damp(this.bolt.rotation.z, -1.30 * lift, 30, dt);
-    this.bolt.position.z = damp(this.bolt.position.z, this.w.boltRest.z + pull * 0.085, 30, dt);
+    this.bolt.position.z = damp(this.bolt.position.z, this.rifleRig.boltRest.z + pull * 0.085, 30, dt);
 
-    // The firing hand grabs the knob, works it, then returns to the wrist.
     this.gun.updateMatrixWorld(true);
     const handR = this.handR;
     const targetR = new THREE.Vector3().copy(this.gripR);
@@ -385,7 +364,7 @@ export class ViewModel {
       } else if (reloadP < 0.30) {
         const k = smoothstep(0.16, 0.30, reloadP);
         target = new THREE.Vector3().lerpVectors(new THREE.Vector3(0.055, -0.420, 0.120), this.clipAnchor.position.clone().add(new THREE.Vector3(0, 0.075, 0.045)), k);
-        rotZ = -1.15 + (0 - -1.15) * k;
+        rotZ = -1.15 + 1.15 * k;
       } else if (reloadP < 0.52) {
         target = this.clipAnchor.position.clone().add(new THREE.Vector3(0, 0.075, 0.045));
         rotZ = 0;
@@ -396,7 +375,7 @@ export class ViewModel {
       } else {
         const k = smoothstep(0.70, 0.92, reloadP);
         target = new THREE.Vector3().lerpVectors(this.clipAnchor.position.clone().add(new THREE.Vector3(0, 0.020, 0.045)), this.gripR, k);
-        rotZ = 0 + (-Math.PI / 2) * k;
+        rotZ = -Math.PI / 2 * k;
       }
       targetR.copy(target);
       handRotZ = rotZ;
@@ -404,14 +383,11 @@ export class ViewModel {
     handR.position.lerp(targetR, 1 - Math.exp(-22 * dt));
     handR.rotation.z = damp(handR.rotation.z, handRotZ, 16, dt);
 
-    // Left hand: forend normally, pulls in slightly for a reload.
     const targetL = this.gripL.clone();
     if (weapon.reloading) targetL.z += 0.03 * smoothstep(0.1, 0.4, reloadP);
     this.handL.position.lerp(targetL, 1 - Math.exp(-14 * dt));
-
     this.clip.visible = weapon.reloading && reloadP > 0.34 && reloadP < 0.70;
 
-    // Sounds are cued from the animation timeline.
     if (boltP > 0 && this.lastCycle <= 0) {
       this.game.audio?.bolt();
       this._ejectCasing();
@@ -422,39 +398,92 @@ export class ViewModel {
       if (this.lastReload < 0.86 && reloadP >= 0.86) this.game.audio?.bolt();
     }
     this.lastReload = weapon.reloading ? reloadP : 0;
+
+    this.gun.updateMatrixWorld(true);
+    if (!this.hands) this.handL.visible = this.ads < 0.55;
+    this.hands?.update(this.gun, this.handR, this.handL);
   }
 
-  /** Automatic weapons: no bolt choreography — hands stay on the grips, brass keeps flying. */
-  _updateAuto(dt, weapon, reloadP) {
-    this.bolt.rotation.z = damp(this.bolt.rotation.z, 0, 30, dt);
-    this.bolt.position.z = damp(this.bolt.position.z, this.w.boltRest.z, 30, dt);
-    this.handR.position.lerp(this.gripR, 1 - Math.exp(-24 * dt));
-    this.handL.position.lerp(this.gripL, 1 - Math.exp(-24 * dt));
-    this.handR.rotation.z = damp(this.handR.rotation.z, -Math.PI / 2, 20, dt);
-
-    if (weapon.cycleT > 0 && this.lastCycle <= 0) this._ejectCasing();
-    this.lastCycle = weapon.cycleT > 0 ? 1 : 0;
-    if (weapon.reloading && this.lastReload < 0.62 && reloadP >= 0.62) this.game.audio?.reload('clip');
-    this.lastReload = weapon.reloading ? reloadP : 0;
-  }
-
-  /** C96: bolt slams back on the shot, hands stay put, reload just pulls the gun in. */
-  _updatePistol(dt, weapon, reloadP) {
-    this.slideT = Math.max(0, (this.slideT || 0) - dt * 8);
-    const travel = Math.min(1, this.slideT) * 0.020;
-    this.bolt.position.z = damp(this.bolt.position.z, this.w.boltRest.z + travel, 34, dt);
-
-    // Hands ride the gun: right on the grip, left cupping the magazine well.
-    this.handR.position.lerp(this.gripR, 1 - Math.exp(-24 * dt));
-    this.handL.position.lerp(this.gripL, 1 - Math.exp(-24 * dt));
-    this.handR.rotation.z = damp(this.handR.rotation.z, -Math.PI / 2, 18, dt);
-
-    if (weapon.cycleT > 0 && this.lastCycle <= 0) this._ejectCasing();
-    this.lastCycle = weapon.cycleT > 0 ? 1 : 0;
-    if (weapon.reloading) {
-      if (this.lastReload < 0.45 && reloadP >= 0.45) this.game.audio?.reload('clip');
+  /* ---------------------------------------------------------------- FP rig */
+  _updateFp(dt, player, weapon, bobX, bobY) {
+    const fp = this.fp[this.fpActive];
+    const P = fp.poses;
+    const adsW = this.ads;
+    const pos = P.hipPos.clone().lerp(P.adsPos, adsW);
+    const rot = new THREE.Euler(
+      P.hipRot.x + (P.adsRot.x - P.hipRot.x) * adsW,
+      P.hipRot.y + (P.adsRot.y - P.hipRot.y) * adsW,
+      P.hipRot.z + (P.adsRot.z - P.hipRot.z) * adsW,
+    );
+    // Sprint carry sits lower and canted.
+    pos.x += 0.05 * this.sprint;
+    pos.y -= 0.08 * this.sprint;
+    rot.x -= 0.30 * this.sprint;
+    rot.y += 0.35 * this.sprint;
+    rot.z += 0.25 * this.sprint;
+    // Reload: the reference project's keyed choreography (tilt in, strip, seat, release).
+    const reloadDur = weapon.def?.reloadTime || 2;
+    const rp = weapon.reloading ? clamp(1 - weapon.reloadT / reloadDur, 0, 1) : -1;
+    if (rp >= 0) {
+      const pistol = fp.kind === 'pistol' || fp.kind === 'sidearm';
+      const keys = pistol
+        ? (weapon.emptyAtReload ? PISTOL_EMPTY : PISTOL_TAC)
+        : (weapon.emptyAtReload ? rifleEmptyKeys('release') : RIFLE_TAC);
+      const k = sampleKeys(keys, rp, this._rk || (this._rk = new Array(6)));
+      pos.x += k[0] * 0.01;
+      pos.y += k[1] * 0.01;
+      pos.z += k[2] * 0.01;
+      rot.x += k[3] * Math.PI / 180;
+      rot.y += k[4] * Math.PI / 180;
+      rot.z += k[5] * Math.PI / 180;
     }
-    this.lastReload = weapon.reloading ? reloadP : 0;
+
+    pos.x += this.swayX + bobX;
+    pos.y += this.swayY + bobY;
+    pos.z += this.kickZ + this.lunge * 0.14;
+    pos.x += this.lunge * 0.04;
+    rot.x += this.kickRot - this.lunge * 0.20 + this.swayY * 0.8;
+    rot.y += this.swayX * 0.9;
+    rot.z += -this.lunge * 0.10 - player.lean * 0.05;
+
+    fp.holder.position.lerp(pos, 1 - Math.exp(-26 * dt));
+    fp.holder.rotation.x = damp(fp.holder.rotation.x, rot.x, 18, dt);
+    fp.holder.rotation.y = damp(fp.holder.rotation.y, rot.y, 18, dt);
+    fp.holder.rotation.z = damp(fp.holder.rotation.z, rot.z, 18, dt);
+    fp.holder.updateMatrixWorld(true);
+
+    if (P.muzzle) {
+      this.flashLight.position.copy(P.muzzle).multiplyScalar(P.scale).applyMatrix4(fp.holder.matrixWorld);
+    }
+
+    // Magazine out / in and the empty-reload bolt release, driven from the same timeline.
+    const rig = fp.rig;
+    if (rig.magazine && rig.magHome) {
+      let out = 0;
+      if (rp >= 0) {
+        if (rp < 0.30) out = phase(rp, [0.09, 0.30]);
+        else if (rp < 0.46) out = 1;
+        else out = 1 - phase(rp, [0.46, 0.62]);
+      }
+      rig.magazine.position.y = rig.magHome.y - out * 0.16;
+      rig.magazine.position.z = rig.magHome.z + out * 0.04;
+      rig.magazine.visible = out < 0.985;
+    }
+    if (rig.charging && rig.chargeHome) {
+      let pull = 0;
+      if (rp >= 0 && weapon.emptyAtReload) {
+        if (rp < 0.66) pull = 0;
+        else if (rp < 0.72) pull = phase(rp, [0.66, 0.72]);
+        else if (rp < 0.76) pull = 1 - phase(rp, [0.72, 0.76]);
+        else pull = 0;
+      }
+      rig.charging.position.z = rig.chargeHome.z + pull * 0.12;
+    }
+
+    if (weapon.cycleT > 0 && this.lastCycle <= 0) this._ejectCasing();
+    this.lastCycle = weapon.cycleT > 0 ? 1 : 0;
+    if (weapon.reloading && this.lastReload < 0.5 && rp >= 0.5) this.game.audio?.reload('clip');
+    this.lastReload = weapon.reloading ? 1 : 0;
   }
 
   setEnabled(v) { this.rig.visible = v; }

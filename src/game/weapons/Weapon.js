@@ -178,6 +178,7 @@ export class Weapon {
 
   startReload() {
     if (this.reloading || this.reserve <= 0) return;
+    this.emptyAtReload = this.ammo === 0;
     this.reloading = true;
     this.reloadCommitted = false;
     this.reloadTotal = this.def.reloadTime;
