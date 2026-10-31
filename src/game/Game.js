@@ -12,6 +12,7 @@ import { Level } from '../world/Level.js';
 import { Player } from './Player.js';
 import { PlayerBody } from './PlayerBody.js';
 import { Weapon } from './weapons/Weapon.js';
+import { DEFAULT_LOADOUT, weaponDef } from './weapons/WeaponDefs.js';
 import { ViewModel } from './weapons/ViewModel.js';
 import { loadRifle } from './weapons/RifleModel.js';
 import { Bot } from './bots/Bot.js';
@@ -48,6 +49,7 @@ export class Game {
     this.bots = [];
     this.player = null;
     this.weapon = null;
+    this.weapons = null;
     this.match = null;
     this.hud = null;
     this.settings = { sens: 1, volume: 0.7, recoil: 1 };
@@ -171,8 +173,11 @@ export class Game {
     const spawn = this.level.playerSpawn || { position: new THREE.Vector3(0, 2, 0), yaw: 0 };
     this.player.spawn(spawn.position, spawn.yaw);
 
-    this.weapon = new Weapon(this, this.player);
+    this.weapons = DEFAULT_LOADOUT.map((id) => new Weapon(this, this.player, weaponDef(id)));
+    this.weaponIndex = 0;
+    this.weapon = this.weapons[0];
     this.viewmodel = new ViewModel(this);
+    this.viewmodel.setWeapon(this.weapon.def);
     this.match = new Match(this);
     this.hud = new HUD(this);
     this.hud.show(true);
@@ -250,6 +255,22 @@ export class Game {
     this.input.lock();
     this.canvas.focus?.();
     this.onMissionStart?.(campaign);
+  }
+
+  /** Switch weapon slots (1/2 or mouse wheel). Cancels a reload and costs a short draw time. */
+  switchWeapon(i) {
+    if (!this.weapons || this.weapons.length < 2) return;
+    const n = this.weapons.length;
+    const idx = ((i % n) + n) % n;
+    if (idx === this.weaponIndex) return;
+    this.weapon?.cancelReload();
+    this.weaponIndex = idx;
+    this.weapon = this.weapons[idx];
+    this.weapon.equipT = 0.42;
+    this.weapon.adsT = 0;
+    this.viewmodel?.setWeapon(this.weapon.def);
+    this.hud?.setWeapon?.(this.weapon.def);
+    this.audio?.ui?.('click');
   }
 
   spawnBots() {
@@ -402,16 +423,11 @@ export class Game {
     const spawn = this.match ? this.match.getSpawn(0) : this.level.playerSpawn;
     this.player.spawn(spawn.position, spawn.yaw);
     this.hud?.banner('重新部署', this.hud.game.campaign.name, 1.8);
-    this.weapon.ammo = this.weapon.def.magazine;
-    this.weapon.reserve = this.weapon.def.reserve;
-    this.weapon.reloading = false;
-    this.weapon.cycleT = 0;
-    this.weapon.reloadT = 0;
-    this.weapon.reloadCommitted = false;
-    this.weapon.spread = 0;
-    this.weapon.shotIndex = 0;
-    this.weapon.sprintLock = 0;
-    this.weapon.adsT = 0;
+    for (const w of this.weapons || []) w.refill();
+    this.weaponIndex = 0;
+    this.weapon = this.weapons ? this.weapons[0] : this.weapon;
+    this.viewmodel?.setWeapon(this.weapon.def);
+    this.hud?.setWeapon?.(this.weapon.def);
     this.hud?.setReloading(false);
     this.viewmodel?.setEnabled(true);
     this.grenades = Math.max(this.grenades, 2);
@@ -582,6 +598,11 @@ export class Game {
     this.physics.step(dt);
     const cmd = this.input.cmd();
     if (this.debug?.aim) cmd.aim = true;
+    if (this.started && !this.paused) {
+      if (cmd.slot1) this.switchWeapon(0);
+      else if (cmd.slot2) this.switchWeapon(1);
+      else if (cmd.wheel) this.switchWeapon(this.weaponIndex + (cmd.wheel > 0 ? 1 : -1));
+    }
     const look = this.input.takeMouseDelta();
 
     if (this.player.alive) {
@@ -589,7 +610,6 @@ export class Game {
       this.player.update(dt, cmd, this.weapon);
       this.weapon.update(dt, cmd);
       this.viewmodel.update(dt, this.player, this.weapon, look);
-      this.playerBody?.update(dt);
       if (this.player.sprinting) this.viewmodel.setEnabled(true);
     } else {
       this.player.update(dt, cmd, this.weapon);
@@ -706,6 +726,7 @@ export class Game {
     }
     this.grenadeList.length = 0;
     this.weapon = null;
+    this.weapons = null;
     this.match = null;
     this.level = null;
     this.nav = null;

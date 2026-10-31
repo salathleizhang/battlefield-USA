@@ -1,38 +1,17 @@
 import * as THREE from 'three';
 import { rand, clamp } from '../../core/MathUtil.js';
 
-export const TYPE38 = {
-  id: 'type38',
-  name: '三八大盖',
-  fullName: '三八式步枪 · 6.5×50mm',
-  kind: '栓动步枪',
-  magazine: 5,
-  reserve: 60,
-  damage: 105,
-  headshot: 2.4,
-  velocity: 760,
-  cycleTime: 0.78,
-  reloadTime: 2.55,
-  // Radians of cone half-angle at the muzzle.
-  spreadHip: 0.010,
-  spreadAds: 0.0011,
-  recoil: 0.030,
-  meleeDamage: 130,
-  zeroRange: 100,
-  // Hands-on model: aimed spread blooms while the string continues, recovers when it stops.
-  adsTime: 0.22,
-  spreadPerShot: 0.00095,
-  spreadMax: 0.0062,
-  spreadRecovery: 0.010,
-  sprintToFire: 0.24,
-  reloadCommit: 0.8,
-};
+import { WEAPONS, weaponDef } from './WeaponDefs.js';
+
+// Back-compat: the Type 38 def used to live here.
+export const TYPE38 = WEAPONS.type38;
 
 export class Weapon {
-  constructor(game, player) {
+  constructor(game, player, def = weaponDef('type38')) {
     this.game = game;
     this.player = player;
-    this.def = TYPE38;
+    this.def = def;
+    this.id = def.id;
     this.ammo = this.def.magazine;
     this.reserve = this.def.reserve;
     this.cycleT = 0;
@@ -46,6 +25,7 @@ export class Weapon {
     this.shotIndex = 0;
     this.lastShot = -9;
     this.sprintLock = 0;
+    this.equipT = 0;
     this.meleeCd = 0;
     this.grenadeCd = 0;
     this.triggerHeld = false;
@@ -55,10 +35,10 @@ export class Weapon {
 
   get canFire() {
     return !this.reloading && this.cycleT <= 0 && this.ammo > 0 && this.player.alive
-      && this.sprintLock <= 0 && !this.player.sliding && !this.player.mantle;
+      && this.sprintLock <= 0 && this.equipT <= 0 && !this.player.sliding && !this.player.mantle;
   }
 
-  mobility() { return this.player.aiming ? 0.92 : 0.97; }
+  mobility() { return this.player.aiming ? (this.def.adsMobility ?? 0.92) : (this.def.mobility ?? 0.97); }
 
   update(dt, cmd) {
     this.time += dt;
@@ -74,6 +54,7 @@ export class Weapon {
     else this.sprintLock = Math.max(0, this.sprintLock - dt);
 
     this.cycleT = Math.max(0, this.cycleT - dt);
+    this.equipT = Math.max(0, this.equipT - dt);
     this.reloadT = Math.max(0, this.reloadT - dt);
     this.meleeCd = Math.max(0, this.meleeCd - dt);
     this.grenadeCd = Math.max(0, this.grenadeCd - dt);
@@ -97,10 +78,11 @@ export class Weapon {
       this.startReload();
     }
 
-    if (cmd.fire && this.canFire) {
+    const wantFire = this.def.mode === 'semi' ? !!cmd.firePressed : !!cmd.fire;
+    if (wantFire && this.canFire) {
       if (this.ammo === 0) this.startReload();
       else this.fire();
-    } else if (cmd.fire && !this.reloading && this.ammo === 0 && this.reserve > 0 && this.cycleT <= 0) {
+    } else if (wantFire && !this.reloading && this.ammo === 0 && this.reserve > 0 && this.cycleT <= 0) {
       this.startReload();
     }
     this.triggerHeld = cmd.fire;
@@ -154,7 +136,7 @@ export class Weapon {
       damage: this.def.damage,
       owner: p,
       team: 0,
-      kind: 'type38',
+      kind: this.def.id,
       headshot: this.def.headshot,
     });
 
@@ -172,11 +154,26 @@ export class Weapon {
     this.shotIndex += 1;
     this.spread = Math.min(this.def.spreadMax, this.spread + this.def.spreadPerShot);
 
-    this.game.audio.shot('type38', { dist: 0 });
+    this.game.audio.shot(this.def.id, { dist: 0 });
     this.game.alertBots(p.position, 70);
-    this.game.viewmodel.onFire();
+    this.game.viewmodel.onFire(this);
     this.game.effects.muzzleSmoke(origin, dir);
     this.game.hud?.shot();
+  }
+
+  /** Fresh magazine + reserve (respawn). */
+  refill() {
+    this.ammo = this.def.magazine;
+    this.reserve = this.def.reserve;
+    this.cycleT = 0;
+    this.reloadT = 0;
+    this.reloadCommitted = false;
+    this.reloading = false;
+    this.adsT = 0;
+    this.spread = 0;
+    this.shotIndex = 0;
+    this.sprintLock = 0;
+    this.equipT = 0;
   }
 
   startReload() {

@@ -111,6 +111,7 @@ export class HUD {
       hp: q('[data-hp]'), hpNum: q('[data-hpnum]'),
       stance: q('[data-stance]'), wound: q('[data-wound]'),
       ammo: q('[data-ammo]'), reserve: q('[data-reserve]'), reload: q('[data-reload]'), pips: q('[data-pips]'),
+      weaponName: q('.weapon-name'),
       banner: q('[data-banner]'), bannerTitle: q('[data-banner] h2'), bannerSub: q('[data-banner] p'),
       subtitle: q('[data-subtitle]'),
       death: q('[data-death]'), deathBy: q('[data-death-by]'), respawn: q('[data-respawn]'), deathTip: q('[data-death-tip]'),
@@ -159,6 +160,17 @@ export class HUD {
   }
 
   setObjective(text) { this.el.objective.textContent = text; }
+
+  /** Weapon slot changed: swap the name and force the ammo widget to rebuild. */
+  setWeapon(def) {
+    if (!def || this.weaponId === def.id) return;
+    this.weaponId = def.id;
+    if (this.el.weaponName) {
+      this.el.weaponName.innerHTML = `${def.name} <span>${def.caliber || ''}</span>`;
+    }
+    this.lastAmmo = -1;
+    this.lastPips = -1;
+  }
 
   banner(title, sub = '', dur = 3) {
     this.el.bannerTitle.textContent = title;
