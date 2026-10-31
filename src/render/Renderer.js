@@ -7,6 +7,8 @@ import {
 import { N8AOPostPass } from 'n8ao';
 import { GradeEffect, LensEffect, SharpenEffect, lensDirtTexture } from './PostFX.js';
 
+const _lodPos = new THREE.Vector3();
+
 const SKY_VERT = /* glsl */`
 varying vec3 vDir;
 void main() {
@@ -486,7 +488,10 @@ export class Renderer {
     if (this.lens) this.lens.uniforms.get('aspect').value = w / h;
   }
 
-  setEnvironment({ fogColor, fog, fogDensity, sunColor, sun, sunIntensity, sunDir, skyTop, skyHorizon, cloudiness, cloudColor, groundColor, ground, hemiIntensity, hemiColor, hemiGround }) {
+  setEnvironment({
+    fogColor, fog, fogDensity, sunColor, sun, sunIntensity, sunDir, sunDisc, godRayWeight,
+    skyTop, skyHorizon, cloudiness, cloudColor, groundColor, ground, hemiIntensity, hemiColor, hemiGround,
+  }) {
     // Campaigns use both naming conventions (`fog`/`fogColor`, `sun`/`sunColor`, …).
     if (fogColor === undefined) fogColor = fog;
     if (sunColor === undefined) sunColor = sun;
@@ -503,6 +508,10 @@ export class Renderer {
       this.skyUniforms.uSun.value.copy(sunDir).normalize();
       this.setSun(sunDir, sunColor ?? 0xffd9a0);
     }
+    // Dense weather diffuses the sun: the disc and the shafts both soften
+    // without disabling the sun source the lens and god rays read from.
+    if (sunDisc !== undefined) this.skyUniforms.uSunDisc.value = sunDisc;
+    if (godRayWeight !== undefined) this.godRays.weight = godRayWeight;
     if (skyTop !== undefined) this.skyUniforms.uTop.value.set(skyTop);
     if (skyHorizon !== undefined) this.skyUniforms.uHorizon.value.set(skyHorizon);
     if (cloudiness !== undefined) this.skyUniforms.uCloudiness.value = cloudiness;
@@ -525,6 +534,51 @@ export class Renderer {
         this.skyUniforms.uSun.value.clone().multiplyScalar(150),
       );
       this.sun.target.updateMatrixWorld();
+    }
+    this._shadowLod();
+    this._adaptiveResolution(dt);
+  }
+
+  /**
+   * Shadow-caster LOD.
+   *
+   * Every visible mesh is submitted twice — once into the cascade, once into the
+   * frame — so a prop that covers four pixels of shadow still costs a draw call
+   * and its vertices. Small objects (props, soldier gear, debris) stop casting
+   * once their shadow is smaller than a cascade texel, and geometry under ~12 cm
+   * never casts at all: at any distance the cascades resolve, that silhouette is
+   * noise.
+   *
+   * The candidate list is rebuilt every 120 frames rather than every frame, since
+   * the scene only changes when something spawns or is torn down.
+   */
+  _shadowLod() {
+    this._frameCount = (this._frameCount || 0) + 1;
+    if (!this._casters || this._frameCount - this._castersFrame >= 120) {
+      this._castersFrame = this._frameCount;
+      this._casters = [];
+      this.scene.traverse((o) => {
+        if (!o.isMesh && !o.isInstancedMesh) return;
+        if (o.userData.noShadowLod) return;
+        const g = o.geometry;
+        if (!g) return;
+        if (!g.boundingSphere) g.computeBoundingSphere();
+        const radius = g.boundingSphere?.radius ?? 1;
+        if (radius > 4) return; // big set-pieces earn their shadow
+        this._casters.push({ mesh: o, radius, base: o.castShadow });
+      });
+    }
+    const cam = this.camera.position;
+    for (const c of this._casters) {
+      const m = c.mesh;
+      if (!m.parent) continue;
+      // Range scales with size: a 3 m palm canopy throws dappled shade across the
+      // beach at 80 m and must keep casting, while a 0.4 m crate at that range
+      // covers a couple of texels.
+      const range = 30 + c.radius * 45;
+      const want = c.base && c.radius >= 0.12
+        && m.getWorldPosition(_lodPos).distanceToSquared(cam) < range * range;
+      if (m.castShadow !== want) m.castShadow = want;
     }
   }
 
