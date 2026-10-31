@@ -15,6 +15,7 @@
 | `weapons/Weapon.js` | 散布膨胀与恢复、开镜过渡、冲刺出枪锁、装填 80% 提交、装填取消、逐发后坐轨迹、多武器状态机 | `src/game/weapons/Weapon.js` |
 | `weapons/WeaponDefs.js` | 数据驱动武器表、槽位与配装（`?loadout=`）、半自动/栓动/全自动开火模式 | `src/game/weapons/WeaponDefs.js` |
 | `weapons/FPRig.js` + `models/fp/*.glb` | 参考项目的作者级第一人称武器 rig（枪 + 手套手臂）、hip/ADS 解算 | `src/game/weapons/FpRig.js`、`public/assets/models/fp/` |
+| 同一批 `models/fp/*.glb` | NPC 武器：只取 `Gun_<id>`，按真实枪长归一化后挂到角色肩上（替代角色包里的低模 Kar98k） | `src/game/bots/BotGun.js` |
 | `weapons/ReloadChoreo.js` | 换弹枪身关键帧（战术/空仓、步枪/手枪）、弹匣与拉机柄节点动画、检视关键帧 | `src/game/weapons/ReloadChoreo.js` |
 | `models/weapons/optics.glb` | 红点 / 全息 / 3.5× 镜，按导轨挂载、分划锚点 ADS、倍率缩放、镜筒成像 | `src/game/weapons/FpRig.js`（`OPTICS`）、`public/assets/models/optics/` |
 | `weapons/WeaponDefs.js` 配件表 | 枪口 / 下挂 / 弹匣三类配件、数值折算、消音 | `src/game/weapons/WeaponDefs.js`（`ATTACHMENTS`、`applyAttachments`） |
