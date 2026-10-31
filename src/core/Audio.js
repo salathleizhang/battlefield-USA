@@ -15,8 +15,12 @@ const SAMPLE_ROOT = '/assets/audio/';
 const HEADROOM = 0.7;
 
 const GROUPS = {
-  // Battlefield voices: charge shout, bugle, curses and the attack order.
-  voice: ['charge-crowd', 'bugle-charge', 'curse-american', 'order-kill-americans'],
+  // Battlefield voices: charge shout, bugle, curses, the attack order and the
+  // opening radio order (already band-limited to a field set, see tools/radioize.py).
+  voice: [
+    'charge-crowd', 'bugle-charge', 'curse-american', 'order-kill-americans',
+    'radio-objective',
+  ],
   guns: [
     // Recorded Type 38 Arisaka and M1 Garand reports (CC0, see CREDITS.md).
     'type38_player_near_000', 'type38_player_near_001',
@@ -161,6 +165,14 @@ export class Audio {
 
     this.sfx = ctx.createGain();
     this.sfx.connect(this.master);
+
+    // First-person channels (the player's own radio headset) skip `sfx` and its
+    // distance/reverb buses: they are not in the world, so they must not be
+    // dulled by distance or smeared by the street, and they have to sit above
+    // the battle rather than inside it.
+    this.headset = ctx.createGain();
+    this.headset.gain.value = 1;
+    this.headset.connect(this.master);
 
     this.reverb = ctx.createConvolver();
     this.reverb.buffer = this._impulse(2.0, 2.6);
@@ -411,6 +423,39 @@ export class Audio {
       });
     }
     return count;
+  }
+
+  /**
+   * First-person radio: a transmission in the player's own headset.
+   *
+   * It is not a voice in the world, so it takes none of the world's treatment —
+   * no distance rolloff, no stereo placement, no room reverb — and runs on the
+   * headset bus above the world mix (2.3× by default: a man two metres away
+   * peaks near −6 dBFS, a headset transmission should sit clearly above that).
+   * The world bus ducks for as long as the net is open and comes back
+   * afterwards, which is what makes the order sound like it is inside the
+   * player's ear rather than shouted across the street.
+   */
+  radio(name, { volume = 2.3, when = 0, duck = 0.5, release = 0.6 } = {}) {
+    if (!this.ready || !this.has(name)) return null;
+    // A transmission is one take; the variants in `play()` are for gunshots.
+    const buf = this.buffers.get(name)[0];
+    const t = this.ctx.currentTime + when;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    const g = this._gain(volume);
+    src.connect(g);
+    g.connect(this.headset);
+    src.start(t);
+
+    if (this.sfx && duck > 0) {
+      const end = t + buf.duration;
+      const p = this.sfx.gain;
+      p.cancelScheduledValues(t);
+      p.setTargetAtTime(duck, t, 0.03);
+      p.setTargetAtTime(1, end, release);
+    }
+    return src;
   }
 
   /* ------------------------------------------------------------ weapons */
