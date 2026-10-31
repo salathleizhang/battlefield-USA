@@ -3,6 +3,7 @@ import { Batcher, signTexture, flagTexture } from './Geo.js';
 import { G } from '../core/Physics.js';
 import { mulberry32 } from '../core/MathUtil.js';
 import { BUILDERS } from './maps/index.js';
+import { Materials } from './Materials.js';
 
 const TEAM_COLORS = [0xd23a2b, 0x3f6fa8];
 
@@ -141,11 +142,18 @@ export class Level {
     base = null, windows = true, balcony = false,
   }) {
     const gy = base ?? this.groundHeight(x, z);
-    const bodyMat = this.mats.get(material);
+    const bodyMat = this._facadeMat(material);
     const roofMat = this.mats.get(flatRoof ? 'plaster' : roofMaterial);
     const rot = rotY;
     const c = Math.cos(rot), s = Math.sin(rot);
     const toWorld = (lx, lz) => [x + lx * c + lz * s, z - lx * s + lz * c];
+
+    // A row of hotels built from one recipe reads as one hotel repeated. These
+    // per-building factors vary the window rhythm, which is the thing the eye
+    // locks onto: identical spacing on every facade is what looks manufactured.
+    const winW = 1.1 * (0.86 + this.rand() * 0.3);
+    const winH = (h / floors) * (0.46 + this.rand() * 0.14);
+    const bayJitter = 0.88 + this.rand() * 0.26;
 
     // Main mass.
     this.batch.box(w, h, d, x, gy + h / 2, z, bodyMat, { rotY });
@@ -163,22 +171,24 @@ export class Level {
 
     if (windows) {
       const floorH = h / floors;
-      const cols = Math.max(2, Math.floor(w / 3.4));
-      const backCols = Math.max(2, Math.floor(d / 3.4));
+      const cols = Math.max(2, Math.round((w / 3.4) * bayJitter));
+      const backCols = Math.max(2, Math.round((d / 3.4) * bayJitter));
       for (let f = 0; f < floors; f++) {
-        const wy = gy + floorH * f + floorH * 0.58;
+        // Each floor sits a hair off the nominal line, like real masonry.
+        const wy = gy + floorH * f + floorH * (0.55 + this.rand() * 0.09);
         for (let i = 0; i < cols; i++) {
           const lx = -w / 2 + (w / cols) * (i + 0.5);
           for (const [nz, flip] of [[d / 2 + 0.06, 0], [-d / 2 - 0.06, Math.PI]]) {
             const [wx, wz] = toWorld(lx, nz);
-            this._window(wx, wy, wz, rot + flip, 1.1, floorH * 0.52, f === 0 && i === Math.floor(cols / 2));
+            const awning = f === 0 && this.rand() < 0.5 ? 0.55 + this.rand() * 0.35 : 0;
+            this._window(wx, wy, wz, rot + flip, winW, winH, f === 0 && i === Math.floor(cols / 2), { awning });
           }
         }
         for (let i = 0; i < backCols; i++) {
           const lz = -d / 2 + (d / backCols) * (i + 0.5);
           for (const [nx, flip] of [[w / 2 + 0.06, Math.PI / 2], [-w / 2 - 0.06, -Math.PI / 2]]) {
             const [wx, wz] = toWorld(nx, lz);
-            this._window(wx, wy, wz, rot + flip, 1.1, floorH * 0.52, false);
+            this._window(wx, wy, wz, rot + flip, winW, winH, false, {});
           }
         }
       }
@@ -209,16 +219,58 @@ export class Level {
     return { x, z, gy, w, d, h };
   }
 
-  _window(x, y, z, rotY, w, h, doorLike = false) {
-    const dark = this.mats.get('glass');
+  _window(x, y, z, rotY, w, h, doorLike = false, { awning = 0 } = {}) {
+    const dark = this._facadeMat('glass');
     this.batch.box(w, h, 0.1, x, y, z, dark, { rotY });
     // Frame.
     this.batch.box(w + 0.22, 0.1, 0.12, x, y + h / 2 + 0.06, z, this.mats.get('plasterWhite'), { rotY });
     this.batch.box(w + 0.22, 0.1, 0.12, x, y - h / 2 - 0.06, z, this.mats.get('plasterWhite'), { rotY });
+    // Sill: a 4 cm lip that catches its own shadow line on the wall.
+    const ox = Math.sin(rotY), oz = Math.cos(rotY);
+    this.batch.box(w + 0.34, 0.07, 0.26, x + ox * 0.08, y - h / 2 - 0.16, z + oz * 0.08, this.mats.get('plasterWhite'), { rotY });
+    if (awning > 0) {
+      // Projecting fabric shade — the single cheapest thing that breaks up a
+      // facade, because it puts a horizontal line and a shadow where the eye
+      // expects only stucco.
+      const mat = this.rand() < 0.5 ? this.mats.get('canvas') : this._facadeMat('metal');
+      this.batch.box(w + 0.5, 0.06, 0.85 * awning, x + ox * 0.46, y + h / 2 + 0.42, z + oz * 0.46, mat, { rotY });
+      // Valance hanging off the front edge.
+      this.batch.box(w + 0.5, 0.22, 0.05, x + ox * (0.46 + 0.42 * awning), y + h / 2 + 0.32, z + oz * (0.46 + 0.42 * awning), mat, { rotY });
+    }
     // Randomly boarded up.
     if (this.rand() < 0.28 && !doorLike) {
       this.batch.box(w + 0.3, h * 0.55, 0.14, x, y, z + 0.06, this.mats.get('wood'), { rotY, uv: 0.5 });
     }
+  }
+
+  /**
+   * Facade material variants.
+   *
+   * One stucco material for forty hotels is why the row reads as a copy-paste:
+   * same albedo, same roughness, same texel scale. Three clones per name with a
+   * slight hue/roughness shift give the row tonal drift for three extra draw
+   * calls, and each clone is still batched.
+   */
+  _facadeMat(name) {
+    if (!this._facadeCache) this._facadeCache = new Map();
+    const base = this.mats.get(name);
+    if (!base) return base;
+    const v = (this.rand() * 3) | 0;
+    const key = `${name}#${v}`;
+    let m = this._facadeCache.get(key);
+    if (m) return m;
+    m = base.clone();
+    const hsl = { h: 0, s: 0, l: 0 };
+    m.color.getHSL(hsl);
+    m.color.setHSL(
+      (hsl.h + (v - 1) * 0.008 + 1) % 1,
+      THREE.MathUtils.clamp(hsl.s * (1 + (v - 1) * 0.08), 0, 1),
+      THREE.MathUtils.clamp(hsl.l * (1 + (v - 1) * 0.05), 0.02, 0.98),
+    );
+    m.roughness = THREE.MathUtils.clamp((m.roughness ?? 0.9) + (v - 1) * 0.05, 0.2, 1);
+    m.userData.facadeVariant = v;
+    this._facadeCache.set(key, m);
+    return m;
   }
 
   _damage(x, z, w, h, d, rot, amount, gy) {
@@ -638,7 +690,13 @@ export class Level {
       for (const m of list) {
         if (!m || seen.has(m)) continue;
         seen.add(m);
-        const preset = (o.name || '').startsWith('prop:') ? 'prop' : 'level';
+        // Ground surfaces are the ones that read as a repeating photograph from
+        // eye height, so they get the extra world-space detail octaves. Every
+        // other material keeps the flat `level` preset it had.
+        const key = m.name?.startsWith('pbr:') ? m.name.slice(4) : '';
+        const preset = /^(sand|terrain|rubble)$/.test(key)
+          ? { ...Materials.PRESETS.level, detail: 1 }
+          : (o.name || '').startsWith('prop:') ? 'prop' : 'level';
         this.mats.applyUnify(m, preset);
       }
     });
